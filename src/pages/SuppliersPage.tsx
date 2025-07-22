@@ -1,0 +1,397 @@
+import React, { useState } from "react";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { Search, Plus, Filter, Eye, Edit3, Trash2, Building2, Phone, Mail, MapPin, Star, TrendingUp, Package, Clock } from "lucide-react";
+import styles from "./SuppliersPage.module.css";
+
+interface Supplier {
+  id: string;
+  name: string;
+  contact: string;
+  email: string;
+  phone: string;
+  address: string;
+  category: string;
+  rating: number;
+  status: "active" | "inactive" | "pending";
+  totalOrders: number;
+  totalAmount: number;
+  lastOrderDate: string;
+  paymentTerms: string;
+  leadTime: number;
+}
+
+const mockSuppliers: Supplier[] = [
+  {
+    id: "1",
+    name: "㈜테크부품",
+    contact: "김철수",
+    email: "sales@techparts.co.kr",
+    phone: "02-123-4567",
+    address: "서울시 강남구 테헤란로 123",
+    category: "전자부품",
+    rating: 4.8,
+    status: "active",
+    totalOrders: 45,
+    totalAmount: 12500000,
+    lastOrderDate: "2024-01-15",
+    paymentTerms: "월말 결제",
+    leadTime: 7,
+  },
+  {
+    id: "2",
+    name: "글로벌머티리얼",
+    contact: "이영희",
+    email: "order@globalmaterial.com",
+    phone: "031-987-6543",
+    address: "경기도 성남시 분당구 판교로 456",
+    category: "원재료",
+    rating: 4.5,
+    status: "active",
+    totalOrders: 32,
+    totalAmount: 8200000,
+    lastOrderDate: "2024-01-16",
+    paymentTerms: "현금 결제",
+    leadTime: 10,
+  },
+  {
+    id: "3",
+    name: "스마트솔루션",
+    contact: "박지민",
+    email: "contact@smartsol.kr",
+    phone: "02-555-7890",
+    address: "서울시 마포구 월드컵북로 789",
+    category: "소프트웨어",
+    rating: 4.9,
+    status: "active",
+    totalOrders: 18,
+    totalAmount: 15600000,
+    lastOrderDate: "2024-01-17",
+    paymentTerms: "선금 결제",
+    leadTime: 14,
+  },
+  {
+    id: "4",
+    name: "프리미엄공급",
+    contact: "최민수",
+    email: "sales@premium.co.kr",
+    phone: "051-222-3333",
+    address: "부산시 해운대구 센텀중앙로 101",
+    category: "사무용품",
+    rating: 4.2,
+    status: "active",
+    totalOrders: 67,
+    totalAmount: 5400000,
+    lastOrderDate: "2024-01-10",
+    paymentTerms: "월말 결제",
+    leadTime: 5,
+  },
+  {
+    id: "5",
+    name: "인더스트리얼파츠",
+    contact: "정수현",
+    email: "info@industrial.kr",
+    phone: "032-777-8888",
+    address: "인천시 연수구 송도국제도시 202",
+    category: "기계부품",
+    rating: 3.8,
+    status: "pending",
+    totalOrders: 12,
+    totalAmount: 3200000,
+    lastOrderDate: "2024-01-18",
+    paymentTerms: "현금 결제",
+    leadTime: 21,
+  },
+];
+
+const statusConfig = {
+  active: { label: "활성", color: "success" },
+  inactive: { label: "비활성", color: "secondary" },
+  pending: { label: "검토중", color: "default" },
+};
+
+export const SuppliersPage: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+
+  const filteredSuppliers = mockSuppliers.filter((supplier) => {
+    const matchesSearch =
+      supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supplier.contact.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supplier.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || supplier.status === statusFilter;
+    const matchesCategory = categoryFilter === "all" || supplier.category === categoryFilter;
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency: "KRW",
+    }).format(amount);
+  };
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => <Star key={i} className={`${styles.star} ${i < Math.floor(rating) ? styles.starFilled : ""}`} />);
+  };
+
+  const categories = [...new Set(mockSuppliers.map((s) => s.category))];
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <div className={styles.headerContent}>
+          <div className={styles.titleSection}>
+            <h1 className={styles.title}>공급업체 관리</h1>
+            <p className={styles.subtitle}>공급업체 정보를 관리하고 성과를 모니터링하세요</p>
+          </div>
+          <Button className={styles.addButton}>
+            <Plus className={styles.icon} />
+            신규 공급업체
+          </Button>
+        </div>
+
+        <div className={styles.statsGrid}>
+          <Card className={styles.statCard}>
+            <div className={styles.statContent}>
+              <div className={styles.statInfo}>
+                <span className={styles.statLabel}>총 공급업체</span>
+                <span className={styles.statValue}>{mockSuppliers.length}개</span>
+              </div>
+              <div className={styles.statIcon}>
+                <Building2 />
+              </div>
+            </div>
+          </Card>
+          <Card className={styles.statCard}>
+            <div className={styles.statContent}>
+              <div className={styles.statInfo}>
+                <span className={styles.statLabel}>활성 공급업체</span>
+                <span className={styles.statValue}>{mockSuppliers.filter((s) => s.status === "active").length}개</span>
+              </div>
+              <div className={styles.statIcon}>
+                <TrendingUp />
+              </div>
+            </div>
+          </Card>
+          <Card className={styles.statCard}>
+            <div className={styles.statContent}>
+              <div className={styles.statInfo}>
+                <span className={styles.statLabel}>평균 평점</span>
+                <span className={styles.statValue}>{(mockSuppliers.reduce((sum, s) => sum + s.rating, 0) / mockSuppliers.length).toFixed(1)}</span>
+              </div>
+              <div className={styles.statIcon}>
+                <Star />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className={styles.controls}>
+          <div className={styles.searchBox}>
+            <Search className={styles.searchIcon} />
+            <Input
+              placeholder="공급업체명, 담당자명으로 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+
+          <div className={styles.filterSection}>
+            <Filter className={styles.filterIcon} />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={styles.filterSelect}>
+              <option value="all">모든 상태</option>
+              <option value="active">활성</option>
+              <option value="inactive">비활성</option>
+              <option value="pending">검토중</option>
+            </select>
+
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={styles.filterSelect}>
+              <option value="all">모든 카테고리</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.content}>
+        <div className={styles.suppliersGrid}>
+          {filteredSuppliers.map((supplier) => (
+            <Card key={supplier.id} className={styles.supplierCard}>
+              <div className={styles.cardHeader}>
+                <div className={styles.supplierInfo}>
+                  <h3 className={styles.supplierName}>{supplier.name}</h3>
+                  <div className={styles.statusSection}>
+                    <Badge variant={statusConfig[supplier.status]?.color as any} className={styles.statusBadge}>
+                      {statusConfig[supplier.status]?.label}
+                    </Badge>
+                    <div className={styles.rating}>
+                      {renderStars(supplier.rating)}
+                      <span className={styles.ratingValue}>{supplier.rating}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.cardActions}>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedSupplier(supplier)}>
+                    <Eye className={styles.actionIcon} />
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <Edit3 className={styles.actionIcon} />
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <Trash2 className={styles.actionIcon} />
+                  </Button>
+                </div>
+              </div>
+
+              <div className={styles.cardBody}>
+                <div className={styles.contactInfo}>
+                  <div className={styles.contactItem}>
+                    <Phone className={styles.contactIcon} />
+                    <span>{supplier.phone}</span>
+                  </div>
+                  <div className={styles.contactItem}>
+                    <Mail className={styles.contactIcon} />
+                    <span>{supplier.email}</span>
+                  </div>
+                  <div className={styles.contactItem}>
+                    <MapPin className={styles.contactIcon} />
+                    <span>{supplier.address}</span>
+                  </div>
+                </div>
+
+                <div className={styles.businessInfo}>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>카테고리</span>
+                    <span className={styles.infoValue}>{supplier.category}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>담당자</span>
+                    <span className={styles.infoValue}>{supplier.contact}</span>
+                  </div>
+                  <div className={styles.infoItem}>
+                    <span className={styles.infoLabel}>리드타임</span>
+                    <span className={styles.infoValue}>{supplier.leadTime}일</span>
+                  </div>
+                </div>
+
+                <div className={styles.performanceInfo}>
+                  <div className={styles.performanceItem}>
+                    <Package className={styles.performanceIcon} />
+                    <div className={styles.performanceData}>
+                      <span className={styles.performanceLabel}>총 주문</span>
+                      <span className={styles.performanceValue}>{supplier.totalOrders}건</span>
+                    </div>
+                  </div>
+                  <div className={styles.performanceItem}>
+                    <TrendingUp className={styles.performanceIcon} />
+                    <div className={styles.performanceData}>
+                      <span className={styles.performanceLabel}>거래액</span>
+                      <span className={styles.performanceValue}>{formatCurrency(supplier.totalAmount)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {selectedSupplier && (
+        <div className={styles.modal} onClick={() => setSelectedSupplier(null)}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>공급업체 상세 정보</h2>
+              <Button variant="ghost" onClick={() => setSelectedSupplier(null)} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.detailSection}>
+                <h3>기본 정보</h3>
+                <div className={styles.detailGrid}>
+                  <div className={styles.detailRow}>
+                    <span>업체명:</span>
+                    <span>{selectedSupplier.name}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>담당자:</span>
+                    <span>{selectedSupplier.contact}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>카테고리:</span>
+                    <span>{selectedSupplier.category}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>상태:</span>
+                    <Badge variant={statusConfig[selectedSupplier.status]?.color as any}>{statusConfig[selectedSupplier.status]?.label}</Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.detailSection}>
+                <h3>연락처 정보</h3>
+                <div className={styles.detailGrid}>
+                  <div className={styles.detailRow}>
+                    <span>전화번호:</span>
+                    <span>{selectedSupplier.phone}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>이메일:</span>
+                    <span>{selectedSupplier.email}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>주소:</span>
+                    <span>{selectedSupplier.address}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.detailSection}>
+                <h3>거래 정보</h3>
+                <div className={styles.detailGrid}>
+                  <div className={styles.detailRow}>
+                    <span>평점:</span>
+                    <div className={styles.ratingDetail}>
+                      {renderStars(selectedSupplier.rating)}
+                      <span>{selectedSupplier.rating}</span>
+                    </div>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>총 주문 건수:</span>
+                    <span>{selectedSupplier.totalOrders}건</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>총 거래액:</span>
+                    <span className={styles.totalAmount}>{formatCurrency(selectedSupplier.totalAmount)}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>결제 조건:</span>
+                    <span>{selectedSupplier.paymentTerms}</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>리드타임:</span>
+                    <span>{selectedSupplier.leadTime}일</span>
+                  </div>
+                  <div className={styles.detailRow}>
+                    <span>최근 주문일:</span>
+                    <span>{selectedSupplier.lastOrderDate}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+};

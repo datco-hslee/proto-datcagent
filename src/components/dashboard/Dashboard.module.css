@@ -1,0 +1,257 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 0;
+}
+
+.page_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.header_content h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  background: linear-gradient(135deg, #1f2937, #374151);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 0.5rem;
+}
+
+.header_content p {
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.status_badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.status_dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 9999px;
+  background-color: #10b981;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.metrics_grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .metrics_grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .metrics_grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.content_grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .content_grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .content_grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.col_span_1 {
+  grid-column: span 1;
+}
+
+.col_span_2 {
+  grid-column: span 2;
+}
+
+@media (min-width: 1024px) {
+  .col_span_2 {
+    grid-column: span 2;
+  }
+}
+
+.todo_item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid;
+  margin-bottom: 0.75rem;
+  transition: all 0.2s;
+}
+
+.todo_item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.todo_urgent {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+}
+
+.todo_warning {
+  background-color: #fffbeb;
+  border-color: #fed7aa;
+}
+
+.todo_info {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.todo_content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.todo_text h4 {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.125rem;
+}
+
+.todo_text p {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.activity_item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1rem;
+}
+
+.activity_item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.activity_dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 9999px;
+  margin-top: 0.5rem;
+  flex-shrink: 0;
+}
+
+.activity_content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity_content h4 {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.125rem;
+}
+
+.activity_content p {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.progress_item {
+  margin-bottom: 1rem;
+}
+
+.progress_item:last-child {
+  margin-bottom: 0;
+}
+
+.progress_header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.progress_bar {
+  width: 100%;
+  background-color: #f3f4f6;
+  border-radius: 9999px;
+  height: 0.5rem;
+  overflow: hidden;
+}
+
+.progress_fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.chart_container {
+  height: 8rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.chart_bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.chart_fill {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-radius: 0.25rem 0.25rem 0 0;
+  width: 100%;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.chart_fill:hover {
+  background-color: rgba(59, 130, 246, 0.3);
+}
+
+.chart_label {
+  font-size: 0.75rem;
+  color: #6b7280;
+}

@@ -1,0 +1,111 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Sizes */
+.size-default {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.size-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+
+.size-lg {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.size-icon {
+  padding: 0.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+/* Variants */
+.variant-default {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+}
+
+.variant-default:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+}
+
+.variant-destructive {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+}
+
+.variant-destructive:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+}
+
+.variant-outline {
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #1e293b;
+}
+
+.variant-outline:hover:not(:disabled) {
+  background: rgba(248, 250, 252, 0.8);
+  border-color: #3b82f6;
+}
+
+.variant-secondary {
+  background: rgba(248, 250, 252, 0.8);
+  color: #1e293b;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.variant-secondary:hover:not(:disabled) {
+  background: rgba(241, 245, 249, 0.9);
+}
+
+.variant-ghost {
+  background: transparent;
+  color: #64748b;
+}
+
+.variant-ghost:hover:not(:disabled) {
+  background: rgba(248, 250, 252, 0.8);
+  color: #1e293b;
+}
+
+.variant-link {
+  background: transparent;
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.variant-link:hover:not(:disabled) {
+  color: #1d4ed8;
+  text-decoration: none;
+}
