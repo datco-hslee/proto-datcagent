@@ -1,15 +1,15 @@
-import React from "react";
-import styles from "./Badge.module.css";
+import * as React from "react";
+import styles from "./badge.module.css";
+import { cn } from "@/lib/utils";
 
-interface BadgeProps {
-  children: React.ReactNode;
-  variant?: "default" | "secondary" | "destructive" | "outline" | "success";
-  className?: string;
+export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: "default" | "secondary" | "destructive" | "outline";
 }
 
-export const Badge: React.FC<BadgeProps> = ({ children, variant = "default", className = "" }) => {
-  const baseClasses = styles.badge;
-  const variantClass = styles[`variant-${variant}`] || styles["variant-default"];
+function Badge({ className, variant = "default", ...props }: BadgeProps) {
+  const variantClass = variant === "default" ? styles.default : styles[variant];
 
-  return <span className={`${baseClasses} ${variantClass} ${className}`}>{children}</span>;
-};
+  return <div className={cn(styles.badge, variantClass, className)} {...props} />;
+}
+
+export { Badge };

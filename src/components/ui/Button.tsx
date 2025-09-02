@@ -1,21 +1,18 @@
-import React from "react";
-import styles from "./Button.module.css";
+import * as React from "react";
+import styles from "./button.module.css";
+import { cn } from "@/lib/utils";
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  children: React.ReactNode;
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
   size?: "default" | "sm" | "lg" | "icon";
-  className?: string;
 }
 
-export const Button: React.FC<ButtonProps> = ({ children, variant = "default", size = "default", className = "", ...props }) => {
-  const baseClasses = styles.button;
-  const variantClass = styles[`variant-${variant}`] || styles["variant-default"];
-  const sizeClass = styles[`size-${size}`] || styles["size-default"];
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant = "default", size = "default", ...props }, ref) => {
+  const variantClass = variant === "default" ? styles.default : styles[variant];
+  const sizeClass = size === "default" ? styles.default_size : styles[size];
 
-  return (
-    <button className={`${baseClasses} ${variantClass} ${sizeClass} ${className}`} {...props}>
-      {children}
-    </button>
-  );
-};
+  return <button className={cn(styles.button, variantClass, sizeClass, className)} ref={ref} {...props} />;
+});
+Button.displayName = "Button";
+
+export { Button };

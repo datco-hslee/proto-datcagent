@@ -1,45 +1,53 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: 0.5rem;
+  border-radius: 9999px;
   border: 1px solid transparent;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s;
   line-height: 1;
-  transition: all 0.3s ease;
+}
+
+.badge:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #3b82f6;
 }
 
 /* Variants */
-.variant-default {
-  background: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.2);
+.default {
+  border-color: transparent;
+  background-color: #3b82f6;
+  color: white;
 }
 
-.variant-secondary {
-  background: rgba(100, 116, 139, 0.1);
-  color: #475569;
-  border-color: rgba(100, 116, 139, 0.2);
+.default:hover {
+  background-color: #2563eb;
 }
 
-.variant-destructive {
-  background: rgba(220, 38, 38, 0.1);
-  color: #dc2626;
-  border-color: rgba(220, 38, 38, 0.2);
+.secondary {
+  border-color: transparent;
+  background-color: #f3f4f6;
+  color: #111827;
 }
 
-.variant-outline {
-  background: transparent;
-  color: #64748b;
-  border-color: rgba(100, 116, 139, 0.3);
+.secondary:hover {
+  background-color: #e5e7eb;
 }
 
-.variant-success {
-  background: rgba(5, 150, 105, 0.1);
-  color: #059669;
-  border-color: rgba(5, 150, 105, 0.2);
+.destructive {
+  border-color: transparent;
+  background-color: #dc2626;
+  color: white;
+}
+
+.destructive:hover {
+  background-color: #b91c1c;
+}
+
+.outline {
+  color: #111827;
+  border-color: #d1d5db;
+  background-color: transparent;
 }
