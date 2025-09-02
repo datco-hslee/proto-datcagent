@@ -2,7 +2,7 @@
   padding: 2rem;
   max-width: 1400px;
   margin: 0 auto;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0), rgb(255, 255, 255));
   min-height: 100vh;
 }
 
@@ -20,14 +20,12 @@
 .titleSection h1 {
   font-size: 2.5rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #000000;
   margin-bottom: 0.5rem;
 }
 
 .titleSection p {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(0, 0, 0, 0.8);
   font-size: 1.1rem;
 }
 
@@ -83,14 +81,14 @@
 
 .statLabel {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgb(14, 0, 0);
   margin-bottom: 0.25rem;
 }
 
 .statValue {
   font-size: 1.5rem;
   font-weight: 700;
-  color: white;
+  color: rgb(0, 0, 0);
 }
 
 .statIcon {
@@ -119,16 +117,16 @@
   transform: translateY(-50%);
   width: 1rem;
   height: 1rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(0, 0, 0, 0.7);
   z-index: 1;
 }
 
 .searchInput {
   width: 100%;
   padding-left: 3rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  color: black;
 }
 
 .filterSection {
@@ -140,13 +138,13 @@
 .filterIcon {
   width: 1rem;
   height: 1rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(0, 0, 0, 0.7);
 }
 
 .filterSelect {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  color: black;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
   min-width: 150px;
@@ -163,9 +161,9 @@
 }
 
 .reportCard {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 1rem;
   padding: 1.5rem;
   transition: all 0.3s ease;
@@ -186,7 +184,7 @@
 .reportInfo h3 {
   font-size: 1.2rem;
   font-weight: 600;
-  color: white;
+  color: black;
   margin-bottom: 0.5rem;
 }
 
@@ -229,7 +227,7 @@
 
 .description {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(0, 0, 0, 0.8);
   line-height: 1.4;
 }
 
@@ -259,7 +257,7 @@
 
 .dataLabel {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(0, 0, 0, 0.7);
 }
 
 .trendUp {
@@ -276,7 +274,7 @@
 
 .dataValue {
   font-size: 1rem;
-  color: white;
+  color: black;
   font-weight: 600;
   margin-bottom: 0.25rem;
 }
@@ -295,7 +293,7 @@
 }
 
 .dataChange.neutral {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(0, 0, 0, 0.7);
 }
 
 .metaInfo {
@@ -324,13 +322,13 @@
 
 .metaLabel {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(0, 0, 0, 0.7);
   margin-bottom: 0.125rem;
 }
 
 .metaValue {
   font-size: 0.85rem;
-  color: white;
+  color: black;
   font-weight: 500;
 }
 
@@ -346,11 +344,11 @@
 
 .tag {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.1);
+  color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.1);
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
 /* Modal styles */
@@ -369,9 +367,9 @@
 }
 
 .modalContent {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(255, 255, 255);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: 1rem;
   max-width: 800px;
   width: 100%;
@@ -385,19 +383,19 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .modalTitle {
   font-size: 1.5rem;
   font-weight: 600;
-  color: white;
+  color: #1e293b;
 }
 
 .closeButton {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(0, 0, 0, 0.7);
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0.5rem;
@@ -406,8 +404,8 @@
 }
 
 .closeButton:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: rgba(0, 0, 0, 0.1);
+  color: black;
 }
 
 .modalBody {
@@ -421,12 +419,12 @@
 .reportMainInfo h3 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: white;
+  color: #1e293b;
   margin-bottom: 0.5rem;
 }
 
 .reportDescription {
-  color: rgba(255, 255, 255, 0.8);
+  color: #475569;
   margin-bottom: 0.75rem;
   line-height: 1.4;
 }
@@ -444,7 +442,7 @@
 .modalDataSection h4 {
   font-size: 1rem;
   font-weight: 600;
-  color: white;
+  color: #1e293b;
   margin-bottom: 1rem;
 }
 
@@ -455,7 +453,7 @@
 }
 
 .modalDataItem {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.05);
   padding: 1rem;
   border-radius: 0.5rem;
   display: flex;
@@ -471,12 +469,12 @@
 
 .modalDataLabel {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: #475569;
 }
 
 .modalDataValue {
   font-size: 1.25rem;
-  color: white;
+  color: #1e293b;
   font-weight: 600;
   margin-bottom: 0.25rem;
 }
@@ -495,7 +493,7 @@
 }
 
 .modalDataChange.neutral {
-  color: rgba(255, 255, 255, 0.7);
+  color: #475569;
 }
 
 .modalInfoSection {
@@ -505,7 +503,7 @@
 .modalInfoSection h4 {
   font-size: 1rem;
   font-weight: 600;
-  color: white;
+  color: #1e293b;
   margin-bottom: 1rem;
 }
 
@@ -520,17 +518,17 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .modalInfoRow span:first-child {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: #475569;
 }
 
 .modalInfoRow span:last-child {
   font-size: 0.9rem;
-  color: white;
+  color: #1e293b;
   font-weight: 500;
 }
 
@@ -544,4 +542,76 @@
 .modalActions .actionIcon {
   width: 1rem;
   height: 1rem;
+}
+
+/* Form styles for create modal */
+.formGroup {
+  margin-bottom: 1.5rem;
+}
+
+.formLabel {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.formInput {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0.5rem;
+  background: white;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.formSelect {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0.5rem;
+  background: white;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.formSelect:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.formTextarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0.5rem;
+  background: white;
+  color: #1e293b;
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.formTextarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.formActions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
 }

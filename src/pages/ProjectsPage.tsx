@@ -9,6 +9,7 @@ import {
   Filter,
   Eye,
   Edit3,
+  Trash2,
   Users,
   Calendar,
   Target,
@@ -154,8 +155,29 @@ export const ProjectsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [newProject, setNewProject] = useState<Partial<Project>>({
+    name: "",
+    description: "",
+    status: "planning",
+    priority: "medium",
+    progress: 0,
+    startDate: "",
+    endDate: "",
+    budget: 0,
+    spent: 0,
+    manager: "",
+    teamMembers: [],
+    category: "",
+    client: "",
+    milestones: 0,
+    completedMilestones: 0
+  });
 
-  const filteredProjects = mockProjects.filter((project) => {
+  const filteredProjects = projects.filter((project) => {
     const matchesSearch =
       project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -178,12 +200,113 @@ export const ProjectsPage: React.FC = () => {
     return <StatusIcon className={styles.statusIcon} />;
   };
 
+  // 새 프로젝트 추가 함수
+  const handleAddProject = () => {
+    if (newProject.name && newProject.description) {
+      const project: Project = {
+        id: Date.now().toString(),
+        name: newProject.name,
+        description: newProject.description,
+        status: newProject.status as Project['status'],
+        priority: newProject.priority as Project['priority'],
+        progress: newProject.progress || 0,
+        startDate: newProject.startDate || "",
+        endDate: newProject.endDate || "",
+        budget: newProject.budget || 0,
+        spent: newProject.spent || 0,
+        manager: newProject.manager || "",
+        teamMembers: newProject.teamMembers || [],
+        category: newProject.category || "",
+        client: newProject.client || "",
+        milestones: newProject.milestones || 0,
+        completedMilestones: newProject.completedMilestones || 0
+      };
+      setProjects([...projects, project]);
+      setNewProject({
+        name: "",
+        description: "",
+        status: "planning",
+        priority: "medium",
+        progress: 0,
+        startDate: "",
+        endDate: "",
+        budget: 0,
+        spent: 0,
+        manager: "",
+        teamMembers: [],
+        category: "",
+        client: "",
+        milestones: 0,
+        completedMilestones: 0
+      });
+      setShowNewProjectModal(false);
+    }
+  };
+
+  // 프로젝트 수정 함수
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+    setNewProject(project);
+    setShowEditModal(true);
+  };
+
+  // 프로젝트 삭제 함수
+  const handleDeleteProject = (projectId: string) => {
+    if (window.confirm("정말로 이 프로젝트를 삭제하시겠습니까?")) {
+      setProjects(projects.filter(project => project.id !== projectId));
+      console.log("프로젝트 삭제됨:", projectId);
+    }
+  };
+
+  const handleUpdateProject = () => {
+    if (editingProject && newProject.name && newProject.description) {
+      const updatedProject: Project = {
+        ...editingProject,
+        name: newProject.name,
+        description: newProject.description,
+        status: newProject.status as Project['status'],
+        priority: newProject.priority as Project['priority'],
+        progress: newProject.progress || 0,
+        startDate: newProject.startDate || "",
+        endDate: newProject.endDate || "",
+        budget: newProject.budget || 0,
+        spent: newProject.spent || 0,
+        manager: newProject.manager || "",
+        teamMembers: newProject.teamMembers || [],
+        category: newProject.category || "",
+        client: newProject.client || "",
+        milestones: newProject.milestones || 0,
+        completedMilestones: newProject.completedMilestones || 0
+      };
+      setProjects(projects.map(p => p.id === editingProject.id ? updatedProject : p));
+      setShowEditModal(false);
+      setEditingProject(null);
+      setNewProject({
+        name: "",
+        description: "",
+        status: "planning",
+        priority: "medium",
+        progress: 0,
+        startDate: "",
+        endDate: "",
+        budget: 0,
+        spent: 0,
+        manager: "",
+        teamMembers: [],
+        category: "",
+        client: "",
+        milestones: 0,
+        completedMilestones: 0
+      });
+    }
+  };
+
   // 통계 계산
-  const totalProjects = mockProjects.length;
-  const activeProjects = mockProjects.filter((p) => p.status === "active").length;
-  const totalBudget = mockProjects.reduce((sum, p) => sum + p.budget, 0);
-  const totalSpent = mockProjects.reduce((sum, p) => sum + p.spent, 0);
-  const averageProgress = Math.round(mockProjects.reduce((sum, p) => sum + p.progress, 0) / totalProjects);
+  const totalProjects = projects.length;
+  const activeProjects = projects.filter((p) => p.status === "active").length;
+  const totalBudget = projects.reduce((sum, p) => sum + p.budget, 0);
+  const totalSpent = projects.reduce((sum, p) => sum + p.spent, 0);
+  const averageProgress = totalProjects > 0 ? Math.round(projects.reduce((sum, p) => sum + p.progress, 0) / totalProjects) : 0;
 
   return (
     <div className={styles.container}>
@@ -193,7 +316,7 @@ export const ProjectsPage: React.FC = () => {
             <h1 className={styles.title}>프로젝트 관리</h1>
             <p className={styles.subtitle}>프로젝트 진행 상황을 관리하고 성과를 추적하세요</p>
           </div>
-          <Button className={styles.addButton}>
+          <Button className={styles.addButton} onClick={() => setShowNewProjectModal(true)}>
             <Plus className={styles.icon} />새 프로젝트
           </Button>
         </div>
@@ -299,8 +422,11 @@ export const ProjectsPage: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => setSelectedProject(project)}>
                     <Eye className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleEditProject(project)}>
                     <Edit3 className={styles.actionIcon} />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteProject(project.id)}>
+                    <Trash2 className={styles.actionIcon} />
                   </Button>
                 </div>
               </div>
@@ -472,6 +598,520 @@ export const ProjectsPage: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* 새 프로젝트 생성 모달 */}
+      {showNewProjectModal && (
+        <div className={styles.modal} onClick={() => setShowNewProjectModal(false)}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>새 프로젝트 생성</h2>
+              <Button variant="ghost" onClick={() => setShowNewProjectModal(false)} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.projectForm}>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>프로젝트명</label>
+                    <Input
+                      value={newProject.name || ""}
+                      onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+                      placeholder="프로젝트명을 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>카테고리</label>
+                    <Input
+                      value={newProject.category || ""}
+                      onChange={(e) => setNewProject({...newProject, category: e.target.value})}
+                      placeholder="카테고리를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>프로젝트 설명</label>
+                  <textarea
+                    value={newProject.description || ""}
+                    onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                    placeholder="프로젝트 설명을 입력하세요"
+                    className={styles.textArea}
+                    rows={3}
+                  />
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>상태</label>
+                    <select
+                      value={newProject.status || "planning"}
+                      onChange={(e) => setNewProject({...newProject, status: e.target.value as Project['status']})}
+                      className={styles.selectInput}
+                    >
+                      <option value="planning">계획중</option>
+                      <option value="active">진행중</option>
+                      <option value="onHold">보류</option>
+                      <option value="completed">완료</option>
+                      <option value="cancelled">취소</option>
+                    </select>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>우선순위</label>
+                    <select
+                      value={newProject.priority || "medium"}
+                      onChange={(e) => setNewProject({...newProject, priority: e.target.value as Project['priority']})}
+                      className={styles.selectInput}
+                    >
+                      <option value="low">낮음</option>
+                      <option value="medium">보통</option>
+                      <option value="high">높음</option>
+                      <option value="critical">긴급</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>시작일</label>
+                    <Input
+                      type="date"
+                      value={newProject.startDate || ""}
+                      onChange={(e) => setNewProject({...newProject, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>종료일</label>
+                    <Input
+                      type="date"
+                      value={newProject.endDate || ""}
+                      onChange={(e) => setNewProject({...newProject, endDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>예산 (원)</label>
+                    <Input
+                      type="number"
+                      value={newProject.budget || ""}
+                      onChange={(e) => setNewProject({...newProject, budget: Number(e.target.value)})}
+                      placeholder="예산을 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>진행률 (%)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={newProject.progress || ""}
+                      onChange={(e) => setNewProject({...newProject, progress: Number(e.target.value)})}
+                      placeholder="진행률을 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>매니저</label>
+                    <Input
+                      value={newProject.manager || ""}
+                      onChange={(e) => setNewProject({...newProject, manager: e.target.value})}
+                      placeholder="프로젝트 매니저를 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>클라이언트</label>
+                    <Input
+                      value={newProject.client || ""}
+                      onChange={(e) => setNewProject({...newProject, client: e.target.value})}
+                      placeholder="클라이언트를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>총 마일스톤</label>
+                    <Input
+                      type="number"
+                      value={newProject.milestones || ""}
+                      onChange={(e) => setNewProject({...newProject, milestones: Number(e.target.value)})}
+                      placeholder="마일스톤 수를 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>완료된 마일스톤</label>
+                    <Input
+                      type="number"
+                      value={newProject.completedMilestones || ""}
+                      onChange={(e) => setNewProject({...newProject, completedMilestones: Number(e.target.value)})}
+                      placeholder="완료된 마일스톤 수"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.modalActions}>
+                  <Button variant="ghost" onClick={() => setShowNewProjectModal(false)}>
+                    취소
+                  </Button>
+                  <Button onClick={handleAddProject}>
+                    프로젝트 생성
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* 프로젝트 편집 모달 */}
+      {showEditModal && (
+        <div className={styles.modal} onClick={() => setShowEditModal(false)}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>프로젝트 편집</h2>
+              <Button variant="ghost" onClick={() => setShowEditModal(false)} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.projectForm}>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>프로젝트명</label>
+                    <Input
+                      value={newProject.name || ""}
+                      onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+                      placeholder="프로젝트명을 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>카테고리</label>
+                    <Input
+                      value={newProject.category || ""}
+                      onChange={(e) => setNewProject({...newProject, category: e.target.value})}
+                      placeholder="카테고리를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>프로젝트 설명</label>
+                  <textarea
+                    value={newProject.description || ""}
+                    onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                    placeholder="프로젝트 설명을 입력하세요"
+                    className={styles.textArea}
+                    rows={3}
+                  />
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>상태</label>
+                    <select
+                      value={newProject.status || "planning"}
+                      onChange={(e) => setNewProject({...newProject, status: e.target.value as Project['status']})}
+                      className={styles.selectInput}
+                    >
+                      <option value="planning">계획중</option>
+                      <option value="active">진행중</option>
+                      <option value="onHold">보류</option>
+                      <option value="completed">완료</option>
+                      <option value="cancelled">취소</option>
+                    </select>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>우선순위</label>
+                    <select
+                      value={newProject.priority || "medium"}
+                      onChange={(e) => setNewProject({...newProject, priority: e.target.value as Project['priority']})}
+                      className={styles.selectInput}
+                    >
+                      <option value="low">낮음</option>
+                      <option value="medium">보통</option>
+                      <option value="high">높음</option>
+                      <option value="critical">긴급</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>시작일</label>
+                    <Input
+                      type="date"
+                      value={newProject.startDate || ""}
+                      onChange={(e) => setNewProject({...newProject, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>종료일</label>
+                    <Input
+                      type="date"
+                      value={newProject.endDate || ""}
+                      onChange={(e) => setNewProject({...newProject, endDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>예산 (원)</label>
+                    <Input
+                      type="number"
+                      value={newProject.budget || ""}
+                      onChange={(e) => setNewProject({...newProject, budget: Number(e.target.value)})}
+                      placeholder="예산을 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>사용 예산 (원)</label>
+                    <Input
+                      type="number"
+                      value={newProject.spent || ""}
+                      onChange={(e) => setNewProject({...newProject, spent: Number(e.target.value)})}
+                      placeholder="사용된 예산을 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>진행률 (%)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={newProject.progress || ""}
+                      onChange={(e) => setNewProject({...newProject, progress: Number(e.target.value)})}
+                      placeholder="진행률을 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>매니저</label>
+                    <Input
+                      value={newProject.manager || ""}
+                      onChange={(e) => setNewProject({...newProject, manager: e.target.value})}
+                      placeholder="프로젝트 매니저를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>클라이언트</label>
+                    <Input
+                      value={newProject.client || ""}
+                      onChange={(e) => setNewProject({...newProject, client: e.target.value})}
+                      placeholder="클라이언트를 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>총 마일스톤</label>
+                    <Input
+                      type="number"
+                      value={newProject.milestones || ""}
+                      onChange={(e) => setNewProject({...newProject, milestones: Number(e.target.value)})}
+                      placeholder="마일스톤 수를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.modalActions}>
+                  <Button variant="ghost" onClick={() => setShowNewProjectModal(false)}>
+                    취소
+                  </Button>
+                  <Button onClick={handleAddProject}>
+                    프로젝트 생성
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* 프로젝트 편집 모달 */}
+      {showEditModal && (
+        <div className={styles.modal} onClick={() => setShowEditModal(false)}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>프로젝트 편집</h2>
+              <Button variant="ghost" onClick={() => setShowEditModal(false)} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.projectForm}>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>프로젝트명</label>
+                    <Input
+                      value={newProject.name || ""}
+                      onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+                      placeholder="프로젝트명을 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>카테고리</label>
+                    <Input
+                      value={newProject.category || ""}
+                      onChange={(e) => setNewProject({...newProject, category: e.target.value})}
+                      placeholder="카테고리를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>프로젝트 설명</label>
+                  <textarea
+                    value={newProject.description || ""}
+                    onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                    placeholder="프로젝트 설명을 입력하세요"
+                    className={styles.textArea}
+                    rows={3}
+                  />
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>상태</label>
+                    <select
+                      value={newProject.status || "planning"}
+                      onChange={(e) => setNewProject({...newProject, status: e.target.value as Project['status']})}
+                      className={styles.selectInput}
+                    >
+                      <option value="planning">계획중</option>
+                      <option value="active">진행중</option>
+                      <option value="onHold">보류</option>
+                      <option value="completed">완료</option>
+                      <option value="cancelled">취소</option>
+                    </select>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>우선순위</label>
+                    <select
+                      value={newProject.priority || "medium"}
+                      onChange={(e) => setNewProject({...newProject, priority: e.target.value as Project['priority']})}
+                      className={styles.selectInput}
+                    >
+                      <option value="low">낮음</option>
+                      <option value="medium">보통</option>
+                      <option value="high">높음</option>
+                      <option value="critical">긴급</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>시작일</label>
+                    <Input
+                      type="date"
+                      value={newProject.startDate || ""}
+                      onChange={(e) => setNewProject({...newProject, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>종료일</label>
+                    <Input
+                      type="date"
+                      value={newProject.endDate || ""}
+                      onChange={(e) => setNewProject({...newProject, endDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>예산 (원)</label>
+                    <Input
+                      type="number"
+                      value={newProject.budget || ""}
+                      onChange={(e) => setNewProject({...newProject, budget: Number(e.target.value)})}
+                      placeholder="예산을 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>사용 예산 (원)</label>
+                    <Input
+                      type="number"
+                      value={newProject.spent || ""}
+                      onChange={(e) => setNewProject({...newProject, spent: Number(e.target.value)})}
+                      placeholder="사용된 예산을 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>진행률 (%)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={newProject.progress || ""}
+                      onChange={(e) => setNewProject({...newProject, progress: Number(e.target.value)})}
+                      placeholder="진행률을 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>매니저</label>
+                    <Input
+                      value={newProject.manager || ""}
+                      onChange={(e) => setNewProject({...newProject, manager: e.target.value})}
+                      placeholder="프로젝트 매니저를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>클라이언트</label>
+                    <Input
+                      value={newProject.client || ""}
+                      onChange={(e) => setNewProject({...newProject, client: e.target.value})}
+                      placeholder="클라이언트를 입력하세요"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>총 마일스톤</label>
+                    <Input
+                      type="number"
+                      value={newProject.milestones || ""}
+                      onChange={(e) => setNewProject({...newProject, milestones: Number(e.target.value)})}
+                      placeholder="마일스톤 수를 입력하세요"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>완료된 마일스톤</label>
+                  <Input
+                    type="number"
+                    value={newProject.completedMilestones || ""}
+                    onChange={(e) => setNewProject({...newProject, completedMilestones: Number(e.target.value)})}
+                    placeholder="완료된 마일스톤 수"
+                  />
+                </div>
+
+                <div className={styles.modalActions}>
+                  <Button variant="ghost" onClick={() => setShowEditModal(false)}>
+                    취소
+                  </Button>
+                  <Button onClick={handleUpdateProject}>
+                    프로젝트 수정
+                  </Button>
                 </div>
               </div>
             </div>

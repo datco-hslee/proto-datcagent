@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -28,14 +28,10 @@ import {
   Mail,
   Building2,
   Calendar,
-  DollarSign,
-  TrendingUp,
   MessageSquare,
   X,
-  Edit,
-  Eye
+  Edit
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -166,33 +162,34 @@ const MOCK_LEADS: Lead[] = [
   }
 ];
 
-// 드래그 앤 드롭 컴포넌트들
-function DroppableColumn({ stage, leads, selectedLead, onSelectLead }: {
+// 단계별 섹션 컴포넌트
+function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead }: {
   stage: typeof PIPELINE_STAGES[0];
   leads: Lead[];
   selectedLead: Lead | null;
   onSelectLead: (lead: Lead) => void;
+  onEditLead: (lead: Lead) => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: stage.id,
   });
 
   return (
-    <div ref={setNodeRef} className={styles.column}>
-      <div className={styles.columnHeader} style={{ borderTopColor: stage.color }}>
-        <div className={styles.columnHeaderContent}>
-          <h3 className={styles.columnTitle}>{stage.name}</h3>
-          <div className={styles.columnBadge} style={{ backgroundColor: stage.color }}>
+    <div className={styles.stageSection}>
+      <div className={styles.stageHeader} style={{ borderTopColor: stage.color }}>
+        <div className={styles.stageHeaderContent}>
+          <h3 className={styles.stageTitle}>{stage.name}</h3>
+          <div className={styles.stageBadge} style={{ backgroundColor: stage.color }}>
             {leads.length}
           </div>
         </div>
-        <div className={styles.columnProgress}>
+        <div className={styles.stageProgress}>
           <div
-            className={styles.columnProgressBar}
+            className={styles.stageProgressBar}
             style={{ backgroundColor: stage.color + '20' }}
           >
             <div
-              className={styles.columnProgressFill}
+              className={styles.stageProgressFill}
               style={{
                 backgroundColor: stage.color,
                 width: `${leads.length > 0 ? 100 : 0}%`
@@ -202,19 +199,21 @@ function DroppableColumn({ stage, leads, selectedLead, onSelectLead }: {
         </div>
       </div>
 
-      <div className={styles.columnContent}>
+      <div className={styles.stageContent} ref={setNodeRef}>
         <SortableContext items={leads.map(lead => lead.id)} strategy={verticalListSortingStrategy}>
-          {leads.map((lead) => (
-            <SortableLeadCard
-              key={lead.id}
-              lead={lead}
-              stage={stage}
-              onSelect={onSelectLead}
-              isSelected={selectedLead?.id === lead.id}
-            />
-          ))}
+          <div className={styles.stageCards}>
+            {leads.map((lead) => (
+              <SortableLeadCard
+                key={lead.id}
+                lead={lead}
+                stage={stage}
+                onSelect={onSelectLead}
+                isSelected={selectedLead?.id === lead.id}
+                onEdit={onEditLead}
+              />
+            ))}
+          </div>
         </SortableContext>
-
         {leads.length === 0 && (
           <div className={styles.emptyColumn}>
             <p className={styles.emptyText}>이 단계에는 아직 고객이 없습니다</p>
@@ -225,11 +224,12 @@ function DroppableColumn({ stage, leads, selectedLead, onSelectLead }: {
   );
 }
 
-function SortableLeadCard({ lead, stage, onSelect, isSelected }: {
+function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit }: {
   lead: Lead;
   stage: typeof PIPELINE_STAGES[0];
   onSelect: (lead: Lead) => void;
   isSelected: boolean;
+  onEdit: (lead: Lead) => void;
 }) {
   const {
     attributes,
@@ -291,17 +291,31 @@ function SortableLeadCard({ lead, stage, onSelect, isSelected }: {
 
       <div className={styles.leadCardFooter}>
         <div className={styles.leadCardTags}>
-          {lead.tags.slice(0, 2).map((tag, idx) => (
-            <span key={idx} className={styles.leadCardTag}>
+          {lead.tags.slice(0, 2).map((tag, index) => (
+            <span key={index} className={styles.leadCardTag}>
               {tag}
             </span>
           ))}
           {lead.tags.length > 2 && (
-            <span className={styles.leadCardTagMore}>+{lead.tags.length - 2}</span>
+            <span className={styles.leadCardTagMore}>
+              +{lead.tags.length - 2}
+            </span>
           )}
         </div>
-        <div className={styles.leadCardDate}>
-          {new Date(lead.updatedAt).toLocaleDateString()}
+        <div className={styles.leadCardActions}>
+          <span className={styles.leadCardDate}>
+            {new Date(lead.updatedAt).toLocaleDateString('ko-KR')}
+          </span>
+          <button 
+            className={styles.leadCardEditButton}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              onEdit(lead); 
+            }}
+            title="리드 편집"
+          >
+            <Edit className={styles.leadCardEditIcon} />
+          </button>
         </div>
       </div>
     </div>
@@ -330,6 +344,81 @@ export function CrmPipelinePage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showNewLeadModal, setShowNewLeadModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  
+  // 리드 편집 폼 데이터
+  const [editLeadForm, setEditLeadForm] = useState({
+    companyName: "",
+    contactPerson: "",
+    phone: "",
+    email: "",
+    estimatedValue: 0,
+    probability: 50,
+    tags: [] as string[],
+    stage: "prospect" as Lead["stage"],
+  });
+  
+  // 새 리드 폼 데이터
+  const [newLeadForm, setNewLeadForm] = useState({
+    customer: "",
+    company: "",
+    email: "",
+    phone: "",
+    value: "",
+    stage: "prospect" as Lead["stage"],
+    source: "웹사이트",
+    description: "",
+    expectedCloseDate: "",
+  });
+  
+  // 필터 상태
+  const [filters, setFilters] = useState({
+    stage: "전체",
+    priority: "전체",
+    source: "전체",
+    dateRange: "전체",
+    minValue: "",
+    maxValue: "",
+    assignedTo: "",
+  });
+
+  // 모달 닫기 함수들
+  const closeModals = () => {
+    setShowNewLeadModal(false);
+    setShowFilterModal(false);
+    setShowEditModal(false);
+    setShowActivityModal(false);
+    setEditingLead(null);
+  };
+
+  // 드래그 핸들러
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over) return;
+    
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    
+    // 리드를 새 단계로 이동
+    if (PIPELINE_STAGES.find(stage => stage.id === overId)) {
+      setLeads(leads.map(lead => 
+        lead.id === activeId 
+          ? { ...lead, stage: overId as Lead['stage'], updatedAt: new Date() }
+          : lead
+      ));
+    }
+    
+    setActiveId(null);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -339,289 +428,604 @@ export function CrmPipelinePage() {
     })
   );
 
-  // 검색 필터링
-  const filteredLeads = leads.filter(lead =>
-    lead.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // 단계별 리드 개수 계산
-  const stagesWithCounts = PIPELINE_STAGES.map(stage => ({
-    ...stage,
-    count: filteredLeads.filter(lead => lead.stage === stage.id).length
-  }));
-
-  // 단계별 리드 그룹핑
-  const getLeadsByStage = (stageId: string) => {
-    return filteredLeads.filter(lead => lead.stage === stageId);
+  // 새 영업 기회 추가
+  const handleAddNewLead = () => {
+    setShowNewLeadModal(true);
   };
 
-  // 총 예상 매출
-  const totalExpectedRevenue = filteredLeads.reduce((sum, lead) => {
-    return sum + (lead.estimatedValue * lead.probability / 100);
-  }, 0);
-
-  // 드래그 앤 드롭 핸들러
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    // 필요시 구현
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (!over) {
-      setActiveId(null);
+  const createNewLead = () => {
+    if (!newLeadForm.customer || !newLeadForm.company || !newLeadForm.email) {
+      alert('필수 항목을 모두 입력해주세요.');
       return;
     }
 
-    const leadId = active.id as string;
-    const newStage = over.id as string;
+    const newLead: Lead = {
+      id: `lead-${Date.now()}`,
+      companyName: newLeadForm.company,
+      contactPerson: newLeadForm.customer,
+      email: newLeadForm.email,
+      phone: newLeadForm.phone,
+      estimatedValue: parseInt(newLeadForm.value) || 0,
+      stage: newLeadForm.stage,
+      probability: 50,
+      source: newLeadForm.source,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      tags: [],
+      activities: [],
+    };
 
-    if (PIPELINE_STAGES.find(stage => stage.id === newStage)) {
-      setLeads(prevLeads =>
-        prevLeads.map(lead =>
-          lead.id === leadId
-            ? { ...lead, stage: newStage as Lead['stage'], updatedAt: new Date() }
-            : lead
-        )
-      );
+    setLeads([...leads, newLead]);
+    setShowNewLeadModal(false);
+    setNewLeadForm({
+      customer: "",
+      company: "",
+      email: "",
+      phone: "",
+      value: "",
+      stage: "prospect",
+      source: "웹사이트",
+      description: "",
+      expectedCloseDate: "",
+    });
+    alert('새 리드가 성공적으로 생성되었습니다.');
+  };
+
+
+  // 필터 모달 열기
+  const handleFilterClick = () => {
+    setShowFilterModal(true);
+  };
+
+  const applyFilters = () => {
+    setShowFilterModal(false);
+    alert('필터가 적용되었습니다.');
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      stage: "전체",
+      priority: "전체",
+      source: "전체",
+      dateRange: "전체",
+      minValue: "",
+      maxValue: "",
+      assignedTo: "",
+    });
+    setSearchTerm("");
+  };
+
+  // 리드 편집
+  const handleEditLead = (lead: Lead) => {
+    setEditingLead(lead);
+    setEditLeadForm({
+      companyName: lead.companyName,
+      contactPerson: lead.contactPerson,
+      phone: lead.phone,
+      email: lead.email,
+      estimatedValue: lead.estimatedValue,
+      probability: lead.probability,
+      tags: [...lead.tags],
+      stage: lead.stage
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEditLead = () => {
+    if (!editLeadForm.companyName || !editLeadForm.contactPerson) {
+      alert('필수 항목을 모두 입력해주세요.');
+      return;
     }
 
-    setActiveId(null);
+    const updatedLeads = leads.map(lead => 
+      lead.id === editingLead?.id 
+        ? { 
+            ...lead, 
+            ...editLeadForm,
+            updatedAt: new Date()
+          }
+        : lead
+    );
+
+    setLeads(updatedLeads);
+    setShowEditModal(false);
+    setEditingLead(null);
+    alert('리드 정보가 수정되었습니다.');
+  };
+
+  // 활동 추가
+  const handleAddActivity = (lead: Lead) => {
+    setEditingLead(lead);
+    setShowActivityModal(true);
+  };
+
+  // 통화 걸기
+  const handleCall = (lead: Lead) => {
+    // 실제 구현에서는 전화 시스템과 연동
+    alert(`${lead.contactPerson}(${lead.phone})에게 전화를 겁니다.`);
+  };
+
+  // 이메일 발송
+  const handleSendEmail = (lead: Lead) => {
+    // 실제 구현에서는 이메일 시스템과 연동
+    window.open(`mailto:${lead.email}?subject=영업 문의&body=안녕하세요 ${lead.contactPerson}님,`);
+  };
+
+  // 미팅 일정 잡기
+  const handleScheduleMeeting = (lead: Lead) => {
+    // 실제 구현에서는 캘린더 시스템과 연동
+    alert(`${lead.contactPerson}님과 미팅 일정을 잡습니다.`);
+  };
+
+  // 필터링 로직
+  const filteredLeads = leads.filter((lead) => {
+    const matchesSearch = searchTerm === "" || 
+      lead.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.contactPerson.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStage = filters.stage === "전체" || lead.stage === filters.stage;
+    const matchesSource = filters.source === "전체" || lead.source === filters.source;
+    
+    const minValue = filters.minValue ? parseInt(filters.minValue) : 0;
+    const maxValue = filters.maxValue ? parseInt(filters.maxValue) : Infinity;
+    const matchesValue = lead.estimatedValue >= minValue && lead.estimatedValue <= maxValue;
+
+    return matchesSearch && matchesStage && matchesSource && matchesValue;
+  });
+
+  // 단계별로 리드 그룹화
+  const getLeadsByStage = (stageId: string) => {
+    return filteredLeads.filter(lead => lead.stage === stageId);
   };
 
   return (
     <div className={styles.container}>
       {/* 헤더 */}
       <div className={styles.header}>
-        <div className={styles.headerContent}>
-          <div className={styles.headerTitleSection}>
-            <div className={styles.headerIcon}>
-              <Users />
-            </div>
-            <div>
-              <h1 className={styles.headerTitle}>CRM 파이프라인</h1>
-              <p className={styles.headerSubtitle}>영업 기회를 단계별로 관리하고 추적하세요</p>
-            </div>
-          </div>
-
-          <div className={styles.headerStats}>
-            <div className={styles.headerStat}>
-              <span className={styles.headerStatLabel}>총 예상 매출</span>
-              <span className={styles.headerStatValue}>
-                ₩{(totalExpectedRevenue / 100000000).toFixed(1)}억원
-              </span>
-            </div>
-          </div>
-
-          <Button className={styles.addButton}>
+        <div className={styles.headerLeft}>
+          <h1 className={styles.title}>CRM 파이프라인</h1>
+          <p className={styles.subtitle}>영업 기회를 관리하고 추적하세요</p>
+        </div>
+        <div className={styles.headerRight}>
+          <Button variant="outline" onClick={handleFilterClick}>
+            <Filter className="h-4 w-4 mr-2" />
+            필터
+          </Button>
+          <Button onClick={handleAddNewLead}>
             <Plus className="h-4 w-4 mr-2" />
             새 영업 기회
           </Button>
         </div>
       </div>
 
-      {/* 필터 및 검색 */}
-      <div className={styles.toolbar}>
-        <div className={styles.searchContainer}>
+      {/* 검색 */}
+      <div className={styles.searchContainer}>
+        <div className={styles.searchBox}>
           <Search className={styles.searchIcon} />
           <Input
-            placeholder="고객명, 담당자명으로 검색..."
+            type="text"
+            placeholder="고객명, 회사명으로 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className={styles.searchInput}
           />
         </div>
-        <Button variant="outline" className={styles.filterButton}>
-          <Filter className="h-4 w-4 mr-2" />
-          필터
-        </Button>
       </div>
 
-      {/* 파이프라인 통계 */}
-      <div className={styles.statsGrid}>
-        {stagesWithCounts.map((stage) => (
-          <div key={stage.id} className={styles.statCard}>
-            <div className={styles.statCardContent}>
-              <div
-                className={styles.statCardProgress}
-                style={{ backgroundColor: stage.color + '20' }}
+      {/* 파이프라인 보드 */}
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div className={styles.pipeline}>
+          {PIPELINE_STAGES.map((stage) => (
+            <StageSection
+              key={stage.id}
+              stage={stage}
+              leads={getLeadsByStage(stage.id)}
+              selectedLead={selectedLead}
+              onSelectLead={setSelectedLead}
+              onEditLead={handleEditLead}
+            />
+          ))}
+        </div>
+        <DragOverlay>
+          {activeId ? (
+            <SortableLeadCard
+              lead={leads.find(lead => lead.id === activeId)!}
+              stage={PIPELINE_STAGES[0]}
+              onSelect={() => {}}
+              onEdit={() => {}}
+              isSelected={false}
+            />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      {/* 리드 편집 모달 */}
+      {showEditModal && editingLead && (
+        <div className={styles.modalOverlay} onClick={() => setShowEditModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>리드 편집</h2>
+              <button
+                className={styles.modalCloseButton}
+                onClick={() => setShowEditModal(false)}
               >
-                <div
-                  className={styles.statCardProgressFill}
-                  style={{
-                    backgroundColor: stage.color,
-                    width: `${Math.min((stage.count / Math.max(...stagesWithCounts.map(s => s.count), 1)) * 100, 100)}%`
-                  }}
-                />
-              </div>
-              <p className={styles.statCardLabel}>{stage.name}</p>
-              <p className={styles.statCardValue} style={{ color: stage.color }}>
-                {stage.count}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* 칸반 보드 */}
-      <div className={styles.kanbanContainer}>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragOver={handleDragOver}
-        >
-          <div className={styles.kanbanBoard}>
-            {PIPELINE_STAGES.map((stage) => (
-              <DroppableColumn
-                key={stage.id}
-                stage={stage}
-                leads={getLeadsByStage(stage.id)}
-                selectedLead={selectedLead}
-                onSelectLead={setSelectedLead}
-              />
-            ))}
-          </div>
-
-          <DragOverlay>
-            {activeId ? (
-              <div className={styles.dragOverlay}>
-                {(() => {
-                  const draggedLead = leads.find(lead => lead.id === activeId);
-                  const draggedStage = PIPELINE_STAGES.find(stage =>
-                    leads.find(lead => lead.id === activeId)?.stage === stage.id
-                  );
-                  if (draggedLead && draggedStage) {
-                    return (
-                      <SortableLeadCard
-                        lead={draggedLead}
-                        stage={draggedStage}
-                        onSelect={() => {}}
-                        isSelected={false}
-                      />
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      </div>
-
-      {/* 사이드 패널 - 리드 상세 정보 */}
-      {selectedLead && (
-        <div className={styles.sidePanel}>
-          <div className={styles.sidePanelContent}>
-            {/* 패널 헤더 */}
-            <div className={styles.sidePanelHeader}>
-              <div className={styles.sidePanelHeaderContent}>
-                <h2 className={styles.sidePanelTitle}>{selectedLead.companyName}</h2>
-                <div className={styles.sidePanelHeaderActions}>
-                  <Button variant="outline" size="sm">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setSelectedLead(null)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <p className={styles.sidePanelSubtitle}>담당자: {selectedLead.contactPerson}</p>
+                <X className={styles.modalCloseIcon} />
+              </button>
             </div>
 
-            {/* 기본 정보 */}
-            <div className={styles.sidePanelSection}>
-              <h3 className={styles.sidePanelSectionTitle}>기본 정보</h3>
-              <div className={styles.sidePanelGrid}>
-                <div className={styles.sidePanelField}>
-                  <p className={styles.sidePanelFieldLabel}>이메일</p>
-                  <p className={styles.sidePanelFieldValue}>{selectedLead.email}</p>
+            <div className={styles.modalContent}>
+              <div className={styles.modalGrid}>
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel} data-required>회사명</label>
+                  <input
+                    type="text"
+                    className={styles.modalInput}
+                    value={editLeadForm.companyName}
+                    onChange={(e) => setEditLeadForm(prev => ({ ...prev, companyName: e.target.value }))}
+                    placeholder="회사명을 입력하세요"
+                    required
+                  />
                 </div>
-                <div className={styles.sidePanelField}>
-                  <p className={styles.sidePanelFieldLabel}>전화번호</p>
-                  <p className={styles.sidePanelFieldValue}>{selectedLead.phone}</p>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel} data-required>담당자명</label>
+                  <input
+                    type="text"
+                    className={styles.modalInput}
+                    value={editLeadForm.contactPerson}
+                    onChange={(e) => setEditLeadForm(prev => ({ ...prev, contactPerson: e.target.value }))}
+                    placeholder="담당자명을 입력하세요"
+                    required
+                  />
                 </div>
-                <div className={styles.sidePanelField}>
-                  <p className={styles.sidePanelFieldLabel}>예상 계약금액</p>
-                  <p className={styles.sidePanelFieldValue}>
-                    ₩{selectedLead.estimatedValue.toLocaleString()}
-                  </p>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>전화번호</label>
+                  <input
+                    type="tel"
+                    className={styles.modalInput}
+                    value={editLeadForm.phone}
+                    onChange={(e) => setEditLeadForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="전화번호를 입력하세요"
+                  />
                 </div>
-                <div className={styles.sidePanelField}>
-                  <p className={styles.sidePanelFieldLabel}>성공 확률</p>
-                  <p className={styles.sidePanelFieldValue}>{selectedLead.probability}%</p>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>이메일</label>
+                  <input
+                    type="email"
+                    className={styles.modalInput}
+                    value={editLeadForm.email}
+                    onChange={(e) => setEditLeadForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="이메일을 입력하세요"
+                  />
                 </div>
-                <div className={styles.sidePanelField}>
-                  <p className={styles.sidePanelFieldLabel}>리드 소스</p>
-                  <p className={styles.sidePanelFieldValue}>{selectedLead.source}</p>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>예상 거래액</label>
+                  <input
+                    type="number"
+                    className={styles.modalInput}
+                    value={editLeadForm.estimatedValue}
+                    onChange={(e) => setEditLeadForm(prev => ({ ...prev, estimatedValue: Number(e.target.value) }))}
+                    placeholder="예상 거래액을 입력하세요"
+                  />
                 </div>
-                <div className={styles.sidePanelField}>
-                  <p className={styles.sidePanelFieldLabel}>태그</p>
-                  <div className={styles.sidePanelTags}>
-                    {selectedLead.tags.map((tag, idx) => (
-                      <Badge key={idx} variant="secondary" className={styles.sidePanelTag}>
-                        {tag}
-                      </Badge>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>성공 확률 (%)</label>
+                  <input
+                    type="range"
+                    className={styles.modalRange}
+                    min="0"
+                    max="100"
+                    value={editLeadForm.probability}
+                    onChange={(e) => setEditLeadForm(prev => ({ ...prev, probability: Number(e.target.value) }))}
+                  />
+                  <span className={styles.modalRangeValue}>{editLeadForm.probability}%</span>
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>단계</label>
+                  <select
+                    className={styles.modalSelect}
+                    value={editLeadForm.stage}
+                    onChange={(e) => setEditLeadForm(prev => ({ ...prev, stage: e.target.value as Lead["stage"] }))}
+                  >
+                    <option value="prospect">잠재고객</option>
+                    <option value="qualified">검증완료</option>
+                    <option value="proposal">제안서 발송</option>
+                    <option value="negotiation">협상중</option>
+                    <option value="closed-won">성공</option>
+                    <option value="closed-lost">실패</option>
+                  </select>
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>태그</label>
+                  <input
+                    type="text"
+                    className={styles.modalInput}
+                    value={editLeadForm.tags.join(', ')}
+                    onChange={(e) => setEditLeadForm(prev => ({ 
+                      ...prev, 
+                      tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag) 
+                    }))}
+                    placeholder="태그를 쉼표로 구분하여 입력하세요"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.modalCancelButton}
+                onClick={() => setShowEditModal(false)}
+              >
+                취소
+              </button>
+              <button
+                className={styles.modalSaveButton}
+                onClick={handleSaveEditLead}
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 새 영업 기회 모달 */}
+      {showNewLeadModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowNewLeadModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>새 영업 기회 추가</h2>
+              <button
+                className={styles.modalCloseButton}
+                onClick={() => setShowNewLeadModal(false)}
+              >
+                <X className={styles.modalCloseIcon} />
+              </button>
+            </div>
+
+            <div className={styles.modalContent}>
+              <div className={styles.modalGrid}>
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel} data-required>회사명</label>
+                  <input
+                    type="text"
+                    className={styles.modalInput}
+                    value={newLeadForm.company}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, company: e.target.value }))}
+                    placeholder="회사명을 입력하세요"
+                    required
+                  />
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel} data-required>담당자명</label>
+                  <input
+                    type="text"
+                    className={styles.modalInput}
+                    value={newLeadForm.customer}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, customer: e.target.value }))}
+                    placeholder="담당자명을 입력하세요"
+                    required
+                  />
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>전화번호</label>
+                  <input
+                    type="tel"
+                    className={styles.modalInput}
+                    value={newLeadForm.phone}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="전화번호를 입력하세요"
+                  />
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>이메일</label>
+                  <input
+                    type="email"
+                    className={styles.modalInput}
+                    value={newLeadForm.email}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="이메일을 입력하세요"
+                  />
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>예상 거래금액</label>
+                  <input
+                    type="number"
+                    className={styles.modalInput}
+                    value={newLeadForm.value}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, value: e.target.value }))}
+                    placeholder="예상 거래금액을 입력하세요"
+                  />
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>파이프라인 단계</label>
+                  <select
+                    className={styles.modalSelect}
+                    value={newLeadForm.stage}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, stage: e.target.value as Lead["stage"] }))}
+                  >
+                    {PIPELINE_STAGES.map(stage => (
+                      <option key={stage.id} value={stage.id}>{stage.name}</option>
                     ))}
-                  </div>
+                  </select>
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>리드 소스</label>
+                  <select
+                    className={styles.modalSelect}
+                    value={newLeadForm.source}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, source: e.target.value }))}
+                  >
+                    <option value="웹사이트">웹사이트</option>
+                    <option value="전시회">전시회</option>
+                    <option value="추천">추천</option>
+                    <option value="광고">광고</option>
+                    <option value="기타">기타</option>
+                  </select>
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>예상 마감일</label>
+                  <input
+                    type="date"
+                    className={styles.modalInput}
+                    value={newLeadForm.expectedCloseDate}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, expectedCloseDate: e.target.value }))}
+                  />
+                </div>
+
+                <div className={styles.modalField} style={{ gridColumn: '1 / -1' }}>
+                  <label className={styles.modalLabel}>설명</label>
+                  <textarea
+                    className={styles.modalInput}
+                    value={newLeadForm.description}
+                    onChange={(e) => setNewLeadForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="추가 설명을 입력하세요"
+                    rows={3}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* 활동 타임라인 */}
-            <div className={styles.sidePanelSection}>
-              <div className={styles.sidePanelSectionHeader}>
-                <h3 className={styles.sidePanelSectionTitle}>활동 내역</h3>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  활동 추가
-                </Button>
-              </div>
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.modalCancelButton}
+                onClick={() => setShowNewLeadModal(false)}
+              >
+                취소
+              </button>
+              <button
+                className={styles.modalSaveButton}
+                onClick={createNewLead}
+              >
+                추가
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className={styles.activityList}>
-                {selectedLead.activities.length > 0 ? (
-                  selectedLead.activities.map((activity) => (
-                    <div key={activity.id} className={styles.activityItem}>
-                      <div className={styles.activityIcon}>
-                        {getActivityTypeIcon(activity.type)}
-                      </div>
-                      <div className={styles.activityContent}>
-                        <h4 className={styles.activityTitle}>{activity.title}</h4>
-                        <p className={styles.activityDescription}>{activity.description}</p>
-                        <p className={styles.activityTimestamp}>
-                          {new Date(activity.timestamp).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className={styles.activityEmpty}>
-                    <p className={styles.activityEmptyText}>아직 활동 내역이 없습니다.</p>
-                  </div>
-                )}
+      {/* 필터 모달 */}
+      {showFilterModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowFilterModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>필터 설정</h2>
+              <button
+                className={styles.modalCloseButton}
+                onClick={() => setShowFilterModal(false)}
+              >
+                <X className={styles.modalCloseIcon} />
+              </button>
+            </div>
+
+            <div className={styles.modalContent}>
+              <div className={styles.modalGrid}>
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>파이프라인 단계</label>
+                  <select
+                    className={styles.modalSelect}
+                    value={filters.stage}
+                    onChange={(e) => setFilters(prev => ({ ...prev, stage: e.target.value }))}
+                  >
+                    <option value="전체">전체</option>
+                    {PIPELINE_STAGES.map(stage => (
+                      <option key={stage.id} value={stage.id}>{stage.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>리드 소스</label>
+                  <select
+                    className={styles.modalSelect}
+                    value={filters.source}
+                    onChange={(e) => setFilters(prev => ({ ...prev, source: e.target.value }))}
+                  >
+                    <option value="전체">전체</option>
+                    <option value="웹사이트">웹사이트</option>
+                    <option value="전시회">전시회</option>
+                    <option value="추천">추천</option>
+                    <option value="광고">광고</option>
+                    <option value="기타">기타</option>
+                  </select>
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>최소 거래금액</label>
+                  <input
+                    type="number"
+                    className={styles.modalInput}
+                    value={filters.minValue}
+                    onChange={(e) => setFilters(prev => ({ ...prev, minValue: e.target.value }))}
+                    placeholder="최소 금액"
+                  />
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>최대 거래금액</label>
+                  <input
+                    type="number"
+                    className={styles.modalInput}
+                    value={filters.maxValue}
+                    onChange={(e) => setFilters(prev => ({ ...prev, maxValue: e.target.value }))}
+                    placeholder="최대 금액"
+                  />
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>기간</label>
+                  <select
+                    className={styles.modalSelect}
+                    value={filters.dateRange}
+                    onChange={(e) => setFilters(prev => ({ ...prev, dateRange: e.target.value }))}
+                  >
+                    <option value="전체">전체</option>
+                    <option value="오늘">오늘</option>
+                    <option value="이번 주">이번 주</option>
+                    <option value="이번 달">이번 달</option>
+                    <option value="지난 30일">지난 30일</option>
+                  </select>
+                </div>
+
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>담당자</label>
+                  <input
+                    type="text"
+                    className={styles.modalInput}
+                    value={filters.assignedTo}
+                    onChange={(e) => setFilters(prev => ({ ...prev, assignedTo: e.target.value }))}
+                    placeholder="담당자명"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* 액션 버튼 */}
-            <div className={styles.sidePanelActions}>
-              <Button className={styles.actionButton}>
-                <Phone className="h-4 w-4 mr-2" />
-                통화 걸기
-              </Button>
-              <Button variant="outline" className={styles.actionButton}>
-                <Mail className="h-4 w-4 mr-2" />
-                이메일 발송
-              </Button>
-              <Button variant="outline" className={styles.actionButton}>
-                <Calendar className="h-4 w-4 mr-2" />
-                미팅 일정 잡기
-              </Button>
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.modalCancelButton}
+                onClick={resetFilters}
+              >
+                초기화
+              </button>
+              <button
+                className={styles.modalSaveButton}
+                onClick={applyFilters}
+              >
+                적용
+              </button>
             </div>
           </div>
         </div>

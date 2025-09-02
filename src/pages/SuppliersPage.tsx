@@ -117,8 +117,26 @@ export const SuppliersPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [newSupplier, setNewSupplier] = useState<Partial<Supplier>>({
+    name: "",
+    contact: "",
+    email: "",
+    phone: "",
+    address: "",
+    category: "",
+    rating: 0,
+    status: "pending",
+    totalOrders: 0,
+    totalAmount: 0,
+    lastOrderDate: "",
+    paymentTerms: "",
+    leadTime: 0,
+  });
 
-  const filteredSuppliers = mockSuppliers.filter((supplier) => {
+  const filteredSuppliers = suppliers.filter((supplier) => {
     const matchesSearch =
       supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       supplier.contact.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -127,6 +145,76 @@ export const SuppliersPage: React.FC = () => {
     const matchesCategory = categoryFilter === "all" || supplier.category === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;
   });
+
+  // 신규 공급업체 생성
+  const handleCreateSupplier = () => {
+    setShowNewSupplierModal(true);
+    setEditingSupplier(null);
+    setNewSupplier({
+      name: "",
+      contact: "",
+      email: "",
+      phone: "",
+      address: "",
+      category: "",
+      rating: 0,
+      status: "pending",
+      totalOrders: 0,
+      totalAmount: 0,
+      lastOrderDate: new Date().toISOString().split('T')[0],
+      paymentTerms: "",
+      leadTime: 0,
+    });
+  };
+
+  // 공급업체 편집
+  const handleEditSupplier = (supplier: Supplier) => {
+    setEditingSupplier(supplier);
+    setNewSupplier(supplier);
+    setShowNewSupplierModal(true);
+  };
+
+  // 공급업체 삭제
+  const handleDeleteSupplier = (supplierId: string) => {
+    if (confirm("정말로 이 공급업체를 삭제하시겠습니까?")) {
+      setSuppliers(prev => prev.filter(supplier => supplier.id !== supplierId));
+      alert("공급업체가 삭제되었습니다.");
+    }
+  };
+
+  // 공급업체 저장
+  const handleSaveSupplier = () => {
+    if (!newSupplier.name || !newSupplier.contact || !newSupplier.email || !newSupplier.category) {
+      alert("필수 정보를 모두 입력해주세요.");
+      return;
+    }
+
+    if (editingSupplier) {
+      // 편집 모드
+      setSuppliers(prev => 
+        prev.map(supplier => 
+          supplier.id === editingSupplier.id 
+            ? { ...newSupplier, id: editingSupplier.id } as Supplier
+            : supplier
+        )
+      );
+      alert("공급업체 정보가 수정되었습니다.");
+    } else {
+      // 신규 생성 모드
+      const newId = String(suppliers.length + 1);
+      setSuppliers(prev => [...prev, { ...newSupplier, id: newId } as Supplier]);
+      alert("새로운 공급업체가 등록되었습니다.");
+    }
+
+    setShowNewSupplierModal(false);
+    setEditingSupplier(null);
+  };
+
+  // 모달 닫기
+  const handleCloseModal = () => {
+    setShowNewSupplierModal(false);
+    setEditingSupplier(null);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR", {
@@ -149,8 +237,8 @@ export const SuppliersPage: React.FC = () => {
             <h1 className={styles.title}>공급업체 관리</h1>
             <p className={styles.subtitle}>공급업체 정보를 관리하고 성과를 모니터링하세요</p>
           </div>
-          <Button className={styles.addButton}>
-            <Plus className={styles.icon} />
+          <Button className={styles.addButton} onClick={handleCreateSupplier}>
+            <Plus className={styles.addIcon} />
             신규 공급업체
           </Button>
         </div>
@@ -244,10 +332,10 @@ export const SuppliersPage: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => setSelectedSupplier(supplier)}>
                     <Eye className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleEditSupplier(supplier)}>
                     <Edit3 className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteSupplier(supplier.id)}>
                     <Trash2 className={styles.actionIcon} />
                   </Button>
                 </div>
@@ -387,6 +475,131 @@ export const SuppliersPage: React.FC = () => {
                     <span>{selectedSupplier.lastOrderDate}</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {showNewSupplierModal && (
+        <div className={styles.modal} onClick={handleCloseModal}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>
+                {editingSupplier ? "공급업체 수정" : "신규 공급업체 등록"}
+              </h2>
+              <Button variant="ghost" onClick={handleCloseModal} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label>업체명 *</label>
+                  <Input
+                    value={newSupplier.name || ""}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="업체명을 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>담당자 *</label>
+                  <Input
+                    value={newSupplier.contact || ""}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, contact: e.target.value }))}
+                    placeholder="담당자명을 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>이메일 *</label>
+                  <Input
+                    type="email"
+                    value={newSupplier.email || ""}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="이메일을 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>전화번호</label>
+                  <Input
+                    value={newSupplier.phone || ""}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="전화번호를 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>주소</label>
+                  <Input
+                    value={newSupplier.address || ""}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, address: e.target.value }))}
+                    placeholder="주소를 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>카테고리 *</label>
+                  <select
+                    value={newSupplier.category || ""}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, category: e.target.value }))}
+                    className={styles.formSelect}
+                  >
+                    <option value="">카테고리 선택</option>
+                    <option value="전자부품">전자부품</option>
+                    <option value="원재료">원재료</option>
+                    <option value="소프트웨어">소프트웨어</option>
+                    <option value="사무용품">사무용품</option>
+                    <option value="기계부품">기계부품</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>평점</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={newSupplier.rating || 0}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, rating: parseFloat(e.target.value) || 0 }))}
+                    placeholder="평점 (0-5)"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>상태</label>
+                  <select
+                    value={newSupplier.status || "pending"}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, status: e.target.value as any }))}
+                    className={styles.formSelect}
+                  >
+                    <option value="pending">검토중</option>
+                    <option value="active">활성</option>
+                    <option value="inactive">비활성</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>결제 조건</label>
+                  <Input
+                    value={newSupplier.paymentTerms || ""}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                    placeholder="결제 조건을 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>리드타임 (일)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={newSupplier.leadTime || 0}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, leadTime: parseInt(e.target.value) || 0 }))}
+                    placeholder="리드타임을 입력하세요"
+                  />
+                </div>
+              </div>
+              <div className={styles.modalActions}>
+                <Button variant="outline" onClick={handleCloseModal}>
+                  취소
+                </Button>
+                <Button onClick={handleSaveSupplier}>
+                  {editingSupplier ? "수정" : "등록"}
+                </Button>
               </div>
             </div>
           </Card>

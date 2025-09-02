@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Search, Plus, Filter, Download, Edit, Eye, Package, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Search, Plus, Filter, Download, Edit, Package, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
 interface Order {
   id: string;
@@ -20,6 +20,282 @@ export function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("전체");
   const [selectedPriority, setSelectedPriority] = useState("전체");
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+
+  // 새 주문 폼 상태
+  const [newOrderForm, setNewOrderForm] = useState({
+    customer: "",
+    company: "",
+    status: "대기중" as Order["status"],
+    priority: "보통" as Order["priority"],
+    orderDate: new Date().toISOString().split('T')[0],
+    dueDate: "",
+    totalAmount: "",
+    items: "",
+    representative: "",
+  });
+
+  // 편집 주문 폼 상태
+  const [editOrderForm, setEditOrderForm] = useState({
+    customer: "",
+    company: "",
+    status: "대기중",
+    priority: "보통",
+    orderDate: "",
+    dueDate: "",
+    totalAmount: "",
+    items: "",
+    representative: "",
+    progress: "",
+  });
+
+  // 고급 필터 상태
+  const [advancedFilters, setAdvancedFilters] = useState({
+    company: "",
+    representative: "",
+    minAmount: "",
+    maxAmount: "",
+    dateFrom: "",
+    dateTo: "",
+    minProgress: "",
+    maxProgress: "",
+  });
+
+  // 버튼 핸들러들
+  const handleAdvancedFilter = () => {
+    setShowAdvancedFilter(true);
+  };
+
+  const applyAdvancedFilters = () => {
+    setShowAdvancedFilter(false);
+    alert('고급 필터가 적용되었습니다.');
+  };
+
+  const resetOrderFilters = () => {
+    setAdvancedFilters({
+      company: "",
+      representative: "",
+      minAmount: "",
+      maxAmount: "",
+      dateFrom: "",
+      dateTo: "",
+      minProgress: "",
+      maxProgress: "",
+    });
+    setSelectedStatus("전체");
+    setSelectedPriority("전체");
+    setSearchTerm("");
+  };
+
+  const handleExport = () => {
+    // CSV 헤더 정의
+    const headers = [
+      '주문번호',
+      '고객명',
+      '회사명',
+      '상태',
+      '우선순위',
+      '주문일',
+      '납기일',
+      '총 금액',
+      '아이템 수',
+      '담당자',
+      '진행률'
+    ];
+
+    // 주문 데이터를 CSV 형식으로 변환
+    const csvData = filteredOrders.map(order => [
+      order.orderNumber,
+      order.customer,
+      order.company,
+      order.status,
+      order.priority,
+      order.orderDate,
+      order.dueDate,
+      order.totalAmount.toLocaleString(),
+      order.items.toString(),
+      order.representative,
+      `${order.progress}%`
+    ]);
+
+    // CSV 문자열 생성
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(field => `"${field}"`).join(','))
+    ].join('\n');
+
+    // BOM 추가 (한글 인코딩을 위해)
+    const BOM = '\uFEFF';
+    const csvWithBOM = BOM + csvContent;
+
+    // Blob 생성 및 다운로드
+    const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `주문목록_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert(`${filteredOrders.length}개의 주문 데이터가 CSV 파일로 내보내졌습니다.`);
+    } else {
+      alert('파일 다운로드가 지원되지 않는 브라우저입니다.');
+    }
+  };
+
+  const handleCreateOrder = () => {
+    setShowCreateOrder(true);
+  };
+
+  const createNewOrder = () => {
+    if (!newOrderForm.customer || !newOrderForm.company || !newOrderForm.dueDate) {
+      alert('필수 항목을 모두 입력해주세요.');
+      return;
+    }
+
+    const newOrder: Order = {
+      id: `ORD-${String(orders.length + 1).padStart(3, '0')}`,
+      orderNumber: `PO-2024-${String(orders.length + 1).padStart(3, '0')}`,
+      customer: newOrderForm.customer,
+      company: newOrderForm.company,
+      status: newOrderForm.status,
+      priority: newOrderForm.priority,
+      orderDate: newOrderForm.orderDate,
+      dueDate: newOrderForm.dueDate,
+      totalAmount: parseInt(newOrderForm.totalAmount) || 0,
+      items: parseInt(newOrderForm.items) || 1,
+      representative: newOrderForm.representative,
+      progress: 0,
+    };
+
+    setOrders([...orders, newOrder]);
+    setShowCreateOrder(false);
+    setNewOrderForm({
+      customer: "",
+      company: "",
+      status: "대기중",
+      priority: "보통",
+      orderDate: new Date().toISOString().split('T')[0],
+      dueDate: "",
+      totalAmount: "",
+      items: "",
+      representative: "",
+    });
+    alert('새 주문이 성공적으로 생성되었습니다.');
+  };
+
+  const handleEditOrder = (order: Order) => {
+    setEditingOrder(order);
+    setEditOrderForm({
+      customer: order.customer,
+      company: order.company,
+      status: order.status,
+      priority: order.priority,
+      orderDate: order.orderDate,
+      dueDate: order.dueDate,
+      totalAmount: order.totalAmount.toString(),
+      items: order.items.toString(),
+      representative: order.representative,
+      progress: order.progress.toString(),
+    });
+  };
+
+  const updateOrder = () => {
+    if (!editingOrder) return;
+    
+    if (!editOrderForm.customer || !editOrderForm.company || !editOrderForm.dueDate) {
+      alert('필수 항목을 모두 입력해주세요.');
+      return;
+    }
+
+    const updatedOrder: Order = {
+      ...editingOrder,
+      customer: editOrderForm.customer,
+      company: editOrderForm.company,
+      status: editOrderForm.status as Order["status"],
+      priority: editOrderForm.priority as Order["priority"],
+      orderDate: editOrderForm.orderDate,
+      dueDate: editOrderForm.dueDate,
+      totalAmount: parseInt(editOrderForm.totalAmount) || 0,
+      items: parseInt(editOrderForm.items) || 1,
+      representative: editOrderForm.representative,
+      progress: parseInt(editOrderForm.progress) || 0,
+    };
+
+    setOrders(orders.map(order => 
+      order.id === editingOrder.id ? updatedOrder : order
+    ));
+    
+    setEditingOrder(null);
+    alert('주문이 성공적으로 수정되었습니다.');
+  };
+
+  const handleShippingManagement = (order: Order) => {
+    alert(`${order.orderNumber} 주문의 배송을 관리합니다.`);
+  };
+
+  const closeModals = () => {
+    setShowAdvancedFilter(false);
+    setShowCreateOrder(false);
+    setEditingOrder(null);
+  };
+
+  // 모달 스타일들
+  const modalOverlayStyle: React.CSSProperties = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    background: "white",
+    borderRadius: "1rem",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+    maxWidth: "500px",
+    width: "90%",
+    maxHeight: "80vh",
+    overflowY: "auto",
+  };
+
+  const modalHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "1.5rem",
+    borderBottom: "1px solid #e5e7eb",
+  };
+
+  const modalTitleStyle: React.CSSProperties = {
+    fontSize: "1.25rem",
+    fontWeight: 600,
+    color: "#1f2937",
+    margin: 0,
+  };
+
+  const modalContentStyle: React.CSSProperties = {
+    padding: "1.5rem",
+  };
+
+  const closeButtonStyle: React.CSSProperties = {
+    background: "none",
+    border: "none",
+    fontSize: "1.5rem",
+    cursor: "pointer",
+    color: "#6b7280",
+  };
 
   const containerStyle: React.CSSProperties = {
     padding: "2rem",
@@ -226,8 +502,8 @@ export function OrdersPage() {
     transition: "all 0.2s ease",
   };
 
-  // 샘플 데이터
-  const orders: Order[] = [
+  // 샘플 데이터를 state로 변환
+  const [orders, setOrders] = useState<Order[]>([
     {
       id: "ORD-001",
       orderNumber: "PO-2024-001",
@@ -298,7 +574,7 @@ export function OrdersPage() {
       representative: "이영희",
       progress: 0,
     },
-  ];
+  ]);
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -307,7 +583,16 @@ export function OrdersPage() {
       order.company.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = selectedStatus === "전체" || order.status === selectedStatus;
     const matchesPriority = selectedPriority === "전체" || order.priority === selectedPriority;
-    return matchesSearch && matchesStatus && matchesPriority;
+    
+    // 고급 필터 적용
+    const matchesCompany = !advancedFilters.company || 
+      order.company.toLowerCase().includes(advancedFilters.company.toLowerCase());
+    const matchesRepresentative = !advancedFilters.representative || 
+      order.representative.toLowerCase().includes(advancedFilters.representative.toLowerCase());
+    const matchesProgress = (!advancedFilters.minProgress || order.progress >= parseInt(advancedFilters.minProgress)) &&
+      (!advancedFilters.maxProgress || order.progress <= parseInt(advancedFilters.maxProgress));
+    
+    return matchesSearch && matchesStatus && matchesPriority && matchesCompany && matchesRepresentative && matchesProgress;
   });
 
   const formatCurrency = (amount: number) => {
@@ -408,15 +693,15 @@ export function OrdersPage() {
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button style={secondaryButtonStyle}>
+          <button style={secondaryButtonStyle} onClick={handleAdvancedFilter}>
             <Filter style={{ height: "1rem", width: "1rem" }} />
             고급 필터
           </button>
-          <button style={secondaryButtonStyle}>
+          <button style={secondaryButtonStyle} onClick={handleExport}>
             <Download style={{ height: "1rem", width: "1rem" }} />
             내보내기
           </button>
-          <button style={primaryButtonStyle}>
+          <button style={primaryButtonStyle} onClick={handleCreateOrder}>
             <Plus style={{ height: "1rem", width: "1rem" }} />새 주문 생성
           </button>
         </div>
@@ -484,13 +769,10 @@ export function OrdersPage() {
                 <td style={tdStyle}>{order.representative}</td>
                 <td style={tdStyle}>
                   <div style={{ display: "flex", gap: "0.25rem" }}>
-                    <button style={actionButtonStyle} title="보기">
-                      <Eye style={{ height: "1rem", width: "1rem" }} />
-                    </button>
-                    <button style={actionButtonStyle} title="편집">
+                    <button style={actionButtonStyle} title="편집" onClick={() => handleEditOrder(order)}>
                       <Edit style={{ height: "1rem", width: "1rem" }} />
                     </button>
-                    <button style={actionButtonStyle} title="배송관리">
+                    <button style={actionButtonStyle} title="배송관리" onClick={() => handleShippingManagement(order)}>
                       <Package style={{ height: "1rem", width: "1rem" }} />
                     </button>
                   </div>
@@ -514,6 +796,648 @@ export function OrdersPage() {
       >
         총 {filteredOrders.length}개의 주문이 표시됨 (전체 {orders.length}개 중)
       </div>
+
+      {/* 모달들 */}
+      {showAdvancedFilter && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={modalTitleStyle}>고급 필터</h2>
+              <button style={closeButtonStyle} onClick={closeModals}>
+                ×
+              </button>
+            </div>
+            <div style={modalContentStyle}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>회사명</label>
+                    <input
+                      type="text"
+                      value={advancedFilters.company}
+                      onChange={(e) => setAdvancedFilters({...advancedFilters, company: e.target.value})}
+                      placeholder="회사명으로 검색..."
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.875rem"
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>담당자</label>
+                    <input
+                      type="text"
+                      value={advancedFilters.representative}
+                      onChange={(e) => setAdvancedFilters({...advancedFilters, representative: e.target.value})}
+                      placeholder="담당자명으로 검색..."
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.875rem"
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>주문일 (시작)</label>
+                    <input
+                      type="date"
+                      value={advancedFilters.dateFrom}
+                      onChange={(e) => setAdvancedFilters({...advancedFilters, dateFrom: e.target.value})}
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.875rem"
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>주문일 (끝)</label>
+                    <input
+                      type="date"
+                      value={advancedFilters.dateTo}
+                      onChange={(e) => setAdvancedFilters({...advancedFilters, dateTo: e.target.value})}
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.875rem"
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>최소 진행률 (%)</label>
+                    <input
+                      type="number"
+                      value={advancedFilters.minProgress}
+                      onChange={(e) => setAdvancedFilters({...advancedFilters, minProgress: e.target.value})}
+                      placeholder="0"
+                      min="0"
+                      max="100"
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.875rem"
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>최대 진행률 (%)</label>
+                    <input
+                      type="number"
+                      value={advancedFilters.maxProgress}
+                      onChange={(e) => setAdvancedFilters({...advancedFilters, maxProgress: e.target.value})}
+                      placeholder="100"
+                      min="0"
+                      max="100"
+                      style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.875rem"
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
+                  <button
+                    onClick={resetOrderFilters}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "0.375rem",
+                      background: "white",
+                      color: "#374151",
+                      fontSize: "0.875rem",
+                      cursor: "pointer"
+                    }}
+                  >
+                    초기화
+                  </button>
+                  <button
+                    onClick={applyAdvancedFilters}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      border: "none",
+                      borderRadius: "0.375rem",
+                      background: "#3b82f6",
+                      color: "white",
+                      fontSize: "0.875rem",
+                      cursor: "pointer"
+                    }}
+                  >
+                    필터 적용
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateOrder && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={modalTitleStyle}>새 주문 생성</h2>
+              <button style={closeButtonStyle} onClick={closeModals}>
+                ×
+              </button>
+            </div>
+            <div style={modalContentStyle}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    고객명 *
+                  </label>
+                  <input
+                    type="text"
+                    value={newOrderForm.customer}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, customer: e.target.value }))}
+                    placeholder="고객명을 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    회사명 *
+                  </label>
+                  <input
+                    type="text"
+                    value={newOrderForm.company}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, company: e.target.value }))}
+                    placeholder="회사명을 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    상태
+                  </label>
+                  <select
+                    value={newOrderForm.status}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, status: e.target.value as Order["status"] }))}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                  >
+                    <option value="대기중">대기중</option>
+                    <option value="진행중">진행중</option>
+                    <option value="완료">완료</option>
+                    <option value="취소">취소</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    우선순위
+                  </label>
+                  <select
+                    value={newOrderForm.priority}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, priority: e.target.value as Order["priority"] }))}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                  >
+                    <option value="낮음">낮음</option>
+                    <option value="보통">보통</option>
+                    <option value="높음">높음</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    주문일
+                  </label>
+                  <input
+                    type="date"
+                    value={newOrderForm.orderDate}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, orderDate: e.target.value }))}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    납기일 *
+                  </label>
+                  <input
+                    type="date"
+                    value={newOrderForm.dueDate}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    총 금액
+                  </label>
+                  <input
+                    type="number"
+                    value={newOrderForm.totalAmount}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, totalAmount: e.target.value }))}
+                    placeholder="총 금액을 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    아이템 수
+                  </label>
+                  <input
+                    type="number"
+                    value={newOrderForm.items}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, items: e.target.value }))}
+                    placeholder="아이템 수를 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                  />
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", color: "#374151" }}>
+                    담당자
+                  </label>
+                  <input
+                    type="text"
+                    value={newOrderForm.representative}
+                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, representative: e.target.value }))}
+                    placeholder="담당자명을 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+                <button
+                  onClick={closeModals}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "2px solid #e2e8f0",
+                    borderRadius: "0.5rem",
+                    background: "white",
+                    color: "#64748b",
+                    fontSize: "0.875rem",
+                    fontWeight: "600",
+                    cursor: "pointer"
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={createNewOrder}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                    background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                    color: "white",
+                    fontSize: "0.875rem",
+                    fontWeight: "600",
+                    cursor: "pointer"
+                  }}
+                >
+                  주문 생성
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingOrder && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={modalTitleStyle}>{editingOrder.orderNumber} 편집</h2>
+              <button style={closeButtonStyle} onClick={closeModals}>
+                ×
+              </button>
+            </div>
+            <div style={modalContentStyle}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>
+                    고객명 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editOrderForm.customer}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, customer: e.target.value})}
+                    placeholder="고객명을 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      transition: "border-color 0.2s",
+                      outline: "none",
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "#3b82f6"}
+                    onBlur={(e) => e.target.style.borderColor = "#e5e7eb"}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>
+                    회사명 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editOrderForm.company}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, company: e.target.value})}
+                    placeholder="회사명을 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      transition: "border-color 0.2s",
+                      outline: "none",
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "#3b82f6"}
+                    onBlur={(e) => e.target.style.borderColor = "#e5e7eb"}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>상태</label>
+                  <select
+                    value={editOrderForm.status}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, status: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      backgroundColor: "white",
+                      outline: "none",
+                    }}
+                  >
+                    <option value="대기중">대기중</option>
+                    <option value="진행중">진행중</option>
+                    <option value="완료">완료</option>
+                    <option value="취소">취소</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>우선순위</label>
+                  <select
+                    value={editOrderForm.priority}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, priority: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      backgroundColor: "white",
+                      outline: "none",
+                    }}
+                  >
+                    <option value="낮음">낮음</option>
+                    <option value="보통">보통</option>
+                    <option value="높음">높음</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>주문일</label>
+                  <input
+                    type="date"
+                    value={editOrderForm.orderDate}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, orderDate: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>
+                    납기일 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editOrderForm.dueDate}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, dueDate: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      outline: "none",
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "#3b82f6"}
+                    onBlur={(e) => e.target.style.borderColor = "#e5e7eb"}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>총 금액</label>
+                  <input
+                    type="number"
+                    value={editOrderForm.totalAmount}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, totalAmount: e.target.value})}
+                    placeholder="0"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>아이템 수</label>
+                  <input
+                    type="number"
+                    value={editOrderForm.items}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, items: e.target.value})}
+                    placeholder="1"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>진행률 (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editOrderForm.progress}
+                    onChange={(e) => setEditOrderForm({...editOrderForm, progress: e.target.value})}
+                    placeholder="0"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "1.5rem" }}>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#374151" }}>담당자</label>
+                <input
+                  type="text"
+                  value={editOrderForm.representative}
+                  onChange={(e) => setEditOrderForm({...editOrderForm, representative: e.target.value})}
+                  placeholder="담당자명을 입력하세요"
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                <button
+                  onClick={closeModals}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "white",
+                    color: "#6b7280",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f9fafb";
+                    e.currentTarget.style.borderColor = "#d1d5db";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "white";
+                    e.currentTarget.style.borderColor = "#e5e7eb";
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={updateOrder}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "#3b82f6",
+                    color: "white",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    transition: "background-color 0.2s",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#2563eb"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#3b82f6"}
+                >
+                  수정 완료
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

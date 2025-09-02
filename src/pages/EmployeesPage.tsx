@@ -1,28 +1,35 @@
 import React, { useState } from "react";
 import { Search, Plus, Filter, Download, Edit, Eye, Phone, Mail, UserCheck, UserX, Award, Clock } from "lucide-react";
-
-interface Employee {
-  id: string;
-  employeeId: string;
-  name: string;
-  position: string;
-  department: string;
-  email: string;
-  phone: string;
-  hireDate: string;
-  salary: number;
-  status: "재직" | "휴직" | "퇴사";
-  workType: "정규직" | "계약직" | "인턴";
-  manager: string;
-  skills: string[];
-  performanceScore: number;
-  avatar?: string;
-}
+import { useEmployees } from "../context/EmployeeContext";
+import type { Employee } from "../types/employee";
 
 export function EmployeesPage() {
+  const { employees, setEmployees, addEmployee, updateEmployee } = useEmployees();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("전체");
   const [selectedStatus, setSelectedStatus] = useState("전체");
+  const [selectedWorkType, setSelectedWorkType] = useState("전체");
+  const [salaryRange, setSalaryRange] = useState({ min: 0, max: 10000000 });
+  const [performanceRange, setPerformanceRange] = useState({ min: 0, max: 100 });
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [showNewEmployeeModal, setShowNewEmployeeModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPerformanceModal, setShowPerformanceModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [newEmployeeForm, setNewEmployeeForm] = useState<Partial<Employee>>({
+    name: "",
+    position: "",
+    department: "",
+    email: "",
+    phone: "",
+    salary: 0,
+    status: "재직",
+    workType: "정규직",
+    manager: "",
+    skills: [],
+    performanceScore: 0
+  });
 
   const containerStyle: React.CSSProperties = {
     padding: "2rem",
@@ -234,8 +241,8 @@ export function EmployeesPage() {
     transition: "all 0.2s ease",
   };
 
-  // 샘플 데이터
-  const employees: Employee[] = [
+  // 초기 데이터
+  const INITIAL_EMPLOYEES: Employee[] = [
     {
       id: "EMP-001",
       employeeId: "EMP2024001",
@@ -326,7 +333,11 @@ export function EmployeesPage() {
       emp.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDepartment = selectedDepartment === "전체" || emp.department === selectedDepartment;
     const matchesStatus = selectedStatus === "전체" || emp.status === selectedStatus;
-    return matchesSearch && matchesDepartment && matchesStatus;
+    const matchesWorkType = selectedWorkType === "전체" || emp.workType === selectedWorkType;
+    const matchesSalary = emp.salary >= salaryRange.min && emp.salary <= salaryRange.max;
+    const matchesPerformance = emp.performanceScore >= performanceRange.min && emp.performanceScore <= performanceRange.max;
+    
+    return matchesSearch && matchesDepartment && matchesStatus && matchesWorkType && matchesSalary && matchesPerformance;
   });
 
   const formatCurrency = (amount: number) => {
@@ -334,6 +345,14 @@ export function EmployeesPage() {
       style: "currency",
       currency: "KRW",
     }).format(amount);
+  };
+
+  const getPerformanceLevel = (score: number) => {
+    if (score >= 90) return "우수";
+    if (score >= 80) return "양호";
+    if (score >= 70) return "보통";
+    if (score >= 60) return "개선필요";
+    return "미흡";
   };
 
   const getStatusIcon = (status: string) => {
@@ -349,12 +368,6 @@ export function EmployeesPage() {
     }
   };
 
-  const getPerformanceLevel = (score: number) => {
-    if (score >= 80) return "우수";
-    if (score >= 60) return "보통";
-    return "개선필요";
-  };
-
   // 통계 계산
   const stats = {
     total: employees.filter((e) => e.status !== "퇴사").length,
@@ -368,6 +381,195 @@ export function EmployeesPage() {
   };
 
   const departments = ["전체", ...Array.from(new Set(employees.map((e) => e.department)))];
+  const workTypes = ["전체", "정규직", "계약직", "인턴"];
+
+  // 모달 스타일
+  const modalOverlayStyle: React.CSSProperties = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 50,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    backgroundColor: "white",
+    borderRadius: "1rem",
+    padding: "2rem",
+    maxWidth: "32rem",
+    width: "90%",
+    maxHeight: "90vh",
+    overflowY: "auto",
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "0.75rem",
+    border: "2px solid #e5e7eb",
+    borderRadius: "0.5rem",
+    fontSize: "0.875rem",
+    transition: "border-color 0.2s ease",
+  };
+
+  // 함수들
+  const handleAdvancedFilter = () => {
+    setShowAdvancedFilter(true);
+  };
+
+  const handleExportEmployeeList = () => {
+    const csvContent = "data:text/csv;charset=utf-8," + 
+      "직원번호,이름,부서,직책,상태,고용형태,연락처,입사일,급여,성과점수\n" +
+      filteredEmployees.map(emp => 
+        `${emp.employeeId},${emp.name},${emp.department},${emp.position},${emp.status},${emp.workType},${emp.phone},${emp.hireDate},${emp.salary},${emp.performanceScore}`
+      ).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `직원명단_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleNewEmployee = () => {
+    setShowNewEmployeeModal(true);
+  };
+
+  const handleEditEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setNewEmployeeForm(employee);
+    setShowEditModal(true);
+  };
+
+  const handlePerformanceEvaluation = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setShowPerformanceModal(true);
+  };
+
+  const handleAddEmployee = () => {
+    if (newEmployeeForm.name && newEmployeeForm.position && newEmployeeForm.department) {
+      const newEmployee: Employee = {
+        id: `EMP-${Date.now()}`,
+        employeeId: `EMP${new Date().getFullYear()}${String(employees.length + 1).padStart(3, '0')}`,
+        name: newEmployeeForm.name!,
+        position: newEmployeeForm.position!,
+        department: newEmployeeForm.department!,
+        email: newEmployeeForm.email || "",
+        phone: newEmployeeForm.phone || "",
+        hireDate: new Date().toISOString().split('T')[0],
+        salary: newEmployeeForm.salary || 0,
+        status: newEmployeeForm.status || "재직",
+        workType: newEmployeeForm.workType || "정규직",
+        manager: newEmployeeForm.manager || "",
+        skills: newEmployeeForm.skills || [],
+        performanceScore: 0,
+      };
+      addEmployee(newEmployee);
+      setShowNewEmployeeModal(false);
+      setNewEmployeeForm({
+        name: "",
+        position: "",
+        department: "",
+        email: "",
+        phone: "",
+        salary: 0,
+        status: "재직",
+        workType: "정규직",
+        manager: "",
+        skills: [],
+      });
+    }
+  };
+
+  const handleSubmitNewEmployee = () => {
+    if (!newEmployeeForm.name || !newEmployeeForm.department || !newEmployeeForm.position) {
+      alert("필수 정보를 모두 입력해주세요.");
+      return;
+    }
+
+    const newEmployee: Employee = {
+      id: `EMP-${String(employees.length + 1).padStart(3, '0')}`,
+      employeeId: `EMP2024${String(employees.length + 1).padStart(3, '0')}`,
+      name: newEmployeeForm.name!,
+      position: newEmployeeForm.position!,
+      department: newEmployeeForm.department!,
+      email: newEmployeeForm.email!,
+      phone: newEmployeeForm.phone!,
+      hireDate: new Date().toISOString().split('T')[0],
+      salary: newEmployeeForm.salary || 0,
+      status: newEmployeeForm.status as Employee['status'] || "재직",
+      workType: newEmployeeForm.workType as Employee['workType'] || "정규직",
+      manager: newEmployeeForm.manager || "",
+      skills: newEmployeeForm.skills || [],
+      performanceScore: newEmployeeForm.performanceScore || 0,
+    };
+
+    setEmployees([...employees, newEmployee]);
+    setNewEmployeeForm({
+      name: "",
+      position: "",
+      department: "",
+      email: "",
+      phone: "",
+      salary: 0,
+      status: "재직",
+      workType: "정규직",
+      manager: "",
+      skills: [],
+      performanceScore: 0
+    });
+    setShowNewEmployeeModal(false);
+  };
+
+  const handleUpdateEmployee = () => {
+    if (!selectedEmployee || !newEmployeeForm.name) return;
+
+    const updatedEmployees = employees.map(emp => 
+      emp.id === selectedEmployee.id 
+        ? { ...emp, ...newEmployeeForm } as Employee
+        : emp
+    );
+    
+    setEmployees(updatedEmployees);
+    setShowEditModal(false);
+    setSelectedEmployee(null);
+  };
+
+  const handleUpdatePerformance = (newScore: number, notes: string) => {
+    if (!selectedEmployee) return;
+
+    const updatedEmployees = employees.map(emp => 
+      emp.id === selectedEmployee.id 
+        ? { ...emp, performanceScore: newScore, notes }
+        : emp
+    );
+    
+    setEmployees(updatedEmployees);
+    setShowPerformanceModal(false);
+    setSelectedEmployee(null);
+  };
+
+  const closeModals = () => {
+    setShowAdvancedFilter(false);
+    setShowNewEmployeeModal(false);
+    setShowEditModal(false);
+    setShowPerformanceModal(false);
+    setShowViewModal(false);
+    setSelectedEmployee(null);
+  };
+
+  const resetAdvancedFilters = () => {
+    setSelectedWorkType("전체");
+    setSalaryRange({ min: 0, max: 10000000 });
+    setPerformanceRange({ min: 0, max: 100 });
+  };
 
   return (
     <div style={containerStyle}>
@@ -441,15 +643,15 @@ export function EmployeesPage() {
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button style={secondaryButtonStyle}>
+          <button style={secondaryButtonStyle} onClick={handleAdvancedFilter}>
             <Filter style={{ height: "1rem", width: "1rem" }} />
             고급 필터
           </button>
-          <button style={secondaryButtonStyle}>
+          <button style={secondaryButtonStyle} onClick={handleExportEmployeeList}>
             <Download style={{ height: "1rem", width: "1rem" }} />
             직원 명단
           </button>
-          <button style={primaryButtonStyle}>
+          <button style={primaryButtonStyle} onClick={handleNewEmployee}>
             <Plus style={{ height: "1rem", width: "1rem" }} />
             신규 직원 등록
           </button>
@@ -575,13 +777,16 @@ export function EmployeesPage() {
                 </td>
                 <td style={tdStyle}>
                   <div style={{ display: "flex", gap: "0.25rem" }}>
-                    <button style={actionButtonStyle} title="보기">
+                    <button style={actionButtonStyle} title="보기" onClick={() => { 
+                      setSelectedEmployee(employee); 
+                      setShowViewModal(true);
+                    }}>
                       <Eye style={{ height: "1rem", width: "1rem" }} />
                     </button>
-                    <button style={actionButtonStyle} title="편집">
+                    <button style={actionButtonStyle} title="편집" onClick={() => handleEditEmployee(employee)}>
                       <Edit style={{ height: "1rem", width: "1rem" }} />
                     </button>
-                    <button style={actionButtonStyle} title="성과평가">
+                    <button style={actionButtonStyle} title="성과평가" onClick={() => handlePerformanceEvaluation(employee)}>
                       <Award style={{ height: "1rem", width: "1rem" }} />
                     </button>
                   </div>
@@ -605,6 +810,532 @@ export function EmployeesPage() {
       >
         총 {filteredEmployees.length}명의 직원이 표시됨 (전체 {employees.length}명 중)
       </div>
+
+      {/* Advanced Filter Modal */}
+      {showAdvancedFilter && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>고급 필터</h2>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>고용형태</label>
+                <select style={inputStyle} value={selectedWorkType} onChange={(e) => setSelectedWorkType(e.target.value)}>
+                  {workTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>급여 범위</label>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                  <input
+                    type="number"
+                    placeholder="최소"
+                    value={salaryRange.min}
+                    onChange={(e) => setSalaryRange({...salaryRange, min: Number(e.target.value)})}
+                    style={{...inputStyle, width: "50%"}}
+                  />
+                  <span>~</span>
+                  <input
+                    type="number"
+                    placeholder="최대"
+                    value={salaryRange.max}
+                    onChange={(e) => setSalaryRange({...salaryRange, max: Number(e.target.value)})}
+                    style={{...inputStyle, width: "50%"}}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>성과점수 범위</label>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                  <input
+                    type="number"
+                    placeholder="최소"
+                    min="0"
+                    max="100"
+                    value={performanceRange.min}
+                    onChange={(e) => setPerformanceRange({...performanceRange, min: Number(e.target.value)})}
+                    style={{...inputStyle, width: "50%"}}
+                  />
+                  <span>~</span>
+                  <input
+                    type="number"
+                    placeholder="최대"
+                    min="0"
+                    max="100"
+                    value={performanceRange.max}
+                    onChange={(e) => setPerformanceRange({...performanceRange, max: Number(e.target.value)})}
+                    style={{...inputStyle, width: "50%"}}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button style={secondaryButtonStyle} onClick={resetAdvancedFilters}>
+                초기화
+              </button>
+              <button style={secondaryButtonStyle} onClick={closeModals}>
+                취소
+              </button>
+              <button style={primaryButtonStyle} onClick={closeModals}>
+                적용
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Employee Modal */}
+      {showNewEmployeeModal && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={{...modalStyle, maxWidth: "40rem"}} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>신규 직원 등록</h2>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>이름 *</label>
+                <input
+                  type="text"
+                  value={newEmployeeForm.name || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, name: e.target.value})}
+                  style={inputStyle}
+                  placeholder="직원 이름을 입력하세요"
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>직책 *</label>
+                <input
+                  type="text"
+                  value={newEmployeeForm.position || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, position: e.target.value})}
+                  style={inputStyle}
+                  placeholder="직책을 입력하세요"
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>부서 *</label>
+                <select
+                  value={newEmployeeForm.department || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, department: e.target.value})}
+                  style={inputStyle}
+                >
+                  <option value="">부서 선택</option>
+                  {departments.filter(d => d !== "전체").map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>고용형태</label>
+                <select
+                  value={newEmployeeForm.workType || "정규직"}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, workType: e.target.value as Employee['workType']})}
+                  style={inputStyle}
+                >
+                  <option value="정규직">정규직</option>
+                  <option value="계약직">계약직</option>
+                  <option value="인턴">인턴</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>이메일</label>
+                <input
+                  type="email"
+                  value={newEmployeeForm.email || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, email: e.target.value})}
+                  style={inputStyle}
+                  placeholder="이메일을 입력하세요"
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>전화번호</label>
+                <input
+                  type="tel"
+                  value={newEmployeeForm.phone || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, phone: e.target.value})}
+                  style={inputStyle}
+                  placeholder="010-0000-0000"
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>급여</label>
+                <input
+                  type="number"
+                  value={newEmployeeForm.salary || 0}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, salary: Number(e.target.value)})}
+                  style={inputStyle}
+                  placeholder="급여를 입력하세요"
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>관리자</label>
+                <input
+                  type="text"
+                  value={newEmployeeForm.manager || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, manager: e.target.value})}
+                  style={inputStyle}
+                  placeholder="관리자 이름을 입력하세요"
+                />
+              </div>
+            </div>
+            
+            <div style={{ marginTop: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>주요 스킬 (쉼표로 구분)</label>
+              <input
+                type="text"
+                value={newEmployeeForm.skills?.join(", ") || ""}
+                onChange={(e) => setNewEmployeeForm({...newEmployeeForm, skills: e.target.value.split(", ").filter(s => s.trim())})}
+                style={inputStyle}
+                placeholder="예: React, TypeScript, Node.js"
+              />
+            </div>
+            
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button style={secondaryButtonStyle} onClick={closeModals}>
+                취소
+              </button>
+              <button style={primaryButtonStyle} onClick={handleSubmitNewEmployee}>
+                등록
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Employee Modal */}
+      {showEditModal && selectedEmployee && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={{...modalStyle, maxWidth: "40rem"}} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>{selectedEmployee.name} 정보 수정</h2>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>이름</label>
+                <input
+                  type="text"
+                  value={newEmployeeForm.name || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, name: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>직책</label>
+                <input
+                  type="text"
+                  value={newEmployeeForm.position || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, position: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>부서</label>
+                <select
+                  value={newEmployeeForm.department || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, department: e.target.value})}
+                  style={inputStyle}
+                >
+                  {departments.filter(d => d !== "전체").map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>상태</label>
+                <select
+                  value={newEmployeeForm.status || "재직"}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, status: e.target.value as Employee['status']})}
+                  style={inputStyle}
+                >
+                  <option value="재직">재직</option>
+                  <option value="휴직">휴직</option>
+                  <option value="퇴사">퇴사</option>
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>이메일</label>
+                <input
+                  type="email"
+                  value={newEmployeeForm.email || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, email: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>전화번호</label>
+                <input
+                  type="tel"
+                  value={newEmployeeForm.phone || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, phone: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>급여</label>
+                <input
+                  type="number"
+                  value={newEmployeeForm.salary || 0}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, salary: Number(e.target.value)})}
+                  style={inputStyle}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>관리자</label>
+                <input
+                  type="text"
+                  value={newEmployeeForm.manager || ""}
+                  onChange={(e) => setNewEmployeeForm({...newEmployeeForm, manager: e.target.value})}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+            
+            <div style={{ marginTop: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>주요 스킬</label>
+              <input
+                type="text"
+                value={newEmployeeForm.skills?.join(", ") || ""}
+                onChange={(e) => setNewEmployeeForm({...newEmployeeForm, skills: e.target.value.split(", ").filter(s => s.trim())})}
+                style={inputStyle}
+                placeholder="예: React, TypeScript, Node.js"
+              />
+            </div>
+            
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button style={secondaryButtonStyle} onClick={closeModals}>
+                취소
+              </button>
+              <button style={primaryButtonStyle} onClick={handleUpdateEmployee}>
+                수정
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Performance Evaluation Modal */}
+      {showPerformanceModal && selectedEmployee && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>{selectedEmployee.name} 성과평가</h2>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div style={{ padding: "1rem", backgroundColor: "#f8fafc", borderRadius: "0.5rem" }}>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: "0.5rem" }}>현재 정보</h3>
+                <p><strong>직책:</strong> {selectedEmployee.position}</p>
+                <p><strong>부서:</strong> {selectedEmployee.department}</p>
+                <p><strong>현재 성과점수:</strong> {selectedEmployee.performanceScore}% ({getPerformanceLevel(selectedEmployee.performanceScore)})</p>
+              </div>
+              
+              <div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: "1rem" }}>새로운 성과점수</h3>
+                <div style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={selectedEmployee.performanceScore}
+                    onChange={(e) => {
+                      const newScore = Number(e.target.value);
+                      setEmployees(employees.map(emp => 
+                        emp.id === selectedEmployee.id 
+                          ? { ...emp, performanceScore: newScore }
+                          : emp
+                      ));
+                      setSelectedEmployee({ ...selectedEmployee, performanceScore: newScore });
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                  <div style={{ 
+                    fontSize: "1.25rem", 
+                    fontWeight: "bold", 
+                    color: selectedEmployee.performanceScore >= 80 ? "#16a34a" : selectedEmployee.performanceScore >= 60 ? "#d97706" : "#dc2626",
+                    minWidth: "4rem"
+                  }}>
+                    {selectedEmployee.performanceScore}점
+                  </div>
+                </div>
+                <div style={{ width: "100%", height: "0.5rem", backgroundColor: "#e5e7eb", borderRadius: "0.25rem", overflow: "hidden" }}>
+                  <div 
+                    style={{ 
+                      height: "100%", 
+                      width: `${selectedEmployee.performanceScore}%`, 
+                      backgroundColor: selectedEmployee.performanceScore >= 80 ? "#16a34a" : selectedEmployee.performanceScore >= 60 ? "#d97706" : "#dc2626",
+                      transition: "width 0.3s ease"
+                    }} 
+                  />
+                </div>
+              </div>
+              
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                <button style={secondaryButtonStyle} onClick={closeModals}>
+                  취소
+                </button>
+                <button style={primaryButtonStyle} onClick={() => {
+                  alert(`${selectedEmployee.name}의 성과점수가 ${selectedEmployee.performanceScore}점으로 업데이트되었습니다.`);
+                  closeModals();
+                }}>
+                  평가 저장
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Employee Modal */}
+      {showViewModal && selectedEmployee && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={{...modalStyle, maxWidth: "40rem"}} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem" }}>{selectedEmployee.name} 상세정보</h2>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              {/* Profile Section */}
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem", backgroundColor: "#f8fafc", borderRadius: "0.5rem" }}>
+                <div
+                  style={{
+                    width: "4rem",
+                    height: "4rem",
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: "1.5rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  {selectedEmployee.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "0.25rem" }}>{selectedEmployee.name}</h3>
+                  <p style={{ color: "#6b7280", marginBottom: "0.25rem" }}>{selectedEmployee.position}</p>
+                  <p style={{ fontSize: "0.875rem", color: "#9ca3af" }}>직원번호: {selectedEmployee.employeeId}</p>
+                </div>
+              </div>
+
+              {/* Basic Information */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.25rem" }}>부서</label>
+                  <p style={{ padding: "0.5rem", backgroundColor: "#f9fafb", borderRadius: "0.375rem", margin: 0 }}>{selectedEmployee.department}</p>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.25rem" }}>고용형태</label>
+                  <span style={workTypeBadgeStyle(selectedEmployee.workType)}>{selectedEmployee.workType}</span>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.25rem" }}>상태</label>
+                  <span style={statusBadgeStyle(selectedEmployee.status)}>{selectedEmployee.status}</span>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.25rem" }}>입사일</label>
+                  <p style={{ padding: "0.5rem", backgroundColor: "#f9fafb", borderRadius: "0.375rem", margin: 0 }}>{selectedEmployee.hireDate}</p>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: "0.75rem" }}>연락처 정보</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.375rem" }}>
+                    <Phone style={{ height: "1rem", width: "1rem", color: "#6b7280" }} />
+                    <span>{selectedEmployee.phone}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.375rem" }}>
+                    <Mail style={{ height: "1rem", width: "1rem", color: "#6b7280" }} />
+                    <span>{selectedEmployee.email}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance & Salary */}
+              <div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: "0.75rem" }}>성과 및 급여</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.5rem" }}>성과점수</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <div style={performanceBarStyle}>
+                        <div style={performanceFillStyle(selectedEmployee.performanceScore)} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{selectedEmployee.performanceScore}%</div>
+                        <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>{getPerformanceLevel(selectedEmployee.performanceScore)}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.5rem" }}>급여</label>
+                    <p style={{ fontSize: "1.125rem", fontWeight: 600, color: "#16a34a", margin: 0 }}>{formatCurrency(selectedEmployee.salary)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Skills & Manager */}
+              <div>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: "0.75rem" }}>스킬 및 관리</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.5rem" }}>주요 스킬</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                      {selectedEmployee.skills.map((skill, index) => (
+                        <span
+                          key={index}
+                          style={{
+                            fontSize: "0.75rem",
+                            padding: "0.375rem 0.75rem",
+                            backgroundColor: "#eff6ff",
+                            color: "#2563eb",
+                            borderRadius: "0.375rem",
+                            border: "1px solid #bfdbfe",
+                          }}
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.5rem" }}>관리자</label>
+                    <p style={{ padding: "0.5rem", backgroundColor: "#f9fafb", borderRadius: "0.375rem", margin: 0 }}>{selectedEmployee.manager}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+              <button style={secondaryButtonStyle} onClick={closeModals}>
+                닫기
+              </button>
+              <button style={primaryButtonStyle} onClick={() => {
+                closeModals();
+                handleEditEmployee(selectedEmployee);
+              }}>
+                편집
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
   DollarSign,
   TrendingUp,
   Receipt,
+  Trash2,
 } from "lucide-react";
 import styles from "./TaxPage.module.css";
 
@@ -138,12 +139,16 @@ const statusConfig = {
 };
 
 export const TaxPage: React.FC = () => {
+  const [documents, setDocuments] = useState<TaxDocument[]>(mockTaxDocuments);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedDocument, setSelectedDocument] = useState<TaxDocument | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<TaxDocument | null>(null);
+  const [formData, setFormData] = useState<Partial<TaxDocument>>({});
 
-  const filteredDocuments = mockTaxDocuments.filter((doc) => {
+  const filteredDocuments = documents.filter((doc) => {
     const matchesSearch =
       doc.documentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -171,10 +176,91 @@ export const TaxPage: React.FC = () => {
   };
 
   // 통계 계산
-  const totalDocuments = mockTaxDocuments.length;
-  const totalAmount = mockTaxDocuments.reduce((sum, doc) => sum + doc.totalAmount, 0);
-  const totalVat = mockTaxDocuments.reduce((sum, doc) => sum + doc.vatAmount, 0);
-  const overdueCount = mockTaxDocuments.filter((doc) => doc.status === "overdue").length;
+  const totalDocuments = documents.length;
+  const totalAmount = documents.reduce((sum, doc) => sum + doc.totalAmount, 0);
+  const totalVat = documents.reduce((sum, doc) => sum + doc.vatAmount, 0);
+  const overdueCount = documents.filter((doc) => doc.status === "overdue").length;
+
+  const handleCreateTaxInvoice = () => {
+    setFormData({
+      type: 'tax_invoice',
+      status: 'issued',
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      amount: 0,
+      vatAmount: 0,
+      totalAmount: 0
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleEditDocument = (document: TaxDocument) => {
+    setFormData(document);
+    setEditingDocument(document);
+  };
+
+  const handleDeleteDocument = (documentId: string) => {
+    if (window.confirm('이 세무 문서를 삭제하시겠습니까?')) {
+      setDocuments(documents.filter(doc => doc.id !== documentId));
+    }
+  };
+
+  const handleCloseModals = () => {
+    setShowCreateModal(false);
+    setEditingDocument(null);
+    setFormData({});
+  };
+
+  const handleFormChange = (field: keyof TaxDocument, value: any) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      // Auto-calculate VAT and total when amount changes
+      if (field === 'amount') {
+        const amount = Number(value) || 0;
+        const vatAmount = Math.round(amount * 0.1);
+        updated.vatAmount = vatAmount;
+        updated.totalAmount = amount + vatAmount;
+      }
+      
+      return updated;
+    });
+  };
+
+  const handleSubmit = () => {
+    if (!formData.documentNumber || !formData.customerName || !formData.amount) {
+      alert('필수 항목을 모두 입력해주세요.');
+      return;
+    }
+
+    if (editingDocument) {
+      // Update existing document
+      setDocuments(prev => prev.map(doc => 
+        doc.id === editingDocument.id ? { ...doc, ...formData } as TaxDocument : doc
+      ));
+    } else {
+      // Create new document
+      const newDocument: TaxDocument = {
+        id: Date.now().toString(),
+        documentNumber: formData.documentNumber || '',
+        customerName: formData.customerName || '',
+        customerBusinessNumber: formData.customerBusinessNumber || '',
+        amount: Number(formData.amount) || 0,
+        vatAmount: Number(formData.vatAmount) || 0,
+        totalAmount: Number(formData.totalAmount) || 0,
+        type: formData.type as TaxDocument['type'] || 'tax_invoice',
+        status: formData.status as TaxDocument['status'] || 'issued',
+        issueDate: formData.issueDate || '',
+        dueDate: formData.dueDate || '',
+        category: formData.category || '',
+        description: formData.description || '',
+        issuedBy: formData.issuedBy || '시스템'
+      };
+      setDocuments(prev => [newDocument, ...prev]);
+    }
+
+    handleCloseModals();
+  };
 
   return (
     <div className={styles.container}>
@@ -184,7 +270,7 @@ export const TaxPage: React.FC = () => {
             <h1 className={styles.title}>세금 관리</h1>
             <p className={styles.subtitle}>세금계산서 발행 및 세무 관리를 효율적으로 처리하세요</p>
           </div>
-          <Button className={styles.addButton}>
+          <Button className={styles.addButton} onClick={handleCreateTaxInvoice}>
             <Plus className={styles.icon} />
             세금계산서 발행
           </Button>
@@ -292,8 +378,11 @@ export const TaxPage: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => setSelectedDocument(document)}>
                     <Eye className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleEditDocument(document)}>
                     <Edit3 className={styles.actionIcon} />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteDocument(document.id)}>
+                    <Trash2 className={styles.actionIcon} />
                   </Button>
                 </div>
               </div>
@@ -431,6 +520,305 @@ export const TaxPage: React.FC = () => {
               <div className={styles.descriptionSection}>
                 <h4>상세 내용</h4>
                 <div className={styles.fullDescription}>{selectedDocument.description}</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Create Tax Invoice Modal */}
+      {showCreateModal && (
+        <div className={styles.modal} onClick={handleCloseModals}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>세금계산서 발행</h2>
+              <Button variant="ghost" onClick={handleCloseModals} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>문서번호 *</label>
+                  <Input
+                    value={formData.documentNumber || ''}
+                    onChange={(e) => handleFormChange('documentNumber', e.target.value)}
+                    placeholder="TAX-2024-001"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>고객명 *</label>
+                  <Input
+                    value={formData.customerName || ''}
+                    onChange={(e) => handleFormChange('customerName', e.target.value)}
+                    placeholder="고객명을 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>사업자번호</label>
+                  <Input
+                    value={formData.customerBusinessNumber || ''}
+                    onChange={(e) => handleFormChange('customerBusinessNumber', e.target.value)}
+                    placeholder="123-45-67890"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>공급가액 *</label>
+                  <Input
+                    type="number"
+                    value={formData.amount || ''}
+                    onChange={(e) => handleFormChange('amount', e.target.value)}
+                    placeholder="1000000"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>부가세</label>
+                  <Input
+                    type="number"
+                    value={formData.vatAmount || ''}
+                    onChange={(e) => handleFormChange('vatAmount', e.target.value)}
+                    placeholder="자동 계산됨"
+                    className={styles.formInput}
+                    readOnly
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>총 금액</label>
+                  <Input
+                    type="number"
+                    value={formData.totalAmount || ''}
+                    onChange={(e) => handleFormChange('totalAmount', e.target.value)}
+                    placeholder="자동 계산됨"
+                    className={styles.formInput}
+                    readOnly
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>발행일</label>
+                  <Input
+                    type="date"
+                    value={formData.issueDate || ''}
+                    onChange={(e) => handleFormChange('issueDate', e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>만료일</label>
+                  <Input
+                    type="date"
+                    value={formData.dueDate || ''}
+                    onChange={(e) => handleFormChange('dueDate', e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>카테고리</label>
+                  <Input
+                    value={formData.category || ''}
+                    onChange={(e) => handleFormChange('category', e.target.value)}
+                    placeholder="용역, 상품, 서비스 등"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>발행자</label>
+                  <Input
+                    value={formData.issuedBy || ''}
+                    onChange={(e) => handleFormChange('issuedBy', e.target.value)}
+                    placeholder="발행자명"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroupFull}>
+                  <label className={styles.formLabel}>상세 내용</label>
+                  <textarea
+                    value={formData.description || ''}
+                    onChange={(e) => handleFormChange('description', e.target.value)}
+                    placeholder="세금계산서 상세 내용을 입력하세요"
+                    className={styles.formTextarea}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
+              <div className={styles.modalActions}>
+                <Button variant="outline" onClick={handleCloseModals} className={styles.cancelButton}>
+                  취소
+                </Button>
+                <Button onClick={handleSubmit} className={styles.submitButton}>
+                  발행
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Document Modal */}
+      {editingDocument && (
+        <div className={styles.modal} onClick={handleCloseModals}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>세무 문서 수정</h2>
+              <Button variant="ghost" onClick={handleCloseModals} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>문서번호 *</label>
+                  <Input
+                    value={formData.documentNumber || ''}
+                    onChange={(e) => handleFormChange('documentNumber', e.target.value)}
+                    placeholder="TAX-2024-001"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>고객명 *</label>
+                  <Input
+                    value={formData.customerName || ''}
+                    onChange={(e) => handleFormChange('customerName', e.target.value)}
+                    placeholder="고객명을 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>사업자번호</label>
+                  <Input
+                    value={formData.customerBusinessNumber || ''}
+                    onChange={(e) => handleFormChange('customerBusinessNumber', e.target.value)}
+                    placeholder="123-45-67890"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>공급가액 *</label>
+                  <Input
+                    type="number"
+                    value={formData.amount || ''}
+                    onChange={(e) => handleFormChange('amount', e.target.value)}
+                    placeholder="1000000"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>부가세</label>
+                  <Input
+                    type="number"
+                    value={formData.vatAmount || ''}
+                    onChange={(e) => handleFormChange('vatAmount', e.target.value)}
+                    placeholder="자동 계산됨"
+                    className={styles.formInput}
+                    readOnly
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>총 금액</label>
+                  <Input
+                    type="number"
+                    value={formData.totalAmount || ''}
+                    onChange={(e) => handleFormChange('totalAmount', e.target.value)}
+                    placeholder="자동 계산됨"
+                    className={styles.formInput}
+                    readOnly
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>상태</label>
+                  <select
+                    value={formData.status || ''}
+                    onChange={(e) => handleFormChange('status', e.target.value)}
+                    className={styles.formSelect}
+                  >
+                    <option value="issued">발행완료</option>
+                    <option value="sent">전송완료</option>
+                    <option value="confirmed">승인완료</option>
+                    <option value="cancelled">취소</option>
+                    <option value="overdue">기한초과</option>
+                  </select>
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>발행일</label>
+                  <Input
+                    type="date"
+                    value={formData.issueDate || ''}
+                    onChange={(e) => handleFormChange('issueDate', e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>만료일</label>
+                  <Input
+                    type="date"
+                    value={formData.dueDate || ''}
+                    onChange={(e) => handleFormChange('dueDate', e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>카테고리</label>
+                  <Input
+                    value={formData.category || ''}
+                    onChange={(e) => handleFormChange('category', e.target.value)}
+                    placeholder="용역, 상품, 서비스 등"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>발행자</label>
+                  <Input
+                    value={formData.issuedBy || ''}
+                    onChange={(e) => handleFormChange('issuedBy', e.target.value)}
+                    placeholder="발행자명"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroupFull}>
+                  <label className={styles.formLabel}>상세 내용</label>
+                  <textarea
+                    value={formData.description || ''}
+                    onChange={(e) => handleFormChange('description', e.target.value)}
+                    placeholder="세금계산서 상세 내용을 입력하세요"
+                    className={styles.formTextarea}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
+              <div className={styles.modalActions}>
+                <Button variant="outline" onClick={handleCloseModals} className={styles.cancelButton}>
+                  취소
+                </Button>
+                <Button onClick={handleSubmit} className={styles.submitButton}>
+                  수정
+                </Button>
               </div>
             </div>
           </Card>

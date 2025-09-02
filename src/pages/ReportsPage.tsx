@@ -21,6 +21,7 @@ import {
   Package,
   ShoppingCart,
   Building,
+  Trash2,
 } from "lucide-react";
 import styles from "./ReportsPage.module.css";
 
@@ -189,8 +190,10 @@ export const ReportsPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [reports, setReports] = useState<Report[]>(mockReports);
 
-  const filteredReports = mockReports.filter((report) => {
+  const filteredReports = reports.filter((report) => {
     const matchesSearch =
       report.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       report.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -216,11 +219,82 @@ export const ReportsPage: React.FC = () => {
     return null;
   };
 
+  // 보고서 생성 핸들러
+  const handleCreateReport = () => {
+    setShowCreateModal(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+  };
+
+  const handleSaveReport = (reportData: any) => {
+    const newReport: Report = {
+      id: (reports.length + 1).toString(),
+      name: reportData.name || "새 보고서",
+      category: reportData.category || "financial",
+      type: reportData.type || "dashboard",
+      description: reportData.description || "새로 생성된 보고서입니다.",
+      lastUpdated: new Date().toISOString().split('T')[0],
+      frequency: reportData.frequency || "monthly",
+      status: "ready",
+      data: [
+        { title: "샘플 데이터", value: "₩0", change: 0, trend: "stable" },
+      ],
+      createdBy: "사용자",
+      tags: reportData.tags || ["새보고서"]
+    };
+    setReports([...reports, newReport]);
+    setShowCreateModal(false);
+    alert('보고서가 성공적으로 생성되었습니다!');
+  };
+
+  const handleDownloadReport = (report: Report) => {
+    // 다운로드 기능 구현
+    const dataStr = JSON.stringify(report, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const exportFileDefaultName = `${report.name}_${report.lastUpdated}.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    alert('보고서가 다운로드되었습니다!');
+  };
+
+  const handleShareReport = (report: Report) => {
+    // 공유 기능 구현
+    if (navigator.share) {
+      navigator.share({
+        title: report.name,
+        text: report.description,
+        url: window.location.href
+      }).then(() => {
+        // alert('보고서가 공유되었습니다!');
+      }).catch((err) => {
+        console.log('공유 실패:', err);
+        // 폴백: 클립보드에 복사
+        navigator.clipboard.writeText(`${report.name}: ${report.description}\n${window.location.href}`);
+        alert('보고서 링크가 클립보드에 복사되었습니다!');
+      });
+    } else {
+      // Web Share API를 지원하지 않는 경우 클립보드에 복사
+      navigator.clipboard.writeText(`${report.name}: ${report.description}\n${window.location.href}`);
+      alert('보고서 링크가 클립보드에 복사되었습니다!');
+    }
+  };
+
+  const handleDeleteReport = (report: Report) => {
+    if (window.confirm(`"${report.name}" 보고서를 삭제하시겠습니까?`)) {
+      setReports(reports.filter(r => r.id !== report.id));
+      alert('보고서가 삭제되었습니다.');
+    }
+  };
+
   // 통계 계산
-  const totalReports = mockReports.length;
-  const readyReports = mockReports.filter((r) => r.status === "ready").length;
-  const categories = [...new Set(mockReports.map((r) => r.category))];
-  const types = [...new Set(mockReports.map((r) => r.type))];
+  const totalReports = reports.length;
+  const readyReports = reports.filter((r) => r.status === "ready").length;
+  const categories = [...new Set(reports.map((r) => r.category))];
+  const types = [...new Set(reports.map((r) => r.type))];
 
   return (
     <div className={styles.container}>
@@ -230,7 +304,7 @@ export const ReportsPage: React.FC = () => {
             <h1 className={styles.title}>보고서 센터</h1>
             <p className={styles.subtitle}>비즈니스 인사이트를 위한 종합 보고서를 확인하세요</p>
           </div>
-          <Button className={styles.addButton}>
+          <Button className={styles.addButton} onClick={handleCreateReport}>
             <Plus className={styles.icon} />
             보고서 생성
           </Button>
@@ -342,11 +416,14 @@ export const ReportsPage: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => setSelectedReport(report)}>
                     <Eye className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleDownloadReport(report)}>
                     <Download className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleShareReport(report)}>
                     <Share className={styles.actionIcon} />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteReport(report)}>
+                    <Trash2 className={styles.actionIcon} />
                   </Button>
                 </div>
               </div>
@@ -486,17 +563,117 @@ export const ReportsPage: React.FC = () => {
                   <Eye className={styles.actionIcon} />
                   보고서 보기
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => handleDownloadReport(selectedReport)}>
                   <Download className={styles.actionIcon} />
                   다운로드
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => handleShareReport(selectedReport)}>
                   <Share className={styles.actionIcon} />
                   공유
                 </Button>
               </div>
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* 보고서 생성 모달 */}
+      {showCreateModal && (
+        <div className={styles.modal} onClick={handleCloseCreateModal}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>새 보고서 생성</h2>
+              <Button variant="ghost" onClick={handleCloseCreateModal} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                const reportData = {
+                  name: formData.get('name') as string,
+                  category: formData.get('category') as string,
+                  type: formData.get('type') as string,
+                  description: formData.get('description') as string,
+                  frequency: formData.get('frequency') as string,
+                  tags: (formData.get('tags') as string)?.split(',').map(tag => tag.trim()) || []
+                };
+                handleSaveReport(reportData);
+              }}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>보고서명</label>
+                  <Input
+                    name="name"
+                    placeholder="보고서명을 입력하세요"
+                    required
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>카테고리</label>
+                  <select name="category" className={styles.formSelect} required>
+                    <option value="financial">재무</option>
+                    <option value="sales">영업</option>
+                    <option value="operations">운영</option>
+                    <option value="hr">인사</option>
+                    <option value="inventory">재고</option>
+                    <option value="customer">고객</option>
+                  </select>
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>보고서 유형</label>
+                  <select name="type" className={styles.formSelect} required>
+                    <option value="dashboard">대시보드</option>
+                    <option value="chart">차트</option>
+                    <option value="table">테이블</option>
+                    <option value="summary">요약</option>
+                  </select>
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>업데이트 주기</label>
+                  <select name="frequency" className={styles.formSelect} required>
+                    <option value="daily">일간</option>
+                    <option value="weekly">주간</option>
+                    <option value="monthly">월간</option>
+                    <option value="quarterly">분기</option>
+                    <option value="yearly">연간</option>
+                  </select>
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>설명</label>
+                  <textarea
+                    name="description"
+                    placeholder="보고서 설명을 입력하세요"
+                    className={styles.formTextarea}
+                    rows={3}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>태그 (쉼표로 구분)</label>
+                  <Input
+                    name="tags"
+                    placeholder="태그1, 태그2, 태그3"
+                    className={styles.formInput}
+                  />
+                </div>
+                
+                <div className={styles.formActions}>
+                  <Button type="button" variant="outline" onClick={handleCloseCreateModal}>
+                    취소
+                  </Button>
+                  <Button type="submit" variant="default">
+                    보고서 생성
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       )}
     </div>

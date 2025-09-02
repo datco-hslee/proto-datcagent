@@ -3,22 +3,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
-import {
-  Search,
-  Plus,
-  Filter,
-  Eye,
-  Edit3,
-  TrendingUp,
-  TrendingDown,
-  PieChart,
-  DollarSign,
-  Calendar,
-  Target,
-  AlertCircle,
-  CheckCircle,
-  BarChart3,
-} from "lucide-react";
+import { Eye, Edit3, Plus, Search, Filter, Calendar, TrendingUp, TrendingDown, AlertTriangle, Trash2, DollarSign, Target, AlertCircle, CheckCircle, BarChart3, PieChart } from "lucide-react";
 import styles from "./BudgetPage.module.css";
 
 interface BudgetItem {
@@ -158,12 +143,37 @@ const priorityConfig = {
 };
 
 export const BudgetPage: React.FC = () => {
+  const [budgets, setBudgets] = useState<BudgetItem[]>(mockBudgetItems);
+  const [selectedBudget, setSelectedBudget] = useState<BudgetItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [selectedBudget, setSelectedBudget] = useState<BudgetItem | null>(null);
+  const [showPlanningModal, setShowPlanningModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<BudgetItem | null>(null);
+  const [newBudget, setNewBudget] = useState({
+    budgetName: "",
+    category: "",
+    plannedAmount: "",
+    description: "",
+    priority: "medium" as "high" | "medium" | "low",
+    startDate: "",
+    endDate: "",
+    department: ""
+  });
+  const [editBudget, setEditBudget] = useState({
+    budgetName: "",
+    category: "",
+    plannedAmount: "",
+    description: "",
+    priority: "medium" as "high" | "medium" | "low",
+    startDate: "",
+    endDate: "",
+    department: "",
+    owner: ""
+  });
 
-  const filteredBudgets = mockBudgetItems.filter((budget) => {
+  const filteredBudgets = budgets.filter((budget) => {
     const matchesSearch =
       budget.budgetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       budget.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -196,13 +206,75 @@ export const BudgetPage: React.FC = () => {
     return styles.progressRed;
   };
 
-  // 통계 계산
-  const totalPlanned = mockBudgetItems.reduce((sum, item) => sum + item.plannedAmount, 0);
-  const totalActual = mockBudgetItems.reduce((sum, item) => sum + item.actualAmount, 0);
-  const totalRemaining = mockBudgetItems.reduce((sum, item) => sum + item.remainingAmount, 0);
-  const overBudgetCount = mockBudgetItems.filter((item) => item.status === "over_budget").length;
+  const handleCreateBudget = () => {
+    // Create new budget logic here
+    console.log('Creating new budget:', newBudget);
+    setShowPlanningModal(false);
+    setNewBudget({
+      budgetName: "",
+      category: "",
+      plannedAmount: "",
+      description: "",
+      priority: "medium",
+      startDate: "",
+      endDate: "",
+      department: ""
+    });
+  };
 
-  const categories = [...new Set(mockBudgetItems.map((item) => item.category))];
+  const handleEditBudget = (budget: BudgetItem) => {
+    setEditingBudget(budget);
+    setEditBudget({
+      budgetName: budget.budgetName,
+      category: budget.category,
+      plannedAmount: budget.plannedAmount.toString(),
+      description: budget.description,
+      priority: budget.priority,
+      startDate: budget.startDate,
+      endDate: budget.endDate,
+      department: budget.department,
+      owner: budget.owner
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateBudget = () => {
+    console.log('Updating budget:', editBudget);
+    // Here you would typically update the budget in your data source
+    setShowEditModal(false);
+    setEditingBudget(null);
+  };
+
+  const handleDeleteBudget = (budgetId: string) => {
+    if (window.confirm('정말로 이 예산을 삭제하시겠습니까?')) {
+      setBudgets(budgets.filter(budget => budget.id !== budgetId));
+      console.log('예산 삭제됨:', budgetId);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false);
+    setEditingBudget(null);
+    setEditBudget({
+      budgetName: "",
+      category: "",
+      plannedAmount: "",
+      description: "",
+      priority: "medium",
+      startDate: "",
+      endDate: "",
+      department: "",
+      owner: ""
+    });
+  };
+
+  // 통계 계산
+  const totalPlanned = budgets.reduce((sum, item) => sum + item.plannedAmount, 0);
+  const totalActual = budgets.reduce((sum, item) => sum + item.actualAmount, 0);
+  const totalRemaining = budgets.reduce((sum, item) => sum + item.remainingAmount, 0);
+  const overBudgetCount = budgets.filter((item) => item.status === "over_budget").length;
+
+  const categories = [...new Set(budgets.map((item) => item.category))];
 
   return (
     <div className={styles.container}>
@@ -212,7 +284,7 @@ export const BudgetPage: React.FC = () => {
             <h1 className={styles.title}>예산 관리</h1>
             <p className={styles.subtitle}>예산 계획과 실행을 체계적으로 관리하세요</p>
           </div>
-          <Button className={styles.addButton}>
+          <Button className={styles.addButton} onClick={() => setShowPlanningModal(true)}>
             <Plus className={styles.icon} />
             예산 계획
           </Button>
@@ -298,6 +370,235 @@ export const BudgetPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Budget Planning Modal */}
+      {showPlanningModal && (
+        <div className={styles.modal}>
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>새 예산 계획</h2>
+              <button className={styles.closeButton} onClick={() => setShowPlanningModal(false)}>
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>예산명</label>
+                  <Input
+                    value={newBudget.budgetName}
+                    onChange={(e) => setNewBudget({...newBudget, budgetName: e.target.value})}
+                    placeholder="예산명을 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>카테고리</label>
+                  <select
+                    value={newBudget.category}
+                    onChange={(e) => setNewBudget({...newBudget, category: e.target.value})}
+                    className={styles.formSelect}
+                  >
+                    <option value="">카테고리 선택</option>
+                    <option value="마케팅">마케팅</option>
+                    <option value="개발">개발</option>
+                    <option value="인사">인사</option>
+                    <option value="운영">운영</option>
+                    <option value="영업">영업</option>
+                    <option value="IT">IT</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>부서</label>
+                  <Input
+                    value={newBudget.department}
+                    onChange={(e) => setNewBudget({...newBudget, department: e.target.value})}
+                    placeholder="담당 부서를 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>계획 예산</label>
+                  <Input
+                    type="number"
+                    value={newBudget.plannedAmount}
+                    onChange={(e) => setNewBudget({...newBudget, plannedAmount: e.target.value})}
+                    placeholder="예산 금액을 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>우선순위</label>
+                  <select
+                    value={newBudget.priority}
+                    onChange={(e) => setNewBudget({...newBudget, priority: e.target.value as 'high' | 'medium' | 'low'})}
+                    className={styles.formSelect}
+                  >
+                    <option value="low">낮음</option>
+                    <option value="medium">보통</option>
+                    <option value="high">높음</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>시작일</label>
+                  <Input
+                    type="date"
+                    value={newBudget.startDate}
+                    onChange={(e) => setNewBudget({...newBudget, startDate: e.target.value})}
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>종료일</label>
+                  <Input
+                    type="date"
+                    value={newBudget.endDate}
+                    onChange={(e) => setNewBudget({...newBudget, endDate: e.target.value})}
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroupFull}>
+                  <label className={styles.formLabel}>설명</label>
+                  <textarea
+                    value={newBudget.description}
+                    onChange={(e) => setNewBudget({...newBudget, description: e.target.value})}
+                    placeholder="예산 계획에 대한 설명을 입력하세요"
+                    className={styles.formTextarea}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className={styles.modalActions}>
+                <Button variant="outline" onClick={() => setShowPlanningModal(false)}>
+                  취소
+                </Button>
+                <Button onClick={handleCreateBudget}>
+                  예산 계획 생성
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Budget Edit Modal */}
+      {showEditModal && editingBudget && (
+        <div className={styles.modal}>
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>예산 수정</h2>
+              <button className={styles.closeButton} onClick={() => setShowEditModal(false)}>
+                ×
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>예산명</label>
+                  <Input
+                    value={editBudget.budgetName}
+                    onChange={(e) => setEditBudget({...editBudget, budgetName: e.target.value})}
+                    placeholder="예산명을 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>카테고리</label>
+                  <select
+                    value={editBudget.category}
+                    onChange={(e) => setEditBudget({...editBudget, category: e.target.value})}
+                    className={styles.formSelect}
+                  >
+                    <option value="">카테고리 선택</option>
+                    <option value="마케팅">마케팅</option>
+                    <option value="개발">개발</option>
+                    <option value="인사">인사</option>
+                    <option value="운영">운영</option>
+                    <option value="영업">영업</option>
+                    <option value="IT">IT</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>부서</label>
+                  <Input
+                    value={editBudget.department}
+                    onChange={(e) => setEditBudget({...editBudget, department: e.target.value})}
+                    placeholder="담당 부서를 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>담당자</label>
+                  <Input
+                    value={editBudget.owner}
+                    onChange={(e) => setEditBudget({...editBudget, owner: e.target.value})}
+                    placeholder="담당자를 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>계획 예산</label>
+                  <Input
+                    type="number"
+                    value={editBudget.plannedAmount}
+                    onChange={(e) => setEditBudget({...editBudget, plannedAmount: e.target.value})}
+                    placeholder="예산 금액을 입력하세요"
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>우선순위</label>
+                  <select
+                    value={editBudget.priority}
+                    onChange={(e) => setEditBudget({...editBudget, priority: e.target.value as 'high' | 'medium' | 'low'})}
+                    className={styles.formSelect}
+                  >
+                    <option value="low">낮음</option>
+                    <option value="medium">보통</option>
+                    <option value="high">높음</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>시작일</label>
+                  <Input
+                    type="date"
+                    value={editBudget.startDate}
+                    onChange={(e) => setEditBudget({...editBudget, startDate: e.target.value})}
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>종료일</label>
+                  <Input
+                    type="date"
+                    value={editBudget.endDate}
+                    onChange={(e) => setEditBudget({...editBudget, endDate: e.target.value})}
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroupFull}>
+                  <label className={styles.formLabel}>설명</label>
+                  <textarea
+                    value={editBudget.description}
+                    onChange={(e) => setEditBudget({...editBudget, description: e.target.value})}
+                    placeholder="예산 계획에 대한 설명을 입력하세요"
+                    className={styles.formTextarea}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className={styles.modalActions}>
+                <Button variant="outline" onClick={() => setShowEditModal(false)}>
+                  취소
+                </Button>
+                <Button onClick={handleUpdateBudget}>
+                  예산 수정
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.content}>
         <div className={styles.budgetsGrid}>
           {filteredBudgets.map((budget) => {
@@ -322,8 +623,11 @@ export const BudgetPage: React.FC = () => {
                     <Button variant="ghost" size="sm" onClick={() => setSelectedBudget(budget)}>
                       <Eye className={styles.actionIcon} />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleEditBudget(budget)}>
                       <Edit3 className={styles.actionIcon} />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteBudget(budget.id)}>
+                      <Trash2 className={styles.actionIcon} />
                     </Button>
                   </div>
                 </div>

@@ -22,6 +22,62 @@ export function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("전체");
   const [selectedStatus, setSelectedStatus] = useState("전체");
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+  const [showNewItem, setShowNewItem] = useState(false);
+  const [showViewItem, setShowViewItem] = useState(false);
+  const [showEditItem, setShowEditItem] = useState(false);
+  const [showAdjustStock, setShowAdjustStock] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  
+  // 고급 필터 상태
+  const [advancedFilters, setAdvancedFilters] = useState({
+    supplier: "",
+    location: "",
+    minStock: "",
+    maxStock: "",
+    minValue: "",
+    maxValue: "",
+    dateFrom: "",
+    dateTo: "",
+  });
+  
+  // 새 품목 폼 상태
+  const [newItemForm, setNewItemForm] = useState({
+    code: "",
+    name: "",
+    category: "",
+    currentStock: "",
+    minStock: "",
+    maxStock: "",
+    unit: "",
+    unitPrice: "",
+    location: "",
+    supplier: "",
+    status: "",
+  });
+  
+  // 편집 품목 폼 상태
+  const [editItemForm, setEditItemForm] = useState({
+    code: "",
+    name: "",
+    category: "",
+    currentStock: "",
+    minStock: "",
+    maxStock: "",
+    unit: "",
+    unitPrice: "",
+    location: "",
+    supplier: "",
+    status: "",
+  });
+  
+  // 재고 조정 폼 상태
+  const [adjustForm, setAdjustForm] = useState({
+    adjustmentType: "increase",
+    quantity: "",
+    reason: "",
+    notes: "",
+  });
 
   const containerStyle: React.CSSProperties = {
     padding: "2rem",
@@ -217,8 +273,8 @@ export function InventoryPage() {
     transition: "all 0.2s ease",
   };
 
-  // 샘플 데이터
-  const inventoryItems: InventoryItem[] = [
+  // 샘플 데이터를 state로 변경
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([
     {
       id: "INV-001",
       code: "RAW-001",
@@ -299,7 +355,7 @@ export function InventoryPage() {
       lastUpdated: "2024-01-16",
       status: "과다",
     },
-  ];
+  ]);
 
   const filteredItems = inventoryItems.filter((item) => {
     const matchesSearch =
@@ -308,7 +364,20 @@ export function InventoryPage() {
       item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "전체" || item.category === selectedCategory;
     const matchesStatus = selectedStatus === "전체" || item.status === selectedStatus;
-    return matchesSearch && matchesCategory && matchesStatus;
+    
+    // 고급 필터 적용
+    const matchesSupplier = !advancedFilters.supplier || 
+      item.supplier.toLowerCase().includes(advancedFilters.supplier.toLowerCase());
+    const matchesLocation = !advancedFilters.location || 
+      item.location.toLowerCase().includes(advancedFilters.location.toLowerCase());
+    const matchesMinStock = !advancedFilters.minStock || item.currentStock >= parseInt(advancedFilters.minStock);
+    const matchesMaxStock = !advancedFilters.maxStock || item.currentStock <= parseInt(advancedFilters.maxStock);
+    const matchesMinValue = !advancedFilters.minValue || item.totalValue >= parseInt(advancedFilters.minValue);
+    const matchesMaxValue = !advancedFilters.maxValue || item.totalValue <= parseInt(advancedFilters.maxValue);
+    
+    return matchesSearch && matchesCategory && matchesStatus && 
+           matchesSupplier && matchesLocation && matchesMinStock && 
+           matchesMaxStock && matchesMinValue && matchesMaxValue;
   });
 
   const formatCurrency = (amount: number) => {
@@ -342,6 +411,306 @@ export function InventoryPage() {
   };
 
   const categories = ["전체", ...Array.from(new Set(inventoryItems.map((i) => i.category)))];
+
+  // 핸들러 함수들
+  const handleInventoryReport = () => {
+    // CSV 헤더 정의
+    const headers = [
+      '품목코드',
+      '품목명',
+      '카테고리',
+      '현재고',
+      '최소재고',
+      '최대재고',
+      '단위',
+      '단가',
+      '총가치',
+      '위치',
+      '공급업체',
+      '상태',
+      '최종수정일'
+    ];
+
+    // 재고 데이터를 CSV 형식으로 변환
+    const csvData = filteredItems.map(item => [
+      item.code,
+      item.name,
+      item.category,
+      item.currentStock.toString(),
+      item.minStock.toString(),
+      item.maxStock.toString(),
+      item.unit,
+      item.unitPrice.toLocaleString(),
+      item.totalValue.toLocaleString(),
+      item.location,
+      item.supplier,
+      item.status,
+      item.lastUpdated
+    ]);
+
+    // CSV 문자열 생성
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(field => `"${field}"`).join(','))
+    ].join('\n');
+
+    // BOM 추가 (한글 인코딩을 위해)
+    const BOM = '\uFEFF';
+    const csvWithBOM = BOM + csvContent;
+
+    // Blob 생성 및 다운로드
+    const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `재고리포트_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert(`${filteredItems.length}개의 재고 데이터가 CSV 파일로 내보내졌습니다.`);
+    } else {
+      alert('파일 다운로드가 지원되지 않는 브라우저입니다.');
+    }
+  };
+
+  const handleViewItem = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setShowViewItem(true);
+  };
+
+  const handleEditItem = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setEditItemForm({
+      code: item.code,
+      name: item.name,
+      category: item.category,
+      currentStock: item.currentStock.toString(),
+      minStock: item.minStock.toString(),
+      maxStock: item.maxStock.toString(),
+      unit: item.unit,
+      unitPrice: item.unitPrice.toString(),
+      location: item.location,
+      supplier: item.supplier,
+      status: item.status,
+    });
+    setShowEditItem(true);
+  };
+
+  const handleAdjustStock = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setAdjustForm({
+      adjustmentType: "increase",
+      quantity: "",
+      reason: "",
+      notes: "",
+    });
+    setShowAdjustStock(true);
+  };
+
+  const createNewItem = () => {
+    if (!newItemForm.code || !newItemForm.name || !newItemForm.category) {
+      alert('필수 항목을 모두 입력해주세요.');
+      return;
+    }
+
+    const currentStock = parseInt(newItemForm.currentStock) || 0;
+    const unitPrice = parseInt(newItemForm.unitPrice) || 0;
+
+    const newItem: InventoryItem = {
+      id: `INV-${String(inventoryItems.length + 1).padStart(3, '0')}`,
+      code: newItemForm.code,
+      name: newItemForm.name,
+      category: newItemForm.category,
+      currentStock: currentStock,
+      minStock: parseInt(newItemForm.minStock) || 0,
+      maxStock: parseInt(newItemForm.maxStock) || 100,
+      unit: newItemForm.unit,
+      unitPrice: unitPrice,
+      totalValue: currentStock * unitPrice,
+      location: newItemForm.location,
+      supplier: newItemForm.supplier,
+      lastUpdated: new Date().toISOString().split('T')[0],
+      status: currentStock === 0 ? "없음" : 
+              currentStock < parseInt(newItemForm.minStock) ? "부족" :
+              currentStock > parseInt(newItemForm.maxStock) * 0.9 ? "과다" : "정상"
+    };
+
+    setInventoryItems([...inventoryItems, newItem]);
+    setShowNewItem(false);
+    setNewItemForm({
+      code: "",
+      name: "",
+      category: "",
+      currentStock: "",
+      minStock: "",
+      maxStock: "",
+      unit: "",
+      unitPrice: "",
+      location: "",
+      supplier: "",
+      status: "",
+    });
+    alert('새 품목이 성공적으로 등록되었습니다.');
+  };
+
+  const updateItem = () => {
+    if (!selectedItem) return;
+    
+    if (!editItemForm.code || !editItemForm.name || !editItemForm.category) {
+      alert('필수 항목을 모두 입력해주세요.');
+      return;
+    }
+
+    const currentStock = parseInt(editItemForm.currentStock) || 0;
+    const unitPrice = parseInt(editItemForm.unitPrice) || 0;
+
+    const updatedItem: InventoryItem = {
+      ...selectedItem,
+      code: editItemForm.code,
+      name: editItemForm.name,
+      category: editItemForm.category,
+      currentStock: currentStock,
+      minStock: parseInt(editItemForm.minStock) || 0,
+      maxStock: parseInt(editItemForm.maxStock) || 100,
+      unit: editItemForm.unit,
+      unitPrice: unitPrice,
+      totalValue: currentStock * unitPrice,
+      location: editItemForm.location,
+      supplier: editItemForm.supplier,
+      lastUpdated: new Date().toISOString().split('T')[0],
+      status: currentStock === 0 ? "없음" : 
+              currentStock < parseInt(editItemForm.minStock) ? "부족" :
+              currentStock > parseInt(editItemForm.maxStock) * 0.9 ? "과다" : "정상"
+    };
+
+    setInventoryItems(inventoryItems.map(item => 
+      item.id === selectedItem.id ? updatedItem : item
+    ));
+    
+    setShowEditItem(false);
+    setSelectedItem(null);
+    alert('품목이 성공적으로 수정되었습니다.');
+  };
+
+  const adjustStock = () => {
+    if (!selectedItem || !adjustForm.quantity || !adjustForm.reason) {
+      alert('필수 항목을 모두 입력해주세요.');
+      return;
+    }
+
+    const adjustmentQuantity = parseInt(adjustForm.quantity);
+    const newStock = adjustForm.adjustmentType === "increase" 
+      ? selectedItem.currentStock + adjustmentQuantity
+      : selectedItem.currentStock - adjustmentQuantity;
+
+    if (newStock < 0) {
+      alert('재고가 음수가 될 수 없습니다.');
+      return;
+    }
+
+    const updatedItem: InventoryItem = {
+      ...selectedItem,
+      currentStock: newStock,
+      totalValue: newStock * selectedItem.unitPrice,
+      lastUpdated: new Date().toISOString().split('T')[0],
+      status: newStock === 0 ? "없음" : 
+              newStock < selectedItem.minStock ? "부족" :
+              newStock > selectedItem.maxStock * 0.9 ? "과다" : "정상"
+    };
+
+    setInventoryItems(inventoryItems.map(item => 
+      item.id === selectedItem.id ? updatedItem : item
+    ));
+    
+    setShowAdjustStock(false);
+    setSelectedItem(null);
+    alert(`재고가 성공적으로 ${adjustForm.adjustmentType === "increase" ? "증가" : "감소"}되었습니다.`);
+  };
+
+  const applyAdvancedFilters = () => {
+    setShowAdvancedFilter(false);
+    alert('고급 필터가 적용되었습니다.');
+  };
+
+  const resetFilters = () => {
+    setAdvancedFilters({
+      supplier: "",
+      location: "",
+      minStock: "",
+      maxStock: "",
+      minValue: "",
+      maxValue: "",
+      dateFrom: "",
+      dateTo: "",
+    });
+    setSelectedCategory("전체");
+    setSelectedStatus("전체");
+    setSearchTerm("");
+  };
+
+  const closeModals = () => {
+    setShowAdvancedFilter(false);
+    setShowNewItem(false);
+    setShowViewItem(false);
+    setShowEditItem(false);
+    setShowAdjustStock(false);
+    setSelectedItem(null);
+  };
+
+  // 모달 스타일들
+  const modalOverlayStyle: React.CSSProperties = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    background: "white",
+    borderRadius: "1rem",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+    maxWidth: "600px",
+    width: "90%",
+    maxHeight: "80vh",
+    overflowY: "auto",
+  };
+
+  const modalHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "1.5rem",
+    borderBottom: "1px solid #e5e7eb",
+  };
+
+  const modalTitleStyle: React.CSSProperties = {
+    fontSize: "1.25rem",
+    fontWeight: 600,
+    color: "#1f2937",
+    margin: 0,
+  };
+
+  const modalContentStyle: React.CSSProperties = {
+    padding: "1.5rem",
+  };
+
+  const closeButtonStyle: React.CSSProperties = {
+    background: "none",
+    border: "none",
+    fontSize: "1.5rem",
+    cursor: "pointer",
+    color: "#6b7280",
+  };
 
   return (
     <div style={containerStyle}>
@@ -412,15 +781,15 @@ export function InventoryPage() {
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button style={secondaryButtonStyle}>
+          <button style={secondaryButtonStyle} onClick={() => setShowAdvancedFilter(true)}>
             <Filter style={{ height: "1rem", width: "1rem" }} />
             고급 필터
           </button>
-          <button style={secondaryButtonStyle}>
+          <button style={secondaryButtonStyle} onClick={handleInventoryReport}>
             <Download style={{ height: "1rem", width: "1rem" }} />
             재고 리포트
           </button>
-          <button style={primaryButtonStyle}>
+          <button style={primaryButtonStyle} onClick={() => setShowNewItem(true)}>
             <Plus style={{ height: "1rem", width: "1rem" }} />새 품목 등록
           </button>
         </div>
@@ -486,13 +855,13 @@ export function InventoryPage() {
                 <td style={tdStyle}>{item.lastUpdated}</td>
                 <td style={tdStyle}>
                   <div style={{ display: "flex", gap: "0.25rem" }}>
-                    <button style={actionButtonStyle} title="보기">
+                    <button style={actionButtonStyle} title="보기" onClick={() => handleViewItem(item)}>
                       <Eye style={{ height: "1rem", width: "1rem" }} />
                     </button>
-                    <button style={actionButtonStyle} title="편집">
+                    <button style={actionButtonStyle} title="편집" onClick={() => handleEditItem(item)}>
                       <Edit style={{ height: "1rem", width: "1rem" }} />
                     </button>
-                    <button style={actionButtonStyle} title="재고조정">
+                    <button style={actionButtonStyle} title="재고조정" onClick={() => handleAdjustStock(item)}>
                       <Package style={{ height: "1rem", width: "1rem" }} />
                     </button>
                   </div>
@@ -516,6 +885,720 @@ export function InventoryPage() {
       >
         총 {filteredItems.length}개 품목이 표시됨 (전체 {inventoryItems.length}개 중)
       </div>
+
+      {/* 모달들 */}
+      {showAdvancedFilter && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={modalTitleStyle}>고급 필터</h2>
+              <button style={closeButtonStyle} onClick={closeModals}>×</button>
+            </div>
+            <div style={modalContentStyle}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>공급업체</label>
+                  <input
+                    type="text"
+                    value={advancedFilters.supplier}
+                    onChange={(e) => setAdvancedFilters({...advancedFilters, supplier: e.target.value})}
+                    placeholder="공급업체명으로 검색..."
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "0.375rem",
+                      fontSize: "0.875rem"
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>위치</label>
+                  <input
+                    type="text"
+                    value={advancedFilters.location}
+                    onChange={(e) => setAdvancedFilters({...advancedFilters, location: e.target.value})}
+                    placeholder="위치로 검색..."
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "0.375rem",
+                      fontSize: "0.875rem"
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
+                <button
+                  onClick={resetFilters}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "0.375rem",
+                    background: "white",
+                    color: "#374151",
+                    fontSize: "0.875rem",
+                    cursor: "pointer"
+                  }}
+                >
+                  초기화
+                </button>
+                <button
+                  onClick={applyAdvancedFilters}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    border: "none",
+                    borderRadius: "0.375rem",
+                    background: "#3b82f6",
+                    color: "white",
+                    fontSize: "0.875rem",
+                    cursor: "pointer"
+                  }}
+                >
+                  필터 적용
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 새 품목 등록 모달 */}
+      {showNewItem && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={modalTitleStyle}>새 품목 등록</h2>
+              <button style={closeButtonStyle} onClick={closeModals}>×</button>
+            </div>
+            <div style={modalContentStyle}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    품목코드 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newItemForm.code}
+                    onChange={(e) => setNewItemForm({...newItemForm, code: e.target.value})}
+                    placeholder="예: RAW-001"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    품목명 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newItemForm.name}
+                    onChange={(e) => setNewItemForm({...newItemForm, name: e.target.value})}
+                    placeholder="품목명을 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    카테고리 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <select
+                    value={newItemForm.category}
+                    onChange={(e) => setNewItemForm({...newItemForm, category: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      backgroundColor: "white",
+                    }}
+                  >
+                    <option value="">카테고리 선택</option>
+                    <option value="원자재">원자재</option>
+                    <option value="부품">부품</option>
+                    <option value="완제품">완제품</option>
+                    <option value="공구">공구</option>
+                    <option value="소모품">소모품</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>단위</label>
+                  <input
+                    type="text"
+                    value={newItemForm.unit}
+                    onChange={(e) => setNewItemForm({...newItemForm, unit: e.target.value})}
+                    placeholder="예: 개, 장, 대"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>현재고</label>
+                  <input
+                    type="number"
+                    value={newItemForm.currentStock}
+                    onChange={(e) => setNewItemForm({...newItemForm, currentStock: e.target.value})}
+                    placeholder="0"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>최소재고</label>
+                  <input
+                    type="number"
+                    value={newItemForm.minStock}
+                    onChange={(e) => setNewItemForm({...newItemForm, minStock: e.target.value})}
+                    placeholder="0"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>최대재고</label>
+                  <input
+                    type="number"
+                    value={newItemForm.maxStock}
+                    onChange={(e) => setNewItemForm({...newItemForm, maxStock: e.target.value})}
+                    placeholder="100"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>단가</label>
+                  <input
+                    type="number"
+                    value={newItemForm.unitPrice}
+                    onChange={(e) => setNewItemForm({...newItemForm, unitPrice: e.target.value})}
+                    placeholder="0"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>위치</label>
+                  <input
+                    type="text"
+                    value={newItemForm.location}
+                    onChange={(e) => setNewItemForm({...newItemForm, location: e.target.value})}
+                    placeholder="예: 창고A-1구역"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>공급업체</label>
+                <input
+                  type="text"
+                  value={newItemForm.supplier}
+                  onChange={(e) => setNewItemForm({...newItemForm, supplier: e.target.value})}
+                  placeholder="공급업체명을 입력하세요"
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                <button
+                  onClick={closeModals}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "white",
+                    color: "#6b7280",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={createNewItem}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "#3b82f6",
+                    color: "white",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  품목 등록
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 품목 보기 모달 */}
+      {showViewItem && selectedItem && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={modalTitleStyle}>{selectedItem.name} 상세정보</h2>
+              <button style={closeButtonStyle} onClick={closeModals}>×</button>
+            </div>
+            <div style={modalContentStyle}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>품목코드</label>
+                  <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                    {selectedItem.code}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>품목명</label>
+                  <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                    {selectedItem.name}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+                <button
+                  onClick={closeModals}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "#3b82f6",
+                    color: "white",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 품목 편집 모달 */}
+      {showEditItem && selectedItem && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={modalTitleStyle}>{selectedItem.name} 편집</h2>
+              <button style={closeButtonStyle} onClick={closeModals}>×</button>
+            </div>
+            <div style={modalContentStyle}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    품목코드 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editItemForm.code}
+                    onChange={(e) => setEditItemForm({...editItemForm, code: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    품목명 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editItemForm.name}
+                    onChange={(e) => setEditItemForm({...editItemForm, name: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    카테고리 <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <select
+                    value={editItemForm.category}
+                    onChange={(e) => setEditItemForm({...editItemForm, category: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      backgroundColor: "white",
+                    }}
+                  >
+                    <option value="">카테고리 선택</option>
+                    <option value="원자재">원자재</option>
+                    <option value="부품">부품</option>
+                    <option value="완제품">완제품</option>
+                    <option value="공구">공구</option>
+                    <option value="소모품">소모품</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>단위</label>
+                  <input
+                    type="text"
+                    value={editItemForm.unit}
+                    onChange={(e) => setEditItemForm({...editItemForm, unit: e.target.value})}
+                    placeholder="예: 개, 장, 대"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>현재고</label>
+                  <input
+                    type="number"
+                    value={editItemForm.currentStock}
+                    onChange={(e) => setEditItemForm({...editItemForm, currentStock: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>최소재고</label>
+                  <input
+                    type="number"
+                    value={editItemForm.minStock}
+                    onChange={(e) => setEditItemForm({...editItemForm, minStock: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>최대재고</label>
+                  <input
+                    type="number"
+                    value={editItemForm.maxStock}
+                    onChange={(e) => setEditItemForm({...editItemForm, maxStock: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>단가</label>
+                  <input
+                    type="number"
+                    value={editItemForm.unitPrice}
+                    onChange={(e) => setEditItemForm({...editItemForm, unitPrice: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>위치</label>
+                  <input
+                    type="text"
+                    value={editItemForm.location}
+                    onChange={(e) => setEditItemForm({...editItemForm, location: e.target.value})}
+                    placeholder="예: 창고A-1구역"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>공급업체</label>
+                  <input
+                    type="text"
+                    value={editItemForm.supplier}
+                    onChange={(e) => setEditItemForm({...editItemForm, supplier: e.target.value})}
+                    placeholder="공급업체명을 입력하세요"
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>상태</label>
+                  <select
+                    value={editItemForm.status}
+                    onChange={(e) => setEditItemForm({...editItemForm, status: e.target.value})}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      border: "2px solid #e5e7eb",
+                      borderRadius: "0.5rem",
+                      fontSize: "0.875rem",
+                      backgroundColor: "white",
+                    }}
+                  >
+                    <option value="정상">정상</option>
+                    <option value="부족">부족</option>
+                    <option value="과다">과다</option>
+                    <option value="없음">없음</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                <button
+                  onClick={closeModals}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "white",
+                    color: "#6b7280",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={updateItem}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "#3b82f6",
+                    color: "white",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  수정 완료
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 재고 조정 모달 */}
+      {showAdjustStock && selectedItem && (
+        <div style={modalOverlayStyle} onClick={closeModals}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h2 style={modalTitleStyle}>{selectedItem.name} 재고 조정</h2>
+              <button style={closeButtonStyle} onClick={closeModals}>×</button>
+            </div>
+            <div style={modalContentStyle}>
+              <div style={{ marginBottom: "1rem" }}>
+                <div style={{ padding: "1rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", marginBottom: "1rem" }}>
+                  <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>현재 재고</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 600, color: "#374151" }}>
+                    {selectedItem.currentStock.toLocaleString()} {selectedItem.unit}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>조정 유형</label>
+                <select
+                  value={adjustForm.adjustmentType}
+                  onChange={(e) => setAdjustForm({...adjustForm, adjustmentType: e.target.value})}
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                    backgroundColor: "white",
+                  }}
+                >
+                  <option value="increase">재고 증가</option>
+                  <option value="decrease">재고 감소</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                  조정 수량 <span style={{ color: "#ef4444" }}>*</span>
+                </label>
+                <input
+                  type="number"
+                  value={adjustForm.quantity}
+                  onChange={(e) => setAdjustForm({...adjustForm, quantity: e.target.value})}
+                  placeholder="조정할 수량을 입력하세요"
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                  조정 사유 <span style={{ color: "#ef4444" }}>*</span>
+                </label>
+                <select
+                  value={adjustForm.reason}
+                  onChange={(e) => setAdjustForm({...adjustForm, reason: e.target.value})}
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.875rem",
+                    backgroundColor: "white",
+                  }}
+                >
+                  <option value="">사유 선택</option>
+                  <option value="입고">입고</option>
+                  <option value="출고">출고</option>
+                  <option value="재고실사">재고실사</option>
+                  <option value="손실">손실</option>
+                  <option value="기타">기타</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                <button
+                  onClick={closeModals}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "white",
+                    color: "#6b7280",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={adjustStock}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    border: "none",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "#3b82f6",
+                    color: "white",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  재고 조정
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

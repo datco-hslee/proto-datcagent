@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Search, Plus, Filter, Eye, Clock, Calendar, User, CheckCircle, AlertCircle, Coffee, Home, Briefcase, BarChart3 } from "lucide-react";
+import { useEmployees } from "@/context/EmployeeContext";
 import styles from "./AttendancePage.module.css";
 
 interface AttendanceRecord {
@@ -113,12 +114,43 @@ const statusConfig = {
 };
 
 export const AttendancePage: React.FC = () => {
+  const { employees } = useEmployees();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newRecord, setNewRecord] = useState<Partial<AttendanceRecord>>({});
 
-  const filteredRecords = mockAttendanceRecords.filter((record) => {
+  // 직원 데이터를 기반으로 근태 기록 생성
+  const generateAttendanceRecordsFromEmployees = () => {
+    const activeEmployees = employees.filter(emp => emp.status === "재직");
+    const today = new Date().toISOString().split('T')[0];
+    
+    return activeEmployees.map(emp => ({
+      id: `att_${emp.id}_${today}`,
+      employeeId: emp.employeeId,
+      employeeName: emp.name,
+      department: emp.department,
+      date: today,
+      checkIn: "09:00",
+      checkOut: "18:00",
+      breakStart: "12:00",
+      breakEnd: "13:00",
+      workingHours: 8,
+      overtimeHours: 0,
+      status: "present" as const,
+    }));
+  };
+
+  useEffect(() => {
+    if (employees.length > 0) {
+      setAttendanceRecords(generateAttendanceRecordsFromEmployees());
+    }
+  }, [employees]);
+
+  const filteredRecords = attendanceRecords.filter((record) => {
     const matchesSearch =
       record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -134,13 +166,41 @@ export const AttendancePage: React.FC = () => {
   };
 
   // 통계 계산
-  const totalEmployees = mockAttendanceRecords.length;
-  const presentEmployees = mockAttendanceRecords.filter((r) => r.status === "present").length;
-  const lateEmployees = mockAttendanceRecords.filter((r) => r.status === "late").length;
-  const totalWorkingHours = mockAttendanceRecords.reduce((sum, r) => sum + r.workingHours, 0);
-  const totalOvertimeHours = mockAttendanceRecords.reduce((sum, r) => sum + r.overtimeHours, 0);
+  const totalEmployees = attendanceRecords.length;
+  const presentEmployees = attendanceRecords.filter((r) => r.status === "present").length;
+  const lateEmployees = attendanceRecords.filter((r) => r.status === "late").length;
+  const totalWorkingHours = attendanceRecords.reduce((sum, r) => sum + r.workingHours, 0);
+  const totalOvertimeHours = attendanceRecords.reduce((sum, r) => sum + r.overtimeHours, 0);
 
-  const departments = [...new Set(mockAttendanceRecords.map((r) => r.department))];
+  const departments = [...new Set(attendanceRecords.map((r) => r.department))];
+
+  // 근태 기록 추가 핸들러
+  const handleAddRecord = () => {
+    if (!newRecord.employeeId || !newRecord.date) return;
+    
+    const employee = employees.find(emp => emp.employeeId === newRecord.employeeId);
+    if (!employee) return;
+
+    const record: AttendanceRecord = {
+      id: `att_${Date.now()}`,
+      employeeId: newRecord.employeeId,
+      employeeName: employee.name,
+      department: employee.department,
+      date: newRecord.date || new Date().toISOString().split('T')[0],
+      checkIn: newRecord.checkIn,
+      checkOut: newRecord.checkOut,
+      breakStart: newRecord.breakStart,
+      breakEnd: newRecord.breakEnd,
+      workingHours: newRecord.workingHours || 0,
+      overtimeHours: newRecord.overtimeHours || 0,
+      status: newRecord.status || "present",
+      notes: newRecord.notes,
+    };
+
+    setAttendanceRecords(prev => [...prev, record]);
+    setNewRecord({});
+    setShowAddModal(false);
+  };
 
   return (
     <div className={styles.container}>
@@ -150,7 +210,7 @@ export const AttendancePage: React.FC = () => {
             <h1 className={styles.title}>근태 관리</h1>
             <p className={styles.subtitle}>직원 출퇴근 및 근무시간을 관리하세요</p>
           </div>
-          <Button className={styles.addButton}>
+          <Button className={styles.addButton} onClick={() => setShowAddModal(true)}>
             <Plus className={styles.icon} />
             근태 기록
           </Button>
@@ -158,9 +218,9 @@ export const AttendancePage: React.FC = () => {
 
         <div className={styles.statsGrid}>
           <Card className={styles.statCard}>
-            <div className={styles.statContent}>
+            <div className={styles.statContent}>  
               <div className={styles.statInfo}>
-                <span className={styles.statLabel}>총 직원</span>
+                <span className={styles.statLabel}>총 직원수</span>
                 <span className={styles.statValue}>{totalEmployees}명</span>
               </div>
               <div className={styles.statIcon}>
@@ -172,7 +232,7 @@ export const AttendancePage: React.FC = () => {
             <div className={styles.statContent}>
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>정상 출근</span>
-                <span className={styles.statValue}>{presentEmployees}명</span>
+                <span className={`${styles.statValue} ${styles.presentEmployees}`}>{presentEmployees}명</span>
               </div>
               <div className={styles.statIcon}>
                 <CheckCircle />
@@ -183,7 +243,7 @@ export const AttendancePage: React.FC = () => {
             <div className={styles.statContent}>
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>지각자</span>
-                <span className={styles.statValue}>{lateEmployees}명</span>
+                <span className={`${styles.statValue} ${styles.lateEmployees}`}>{lateEmployees}명</span>
               </div>
               <div className={styles.statIcon}>
                 <Clock />
@@ -194,7 +254,7 @@ export const AttendancePage: React.FC = () => {
             <div className={styles.statContent}>
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>총 근무시간</span>
-                <span className={styles.statValue}>{totalWorkingHours.toFixed(1)}h</span>
+                <span className={`${styles.statValue} ${styles.totalWorkHours}`}>{totalWorkingHours.toFixed(1)}h</span>
               </div>
               <div className={styles.statIcon}>
                 <Briefcase />
@@ -412,6 +472,148 @@ export const AttendancePage: React.FC = () => {
                   <div className={styles.notesContent}>{selectedRecord.notes}</div>
                 </div>
               )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* 근태 기록 추가 모달 */}
+      {showAddModal && (
+        <div className={styles.modal} onClick={() => setShowAddModal(false)}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>근태 기록 추가</h2>
+              <Button variant="ghost" onClick={() => setShowAddModal(false)} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.attendanceForm}>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>직원 선택</label>
+                    <select
+                      value={newRecord.employeeId || ""}
+                      onChange={(e) => setNewRecord({...newRecord, employeeId: e.target.value})}
+                      className={styles.selectInput}
+                    >
+                      <option value="">직원을 선택하세요</option>
+                      {employees.filter(emp => emp.status === "재직").map((emp) => (
+                        <option key={emp.id} value={emp.employeeId}>
+                          {emp.name} ({emp.employeeId}) - {emp.department}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>근무일</label>
+                    <Input
+                      type="date"
+                      value={newRecord.date || new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setNewRecord({...newRecord, date: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>출근시간</label>
+                    <Input
+                      type="time"
+                      value={newRecord.checkIn || ""}
+                      onChange={(e) => setNewRecord({...newRecord, checkIn: e.target.value})}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>퇴근시간</label>
+                    <Input
+                      type="time"
+                      value={newRecord.checkOut || ""}
+                      onChange={(e) => setNewRecord({...newRecord, checkOut: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>휴게시작</label>
+                    <Input
+                      type="time"
+                      value={newRecord.breakStart || ""}
+                      onChange={(e) => setNewRecord({...newRecord, breakStart: e.target.value})}
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>휴게종료</label>
+                    <Input
+                      type="time"
+                      value={newRecord.breakEnd || ""}
+                      onChange={(e) => setNewRecord({...newRecord, breakEnd: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>근무시간</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={newRecord.workingHours || ""}
+                      onChange={(e) => setNewRecord({...newRecord, workingHours: Number(e.target.value)})}
+                      placeholder="근무시간 (시간)"
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>연장근무</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={newRecord.overtimeHours || ""}
+                      onChange={(e) => setNewRecord({...newRecord, overtimeHours: Number(e.target.value)})}
+                      placeholder="연장근무 (시간)"
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>근태 상태</label>
+                    <select
+                      value={newRecord.status || "present"}
+                      onChange={(e) => setNewRecord({...newRecord, status: e.target.value as AttendanceRecord['status']})}
+                      className={styles.selectInput}
+                    >
+                      <option value="present">정상출근</option>
+                      <option value="late">지각</option>
+                      <option value="early_leave">조퇴</option>
+                      <option value="absent">결근</option>
+                      <option value="vacation">휴가</option>
+                      <option value="sick_leave">병가</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>특이사항</label>
+                  <textarea
+                    value={newRecord.notes || ""}
+                    onChange={(e) => setNewRecord({...newRecord, notes: e.target.value})}
+                    placeholder="특이사항이나 메모를 입력하세요"
+                    className={styles.textArea}
+                    rows={3}
+                  />
+                </div>
+
+                <div className={styles.modalActions}>
+                  <Button variant="ghost" onClick={() => setShowAddModal(false)}>
+                    취소
+                  </Button>
+                  <Button onClick={handleAddRecord}>
+                    근태 기록 추가
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
         </div>

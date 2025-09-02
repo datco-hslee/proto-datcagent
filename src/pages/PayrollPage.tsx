@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
+import { useEmployees } from "../context/EmployeeContext";
+import type { PayrollRecord } from "../types/employee";
 import {
   Search,
   Plus,
@@ -21,105 +23,30 @@ import {
 } from "lucide-react";
 import styles from "./PayrollPage.module.css";
 
-interface PayrollRecord {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  department: string;
-  position: string;
-  period: string;
-  baseSalary: number;
-  allowances: number;
-  overtime: number;
-  deductions: number;
-  tax: number;
-  netPay: number;
-  status: "draft" | "approved" | "paid" | "cancelled";
-  payDate: string;
-}
 
-const mockPayrollRecords: PayrollRecord[] = [
-  {
-    id: "1",
-    employeeId: "EMP001",
-    employeeName: "김철수",
-    department: "개발팀",
-    position: "시니어 개발자",
-    period: "2024-01",
-    baseSalary: 4500000,
-    allowances: 300000,
-    overtime: 200000,
-    deductions: 120000,
-    tax: 680000,
-    netPay: 4200000,
-    status: "paid",
-    payDate: "2024-01-25",
-  },
-  {
-    id: "2",
-    employeeId: "EMP002",
-    employeeName: "이영희",
-    department: "마케팅팀",
-    position: "팀장",
-    period: "2024-01",
-    baseSalary: 5200000,
-    allowances: 400000,
-    overtime: 150000,
-    deductions: 140000,
-    tax: 820000,
-    netPay: 4790000,
-    status: "paid",
-    payDate: "2024-01-25",
-  },
-  {
-    id: "3",
-    employeeId: "EMP003",
-    employeeName: "박지민",
-    department: "영업팀",
-    position: "영업 대표",
-    period: "2024-01",
-    baseSalary: 3800000,
-    allowances: 250000,
-    overtime: 180000,
-    deductions: 100000,
-    tax: 590000,
-    netPay: 3540000,
-    status: "approved",
-    payDate: "2024-01-30",
-  },
-  {
-    id: "4",
-    employeeId: "EMP004",
-    employeeName: "최민수",
-    department: "인사팀",
-    position: "주임",
-    period: "2024-01",
-    baseSalary: 3200000,
-    allowances: 200000,
-    overtime: 120000,
-    deductions: 80000,
-    tax: 480000,
-    netPay: 2960000,
-    status: "draft",
-    payDate: "2024-01-30",
-  },
-  {
-    id: "5",
-    employeeId: "EMP005",
-    employeeName: "정수현",
-    department: "회계팀",
-    position: "대리",
-    period: "2024-01",
-    baseSalary: 3600000,
-    allowances: 180000,
-    overtime: 100000,
-    deductions: 90000,
-    tax: 520000,
-    netPay: 3270000,
-    status: "approved",
-    payDate: "2024-01-30",
-  },
-];
+// 실제 직원 데이터를 기반으로 급여 기록을 생성하는 함수
+const generatePayrollRecordsFromEmployees = (employees: any[]) => {
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM 형식
+  
+  return employees
+    .filter(emp => emp.status === "재직")
+    .map((employee) => ({
+      id: `payroll-${employee.employeeId}`,
+      employeeId: employee.employeeId,
+      employeeName: employee.name,
+      department: employee.department,
+      position: employee.position,
+      period: currentMonth,
+      baseSalary: employee.salary,
+      allowances: Math.floor(employee.salary * 0.1), // 기본급의 10%로 설정
+      overtime: 0, // 초기값 0
+      deductions: Math.floor(employee.salary * 0.03), // 기본급의 3%로 설정
+      tax: Math.floor(employee.salary * 0.15), // 기본급의 15%로 설정
+      netPay: employee.salary + Math.floor(employee.salary * 0.1) - Math.floor(employee.salary * 0.03) - Math.floor(employee.salary * 0.15),
+      status: "draft" as const,
+      payDate: "",
+    }));
+};
 
 const statusConfig = {
   draft: { label: "작성중", color: "secondary", icon: FileText },
@@ -129,12 +56,31 @@ const statusConfig = {
 };
 
 export const PayrollPage: React.FC = () => {
+  const { employees, getEmployeeById, getActiveEmployees } = useEmployees();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
+  const [showCalculationModal, setShowCalculationModal] = useState(false);
+  const [calculationData, setCalculationData] = useState({
+    employeeId: "",
+    period: "",
+    baseSalary: 0,
+    allowances: 0,
+    overtimeHours: 0,
+    overtimeRate: 1.5
+  });
 
-  const filteredRecords = mockPayrollRecords.filter((record) => {
+  // 직원 데이터가 변경될 때마다 급여 기록을 업데이트
+  useEffect(() => {
+    if (employees.length > 0) {
+      const generatedRecords = generatePayrollRecordsFromEmployees(employees);
+      setPayrollRecords(generatedRecords);
+    }
+  }, [employees]);
+
+  const filteredRecords = payrollRecords.filter((record) => {
     const matchesSearch =
       record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -156,9 +102,155 @@ export const PayrollPage: React.FC = () => {
     return <StatusIcon className={styles.statusIcon} />;
   };
 
-  const totalPayroll = mockPayrollRecords.reduce((sum, record) => sum + record.netPay, 0);
-  const totalTax = mockPayrollRecords.reduce((sum, record) => sum + record.tax, 0);
-  const departments = [...new Set(mockPayrollRecords.map((r) => r.department))];
+  const totalPayroll = payrollRecords.reduce((sum, record) => sum + record.netPay, 0);
+  const totalTax = payrollRecords.reduce((sum, record) => sum + record.tax, 0);
+  const departments = [...new Set(employees.map((e) => e.department))];
+
+  // Salary calculation function
+  const calculateSalary = () => {
+    const { baseSalary, allowances, overtimeHours, overtimeRate } = calculationData;
+    const hourlyRate = baseSalary / 209; // 월 기준 근무시간 (주 40시간 * 52주 / 12개월)
+    const overtimePay = hourlyRate * overtimeRate * overtimeHours;
+    const grossPay = baseSalary + allowances + overtimePay;
+    
+    // 4대보험 계산 (2024년 기준)
+    const nationalPension = Math.round(grossPay * 0.045); // 국민연금 4.5%
+    const healthInsurance = Math.round(grossPay * 0.03545); // 건강보험 3.545%
+    const employmentInsurance = Math.round(grossPay * 0.009); // 고용보험 0.9%
+    const totalInsurance = nationalPension + healthInsurance + employmentInsurance;
+    
+    // 소득세 계산 (간이세액표 기준 - 단순화)
+    const taxableIncome = grossPay - totalInsurance;
+    const incomeTax = Math.round(taxableIncome * 0.08); // 소득세 8% (단순화)
+    const localTax = Math.round(incomeTax * 0.1); // 지방소득세 10%
+    const totalTax = incomeTax + localTax;
+    
+    const netPay = grossPay - totalInsurance - totalTax;
+    
+    return {
+      grossPay,
+      overtime: overtimePay,
+      deductions: totalInsurance,
+      tax: totalTax,
+      netPay,
+      breakdown: {
+        nationalPension,
+        healthInsurance,
+        employmentInsurance,
+        incomeTax,
+        localTax
+      }
+    };
+  };
+
+  // Handle salary calculation submission
+  const handleCalculatePayroll = () => {
+    const employee = getEmployeeById(calculationData.employeeId);
+    if (!employee) {
+      alert("직원 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    const calculation = calculateSalary();
+    const newRecord: PayrollRecord = {
+      id: `PAY-${Date.now()}`,
+      employeeId: calculationData.employeeId,
+      employeeName: employee.name,
+      department: employee.department,
+      position: employee.position,
+      period: calculationData.period,
+      baseSalary: calculationData.baseSalary,
+      allowances: calculationData.allowances,
+      overtime: calculation.overtime,
+      deductions: calculation.deductions,
+      tax: calculation.tax,
+      netPay: calculation.netPay,
+      status: "draft",
+      payDate: new Date().toISOString().split('T')[0]
+    };
+    
+    setPayrollRecords([...payrollRecords, newRecord]);
+    setShowCalculationModal(false);
+    setCalculationData({
+      employeeId: "",
+      period: "",
+      baseSalary: 0,
+      allowances: 0,
+      overtimeHours: 0,
+      overtimeRate: 1.5
+    });
+  };
+
+  // Download individual payslip as CSV
+  const downloadPayslip = (record: PayrollRecord) => {
+    const csvContent = [
+      ['급여명세서'],
+      [''],
+      ['직원정보'],
+      ['사번', record.employeeId],
+      ['성명', record.employeeName],
+      ['부서', record.department],
+      ['직급', record.position],
+      ['급여기간', record.period],
+      ['지급일', record.payDate],
+      [''],
+      ['지급내역'],
+      ['기본급', record.baseSalary.toLocaleString()],
+      ['수당', record.allowances.toLocaleString()],
+      ['연장근무수당', record.overtime.toLocaleString()],
+      ['지급액소계', (record.baseSalary + record.allowances + record.overtime).toLocaleString()],
+      [''],
+      ['공제내역'],
+      ['4대보험', record.deductions.toLocaleString()],
+      ['소득세', record.tax.toLocaleString()],
+      ['공제액소계', (record.deductions + record.tax).toLocaleString()],
+      [''],
+      ['실수령액', record.netPay.toLocaleString()]
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `급여명세서_${record.employeeName}_${record.period}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Download all payroll data as CSV
+  const downloadAllPayroll = () => {
+    const headers = ['사번', '성명', '부서', '직급', '급여기간', '기본급', '수당', '연장근무수당', '공제액', '세금', '실수령액', '상태', '지급일'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredRecords.map(record => [
+        record.employeeId,
+        record.employeeName,
+        record.department,
+        record.position,
+        record.period,
+        record.baseSalary,
+        record.allowances,
+        record.overtime,
+        record.deductions,
+        record.tax,
+        record.netPay,
+        statusConfig[record.status]?.label,
+        record.payDate
+      ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `급여대장_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className={styles.container}>
@@ -168,10 +260,16 @@ export const PayrollPage: React.FC = () => {
             <h1 className={styles.title}>급여 관리</h1>
             <p className={styles.subtitle}>직원 급여를 계산하고 관리하세요</p>
           </div>
-          <Button className={styles.addButton}>
-            <Plus className={styles.icon} />
-            급여 계산
-          </Button>
+          <div className={styles.headerActions}>
+            <Button variant="outline" onClick={downloadAllPayroll}>
+              <Download className={styles.icon} />
+              전체 다운로드
+            </Button>
+            <Button className={styles.addButton} onClick={() => setShowCalculationModal(true)}>
+              <Plus className={styles.icon} />
+              급여 계산
+            </Button>
+          </div>
         </div>
 
         <div className={styles.statsGrid}>
@@ -201,7 +299,7 @@ export const PayrollPage: React.FC = () => {
             <div className={styles.statContent}>
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>처리 직원 수</span>
-                <span className={styles.statValue}>{mockPayrollRecords.length}명</span>
+                <span className={styles.statValue}>{payrollRecords.length}명</span>
               </div>
               <div className={styles.statIcon}>
                 <Users />
@@ -213,7 +311,7 @@ export const PayrollPage: React.FC = () => {
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>지급 완료율</span>
                 <span className={styles.statValue}>
-                  {Math.round((mockPayrollRecords.filter((r) => r.status === "paid").length / mockPayrollRecords.length) * 100)}%
+                  {Math.round((payrollRecords.filter((r) => r.status === "paid").length / payrollRecords.length) * 100)}%
                 </span>
               </div>
               <div className={styles.statIcon}>
@@ -273,7 +371,7 @@ export const PayrollPage: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => setSelectedRecord(record)}>
                     <Eye className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => downloadPayslip(record)}>
                     <Download className={styles.actionIcon} />
                   </Button>
                 </div>
@@ -337,9 +435,9 @@ export const PayrollPage: React.FC = () => {
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>급여 명세서</h2>
               <div className={styles.modalActions}>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => downloadPayslip(selectedRecord)}>
                   <Download className={styles.icon} />
-                  PDF 다운로드
+                  CSV 다운로드
                 </Button>
                 <Button variant="ghost" onClick={() => setSelectedRecord(null)} className={styles.closeButton}>
                   ✕
@@ -421,6 +519,130 @@ export const PayrollPage: React.FC = () => {
                     <span>실수령액</span>
                     <span className={styles.finalAmount}>{formatCurrency(selectedRecord.netPay)}</span>
                   </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Salary Calculation Modal */}
+      {showCalculationModal && (
+        <div className={styles.modal} onClick={() => setShowCalculationModal(false)}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>급여 계산</h2>
+              <Button variant="ghost" onClick={() => setShowCalculationModal(false)} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.calculationForm}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>직원 선택</label>
+                  <select
+                    value={calculationData.employeeId}
+                    onChange={(e) => {
+                      const selectedEmployee = getEmployeeById(e.target.value);
+                      setCalculationData({
+                        ...calculationData, 
+                        employeeId: e.target.value,
+                        baseSalary: selectedEmployee?.salary || 0
+                      });
+                    }}
+                    className={styles.employeeSelect}
+                  >
+                    <option value="">직원을 선택하세요</option>
+                    {getActiveEmployees().map((employee) => (
+                      <option key={employee.employeeId} value={employee.employeeId}>
+                        {employee.name} ({employee.employeeId}) - {employee.department}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>급여 기간</label>
+                  <Input
+                    type="month"
+                    value={calculationData.period}
+                    onChange={(e) => setCalculationData({...calculationData, period: e.target.value})}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>기본급</label>
+                  <Input
+                    type="number"
+                    value={calculationData.baseSalary}
+                    onChange={(e) => setCalculationData({...calculationData, baseSalary: Number(e.target.value)})}
+                    placeholder="기본급을 입력하세요"
+                    disabled={!!calculationData.employeeId}
+                  />
+                  {calculationData.employeeId && (
+                    <div className={styles.salaryNote}>
+                      * 선택된 직원의 기본급이 자동으로 설정됩니다
+                    </div>
+                  )}
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>수당</label>
+                  <Input
+                    type="number"
+                    value={calculationData.allowances}
+                    onChange={(e) => setCalculationData({...calculationData, allowances: Number(e.target.value)})}
+                    placeholder="수당을 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>연장근무 시간</label>
+                  <Input
+                    type="number"
+                    value={calculationData.overtimeHours}
+                    onChange={(e) => setCalculationData({...calculationData, overtimeHours: Number(e.target.value)})}
+                    placeholder="연장근무 시간을 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>연장근무 수당률</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={calculationData.overtimeRate}
+                    onChange={(e) => setCalculationData({...calculationData, overtimeRate: Number(e.target.value)})}
+                    placeholder="1.5"
+                  />
+                </div>
+                
+                {calculationData.baseSalary > 0 && (
+                  <div className={styles.calculationPreview}>
+                    <h4>계산 결과 미리보기</h4>
+                    <div className={styles.previewGrid}>
+                      <div className={styles.previewItem}>
+                        <span>총 지급액:</span>
+                        <span>{formatCurrency(calculateSalary().grossPay)}</span>
+                      </div>
+                      <div className={styles.previewItem}>
+                        <span>총 공제액:</span>
+                        <span>{formatCurrency(calculateSalary().deductions + calculateSalary().tax)}</span>
+                      </div>
+                      <div className={styles.previewItem}>
+                        <span>실수령액:</span>
+                        <span className={styles.finalAmount}>{formatCurrency(calculateSalary().netPay)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className={styles.formActions}>
+                  <Button variant="outline" onClick={() => setShowCalculationModal(false)}>
+                    취소
+                  </Button>
+                  <Button 
+                    onClick={handleCalculatePayroll}
+                    disabled={!calculationData.employeeId || !calculationData.period || calculationData.baseSalary <= 0}
+                  >
+                    <Calculator className={styles.icon} />
+                    급여 계산
+                  </Button>
                 </div>
               </div>
             </div>

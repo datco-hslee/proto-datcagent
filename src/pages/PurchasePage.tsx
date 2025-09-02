@@ -94,13 +94,93 @@ export const PurchasePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(mockPurchaseOrders);
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+  const [newOrder, setNewOrder] = useState<Partial<PurchaseOrder>>({
+    poNumber: "",
+    supplier: "",
+    supplierEmail: "",
+    items: 0,
+    totalAmount: 0,
+    status: "draft",
+    orderDate: new Date().toISOString().split('T')[0],
+    expectedDate: "",
+    category: "",
+  });
 
-  const filteredOrders = mockPurchaseOrders.filter((order) => {
+  const filteredOrders = purchaseOrders.filter((order) => {
     const matchesSearch =
       order.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) || order.supplier.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // 신규 구매 주문 생성
+  const handleCreateOrder = () => {
+    setShowNewOrderModal(true);
+    setEditingOrder(null);
+    setNewOrder({
+      poNumber: `PO-${new Date().getFullYear()}-${String(purchaseOrders.length + 1).padStart(3, '0')}`,
+      supplier: "",
+      supplierEmail: "",
+      items: 0,
+      totalAmount: 0,
+      status: "draft",
+      orderDate: new Date().toISOString().split('T')[0],
+      expectedDate: "",
+      category: "",
+    });
+  };
+
+  // 구매 주문 편집
+  const handleEditOrder = (order: PurchaseOrder) => {
+    setEditingOrder(order);
+    setNewOrder(order);
+    setShowNewOrderModal(true);
+  };
+
+  // 구매 주문 삭제
+  const handleDeleteOrder = (orderId: string) => {
+    if (confirm("정말로 이 구매 주문을 삭제하시겠습니까?")) {
+      setPurchaseOrders(prev => prev.filter(order => order.id !== orderId));
+      alert("구매 주문이 삭제되었습니다.");
+    }
+  };
+
+  // 구매 주문 저장
+  const handleSaveOrder = () => {
+    if (!newOrder.supplier || !newOrder.supplierEmail || !newOrder.category) {
+      alert("필수 정보를 모두 입력해주세요.");
+      return;
+    }
+
+    if (editingOrder) {
+      // 편집 모드
+      setPurchaseOrders(prev => 
+        prev.map(order => 
+          order.id === editingOrder.id 
+            ? { ...newOrder, id: editingOrder.id } as PurchaseOrder
+            : order
+        )
+      );
+      alert("구매 주문이 수정되었습니다.");
+    } else {
+      // 신규 생성 모드
+      const newId = String(purchaseOrders.length + 1);
+      setPurchaseOrders(prev => [...prev, { ...newOrder, id: newId } as PurchaseOrder]);
+      alert("새로운 구매 주문이 생성되었습니다.");
+    }
+
+    setShowNewOrderModal(false);
+    setEditingOrder(null);
+  };
+
+  // 모달 닫기
+  const handleCloseModal = () => {
+    setShowNewOrderModal(false);
+    setEditingOrder(null);
+  };
 
   const getStatusIcon = (status: string) => {
     const StatusIcon = statusConfig[status as keyof typeof statusConfig]?.icon || Clock;
@@ -122,7 +202,7 @@ export const PurchasePage: React.FC = () => {
             <h1 className={styles.title}>구매 관리</h1>
             <p className={styles.subtitle}>구매 주문을 생성하고 관리하세요</p>
           </div>
-          <Button className={styles.addButton}>
+          <Button className={styles.addButton} onClick={handleCreateOrder}>
             <Plus className={styles.icon} />
             신규 구매 주문
           </Button>
@@ -205,10 +285,10 @@ export const PurchasePage: React.FC = () => {
                   <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
                     <Eye className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleEditOrder(order)}>
                     <Edit3 className={styles.actionIcon} />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteOrder(order.id)}>
                     <Trash2 className={styles.actionIcon} />
                   </Button>
                 </div>
@@ -313,6 +393,123 @@ export const PurchasePage: React.FC = () => {
                     <span className={styles.totalAmount}>{formatCurrency(selectedOrder.totalAmount)}</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* 신규/편집 구매 주문 모달 */}
+      {showNewOrderModal && (
+        <div className={styles.modal} onClick={handleCloseModal}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>
+                {editingOrder ? "구매 주문 편집" : "신규 구매 주문"}
+              </h2>
+              <Button variant="ghost" onClick={handleCloseModal} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label>주문번호</label>
+                  <Input
+                    value={newOrder.poNumber || ""}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, poNumber: e.target.value }))}
+                    placeholder="PO-2024-001"
+                    disabled={!!editingOrder}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>공급업체명 *</label>
+                  <Input
+                    value={newOrder.supplier || ""}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, supplier: e.target.value }))}
+                    placeholder="공급업체명을 입력하세요"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>공급업체 이메일 *</label>
+                  <Input
+                    type="email"
+                    value={newOrder.supplierEmail || ""}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, supplierEmail: e.target.value }))}
+                    placeholder="supplier@example.com"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>카테고리 *</label>
+                  <select
+                    value={newOrder.category || ""}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, category: e.target.value }))}
+                    className={styles.formSelect}
+                  >
+                    <option value="">카테고리 선택</option>
+                    <option value="전자부품">전자부품</option>
+                    <option value="원재료">원재료</option>
+                    <option value="소프트웨어">소프트웨어</option>
+                    <option value="사무용품">사무용품</option>
+                    <option value="기계부품">기계부품</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>품목 수</label>
+                  <Input
+                    type="number"
+                    value={newOrder.items || 0}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, items: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>총 금액 (원)</label>
+                  <Input
+                    type="number"
+                    value={newOrder.totalAmount || 0}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, totalAmount: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>주문일</label>
+                  <Input
+                    type="date"
+                    value={newOrder.orderDate || ""}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, orderDate: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>예정일</label>
+                  <Input
+                    type="date"
+                    value={newOrder.expectedDate || ""}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, expectedDate: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>상태</label>
+                  <select
+                    value={newOrder.status || "draft"}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, status: e.target.value as PurchaseOrder["status"] }))}
+                    className={styles.formSelect}
+                  >
+                    <option value="draft">작성중</option>
+                    <option value="sent">발송됨</option>
+                    <option value="confirmed">확정됨</option>
+                    <option value="received">입고완료</option>
+                    <option value="cancelled">취소됨</option>
+                  </select>
+                </div>
+              </div>
+              <div className={styles.modalActions}>
+                <Button variant="outline" onClick={handleCloseModal}>
+                  취소
+                </Button>
+                <Button onClick={handleSaveOrder}>
+                  {editingOrder ? "수정" : "생성"}
+                </Button>
               </div>
             </div>
           </Card>

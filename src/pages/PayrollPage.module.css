@@ -27,6 +27,12 @@
   font-size: 1rem;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .addButton {
   display: flex;
   align-items: center;
@@ -570,6 +576,143 @@
   font-weight: 800 !important;
 }
 
+/* Calculation Form Styles */
+.calculationForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.calculationForm input {
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.calculationForm input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.previewSection {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.employeeSelect {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  color: #374151;
+  transition: border-color 0.2s ease;
+}
+
+.employeeSelect:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.employeeSelect:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.salaryNote {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.calculationPreview h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.previewGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.previewItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.previewItem span:first-child {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.previewItem span:last-child {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.previewItem:last-child {
+  border-top: 2px solid #3b82f6;
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.previewItem:last-child span {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.formActions button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.formActions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .container {
@@ -608,5 +751,22 @@
 
   .employeeDetails {
     flex-direction: column;
+  }
+
+  .headerActions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .formActions {
+    flex-direction: column;
+  }
+
+  .previewGrid {
+    gap: 0.5rem;
+  }
+
+  .calculationForm {
+    gap: 1rem;
   }
 }

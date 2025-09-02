@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
+import { EmployeeProvider } from "./context/EmployeeContext";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { CustomersPage } from "./pages/CustomersPage";
 import { OrdersPage } from "./pages/OrdersPage";
@@ -25,8 +26,9 @@ import { ProjectsPage } from "./pages/ProjectsPage";
 
 function App() {
   return (
-    <AppLayout>
-      <Routes>
+    <EmployeeProvider>
+      <AppLayout>
+        <Routes>
         <Route path="/" element={<Dashboard />} />
         {/* 고객 비즈니스 모듈 */}
         <Route path="/crm-pipeline" element={<CrmPipelinePage />} />
@@ -53,14 +55,9 @@ function App() {
         <Route path="/taxes" element={<TaxPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/documents" element={<div style={{ padding: "2rem" }}>문서 관리 페이지</div>} />
-        <Route path="/calendar" element={<div style={{ padding: "2rem" }}>일정 관리 페이지</div>} />
-        <Route path="/communication" element={<div style={{ padding: "2rem" }}>커뮤니케이션 페이지</div>} />
-        <Route path="/quality" element={<div style={{ padding: "2rem" }}>품질 관리 페이지</div>} />
-        <Route path="/settings" element={<div style={{ padding: "2rem" }}>설정 페이지</div>} />
-        <Route path="/permissions" element={<div style={{ padding: "2rem" }}>사용자 권한 페이지</div>} />
-        <Route path="/integrations" element={<div style={{ padding: "2rem" }}>통합 관리 페이지</div>} />
-      </Routes>
-    </AppLayout>
+        </Routes>
+      </AppLayout>
+    </EmployeeProvider>
   );
 }
 

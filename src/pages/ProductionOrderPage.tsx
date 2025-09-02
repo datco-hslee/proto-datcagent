@@ -8,22 +8,13 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Settings,
-  Users,
-  Package,
-  Zap,
   TrendingUp,
   Filter,
   Plus,
   Search,
   Eye,
   Edit,
-  Trash2,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 
 interface ProductionOrder {
   id: string;
@@ -193,6 +184,111 @@ export function ProductionOrderPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
 
+  // 스타일 정의
+  const cardStyle: React.CSSProperties = {
+    backgroundColor: "white",
+    borderRadius: "0.5rem",
+    padding: "1.5rem",
+    boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+    border: "1px solid #e5e7eb",
+  };
+
+  const primaryButtonStyle: React.CSSProperties = {
+    backgroundColor: "#3b82f6",
+    color: "white",
+    padding: "0.5rem 1rem",
+    borderRadius: "0.375rem",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+  };
+
+  const secondaryButtonStyle: React.CSSProperties = {
+    backgroundColor: "white",
+    color: "#374151",
+    padding: "0.5rem 1rem",
+    borderRadius: "0.375rem",
+    border: "1px solid #d1d5db",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+  };
+
+  const inputStyle: React.CSSProperties = {
+    padding: "0.5rem 0.75rem",
+    border: "1px solid #d1d5db",
+    borderRadius: "0.375rem",
+    fontSize: "0.875rem",
+    width: "100%",
+  };
+
+  const badgeStyle: React.CSSProperties = {
+    padding: "0.25rem 0.5rem",
+    borderRadius: "0.25rem",
+    fontSize: "0.75rem",
+    fontWeight: 500,
+  };
+
+  const modalOverlayStyle: React.CSSProperties = {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 50,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    backgroundColor: "white",
+    borderRadius: "0.5rem",
+    padding: "1.5rem",
+    maxWidth: "32rem",
+    width: "90%",
+    maxHeight: "90vh",
+    overflowY: "auto",
+  };
+
+  const getPriorityColorStyle = (priority: string): React.CSSProperties => {
+    switch (priority) {
+      case "urgent":
+        return { backgroundColor: "#dc2626", color: "white" };
+      case "high":
+        return { backgroundColor: "#ea580c", color: "white" };
+      case "medium":
+        return { backgroundColor: "#ca8a04", color: "white" };
+      case "low":
+        return { backgroundColor: "#16a34a", color: "white" };
+      default:
+        return { backgroundColor: "#6b7280", color: "white" };
+    }
+  };
+
+  const getStatusColorHex = (status: string): string => {
+    switch (status) {
+      case "planned":
+        return "#3b82f6";
+      case "in-progress":
+        return "#f59e0b";
+      case "completed":
+        return "#10b981";
+      case "on-hold":
+        return "#ef4444";
+      default:
+        return "#6b7280";
+    }
+  };
+
   const getStatusColor = (status: ProductionOrder["status"]) => {
     switch (status) {
       case "planned":
@@ -283,27 +379,39 @@ export function ProductionOrderPage() {
   };
 
   const getActionButton = (order: ProductionOrder) => {
+    const buttonBaseStyle: React.CSSProperties = {
+      padding: "0.25rem 0.75rem",
+      borderRadius: "0.375rem",
+      border: "none",
+      cursor: "pointer",
+      fontSize: "0.75rem",
+      fontWeight: 500,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "0.25rem",
+    };
+
     switch (order.status) {
       case "planned":
         return (
-          <Button size="sm" className="bg-blue-500 hover:bg-blue-600">
-            <Play className="h-3 w-3 mr-1" />
+          <button style={{...buttonBaseStyle, backgroundColor: "#3b82f6", color: "white"}}>
+            <Play size={12} />
             시작
-          </Button>
+          </button>
         );
       case "in-progress":
         return (
-          <Button size="sm" variant="outline">
-            <Pause className="h-3 w-3 mr-1" />
+          <button style={{...buttonBaseStyle, backgroundColor: "white", color: "#374151", border: "1px solid #d1d5db"}}>
+            <Pause size={12} />
             일시정지
-          </Button>
+          </button>
         );
       case "on-hold":
         return (
-          <Button size="sm" className="bg-green-500 hover:bg-green-600">
-            <RotateCcw className="h-3 w-3 mr-1" />
+          <button style={{...buttonBaseStyle, backgroundColor: "#10b981", color: "white"}}>
+            <RotateCcw size={12} />
             재개
-          </Button>
+          </button>
         );
       default:
         return null;
@@ -311,61 +419,59 @@ export function ProductionOrderPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div style={{ padding: "1.5rem", backgroundColor: "#f9fafb", minHeight: "100vh" }}>
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">생산 오더 현황</h1>
-          <p className="text-gray-500">생산 일정과 진행 상황을 실시간으로 관리하세요</p>
+          <h1 style={{ fontSize: "1.875rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>생산 오더 현황</h1>
+          <p style={{ color: "#6b7280" }}>생산 일정과 진행 상황을 실시간으로 관리하세요</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <button style={{...secondaryButtonStyle}}>
+            <Filter size={16} />
             상세 필터
-          </Button>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />새 오더 생성
-          </Button>
+          </button>
+          <button style={{...primaryButtonStyle}}>
+            <Plus size={16} />새 오더 생성
+          </button>
         </div>
       </div>
 
       {/* 주요 지표 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>
         {PRODUCTION_METRICS.map((metric, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">{metric.label}</CardTitle>
-              <metric.icon className={`h-4 w-4 text-${metric.color}-600`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{metric.value}</div>
-              {metric.change !== 0 && (
-                <p className={`text-xs ${metric.change > 0 ? "text-green-600" : "text-red-600"}`}>
-                  {metric.change > 0 ? "+" : ""}
-                  {metric.change} vs 어제
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <div key={index} style={cardStyle}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+              <h3 style={{ fontSize: "0.875rem", fontWeight: 500, color: "#6b7280" }}>{metric.label}</h3>
+              <metric.icon size={16} style={{ color: `var(--${metric.color}-600, #6b7280)` }} />
+            </div>
+            <div style={{ fontSize: "1.5rem", fontWeight: "bold", color: "#111827" }}>{metric.value}</div>
+            {metric.change !== 0 && (
+              <p style={{ fontSize: "0.75rem", color: metric.change > 0 ? "#10b981" : "#ef4444" }}>
+                {metric.change > 0 ? "+" : ""}
+                {metric.change} vs 어제
+              </p>
+            )}
+          </div>
         ))}
       </div>
 
       {/* 필터 및 검색 */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <Search size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+          <input
             placeholder="제품명, 오더번호, 고객사로 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            style={{...inputStyle, paddingLeft: "2.5rem"}}
           />
         </div>
-        <div className="flex gap-2">
+        <div style={{ display: "flex", gap: "0.5rem" }}>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            style={inputStyle}
           >
             <option value="all">모든 상태</option>
             <option value="planned">계획됨</option>
@@ -376,7 +482,7 @@ export function ProductionOrderPage() {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            style={inputStyle}
           >
             <option value="all">모든 우선순위</option>
             <option value="urgent">긴급</option>
@@ -388,76 +494,82 @@ export function ProductionOrderPage() {
       </div>
 
       {/* 생산 오더 목록 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>
         {filteredOrders.map((order) => (
-          <Card key={order.id} className="cursor-pointer transition-all hover:shadow-lg">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+          <div key={order.id} style={{...cardStyle, cursor: "pointer"}} onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 10px 15px -3px rgba(0, 0, 0, 0.1)"} onMouseLeave={(e) => e.currentTarget.style.boxShadow = cardStyle.boxShadow}>
+            <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e5e7eb", marginBottom: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <CardTitle className="text-lg font-semibold">{order.productName}</CardTitle>
-                  <p className="text-sm text-gray-500">{order.orderNumber}</p>
+                  <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#111827", marginBottom: "0.25rem" }}>{order.productName}</h3>
+                  <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>{order.orderNumber}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={getPriorityColor(order.priority)}>{getPriorityLabel(order.priority)}</Badge>
-                  <div className={`w-3 h-3 rounded-full ${getStatusColor(order.status)}`} />
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{...badgeStyle, ...getPriorityColorStyle(order.priority)}}>{getPriorityLabel(order.priority)}</span>
+                  <div style={{ width: "0.75rem", height: "0.75rem", borderRadius: "50%", backgroundColor: getStatusColorHex(order.status) }} />
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               {/* 기본 정보 */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", fontSize: "0.875rem" }}>
                 <div>
-                  <p className="text-gray-500">수량</p>
-                  <p className="font-medium">
+                  <p style={{ color: "#6b7280", marginBottom: "0.25rem" }}>수량</p>
+                  <p style={{ fontWeight: 500 }}>
                     {order.quantity.toLocaleString()} {order.unit}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500">고객사</p>
-                  <p className="font-medium">{order.customer}</p>
+                  <p style={{ color: "#6b7280", marginBottom: "0.25rem" }}>고객사</p>
+                  <p style={{ fontWeight: 500 }}>{order.customer}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">완료율</p>
-                  <p className="font-medium">{order.progress}%</p>
+                  <p style={{ color: "#6b7280", marginBottom: "0.25rem" }}>완료율</p>
+                  <p style={{ fontWeight: 500 }}>{order.progress}%</p>
                 </div>
                 <div>
-                  <p className="text-gray-500">담당팀</p>
-                  <p className="font-medium">{order.assignedTeam}</p>
+                  <p style={{ color: "#6b7280", marginBottom: "0.25rem" }}>담당팀</p>
+                  <p style={{ fontWeight: 500 }}>{order.assignedTeam}</p>
                 </div>
               </div>
 
               {/* 진행률 바 */}
               <div>
-                <div className="flex justify-between text-sm mb-1">
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem", marginBottom: "0.25rem" }}>
                   <span>진행률</span>
                   <span>
                     {order.completedQuantity}/{order.quantity}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div style={{ width: "100%", backgroundColor: "#e5e7eb", borderRadius: "9999px", height: "0.5rem" }}>
                   <div
-                    className={`h-2 rounded-full transition-all ${
-                      order.progress === 100 ? "bg-green-500" : order.progress > 50 ? "bg-blue-500" : "bg-orange-500"
-                    }`}
-                    style={{ width: `${order.progress}%` }}
+                    style={{
+                      height: "0.5rem",
+                      borderRadius: "9999px",
+                      transition: "all 0.3s",
+                      backgroundColor: order.progress === 100 ? "#10b981" : order.progress > 50 ? "#3b82f6" : "#f59e0b",
+                      width: `${order.progress}%`
+                    }}
                   />
                 </div>
               </div>
 
               {/* 일정 정보 */}
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-1 text-gray-500">
-                  <Calendar className="h-3 w-3" />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.875rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "#6b7280" }}>
+                  <Calendar size={12} />
                   <span>
                     {formatDate(order.startDate)} - {formatDate(order.dueDate)}
                   </span>
                 </div>
                 <div
-                  className={`flex items-center gap-1 ${
-                    getDaysRemaining(order.dueDate) < 0 ? "text-red-600" : getDaysRemaining(order.dueDate) <= 3 ? "text-orange-600" : "text-green-600"
-                  }`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                    color: getDaysRemaining(order.dueDate) < 0 ? "#dc2626" : getDaysRemaining(order.dueDate) <= 3 ? "#ea580c" : "#16a34a"
+                  }}
                 >
-                  <Clock className="h-3 w-3" />
+                  <Clock size={12} />
                   <span>
                     {getDaysRemaining(order.dueDate) < 0
                       ? `${Math.abs(getDaysRemaining(order.dueDate))}일 지연`
@@ -468,14 +580,17 @@ export function ProductionOrderPage() {
 
               {/* 자재 상태 미리보기 */}
               <div>
-                <p className="text-sm text-gray-500 mb-2">자재 상태</p>
-                <div className="flex gap-1">
+                <p style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>자재 상태</p>
+                <div style={{ display: "flex", gap: "0.25rem" }}>
                   {order.materials.map((material) => (
                     <div
                       key={material.id}
-                      className={`w-2 h-2 rounded-full ${
-                        material.status === "available" ? "bg-green-500" : material.status === "shortage" ? "bg-red-500" : "bg-yellow-500"
-                      }`}
+                      style={{
+                        width: "0.5rem",
+                        height: "0.5rem",
+                        borderRadius: "50%",
+                        backgroundColor: material.status === "available" ? "#10b981" : material.status === "shortage" ? "#ef4444" : "#eab308"
+                      }}
                       title={`${material.name}: ${material.status}`}
                     />
                   ))}
@@ -483,205 +598,206 @@ export function ProductionOrderPage() {
               </div>
 
               {/* 액션 버튼 */}
-              <div className="flex items-center gap-2 pt-2">
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingTop: "0.5rem" }}>
                 {getActionButton(order)}
-                <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
-                  <Eye className="h-3 w-3 mr-1" />
+                <button style={{...secondaryButtonStyle, fontSize: "0.75rem", padding: "0.25rem 0.75rem"}} onClick={() => setSelectedOrder(order)}>
+                  <Eye size={12} />
                   상세보기
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Edit className="h-3 w-3" />
-                </Button>
+                </button>
+                <button style={{...secondaryButtonStyle, fontSize: "0.75rem", padding: "0.25rem 0.5rem", backgroundColor: "transparent", border: "none"}}>
+                  <Edit size={12} />
+                </button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
 
       {/* 간트 차트 뷰 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+      <div style={cardStyle}>
+        <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e5e7eb", marginBottom: "1rem" }}>
+          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Calendar size={20} />
             생산 일정 간트 차트
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {filteredOrders.map((order) => {
-              const totalDays = Math.ceil((order.dueDate.getTime() - order.startDate.getTime()) / (1000 * 3600 * 24));
-              const startOffset = Math.ceil((order.startDate.getTime() - new Date("2024-01-01").getTime()) / (1000 * 3600 * 24));
+          </h3>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {filteredOrders.map((order) => {
+            const totalDays = Math.ceil((order.dueDate.getTime() - order.startDate.getTime()) / (1000 * 3600 * 24));
+            const startOffset = Math.ceil((order.startDate.getTime() - new Date("2024-01-01").getTime()) / (1000 * 3600 * 24));
 
-              return (
-                <div key={order.id} className="flex items-center gap-4">
-                  <div className="w-48 text-sm">
-                    <p className="font-medium truncate">{order.productName}</p>
-                    <p className="text-gray-500 text-xs">{order.orderNumber}</p>
-                  </div>
-                  <div className="flex-1 relative h-8 bg-gray-100 rounded">
-                    <div
-                      className={`absolute top-0 h-full rounded ${getStatusColor(order.status)} opacity-80`}
-                      style={{
-                        left: `${(startOffset / 31) * 100}%`,
-                        width: `${(totalDays / 31) * 100}%`,
-                      }}
-                    />
-                    <div
-                      className={`absolute top-0 h-full rounded ${getStatusColor(order.status)}`}
-                      style={{
-                        left: `${(startOffset / 31) * 100}%`,
-                        width: `${(totalDays / 31) * (order.progress / 100) * 100}%`,
-                      }}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center text-xs text-white font-medium">{order.progress}%</div>
-                  </div>
-                  <div className="w-20 text-xs text-gray-500">{formatDate(order.dueDate)}</div>
+            return (
+              <div key={order.id} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <div style={{ width: "12rem", fontSize: "0.875rem" }}>
+                  <p style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{order.productName}</p>
+                  <p style={{ color: "#6b7280", fontSize: "0.75rem" }}>{order.orderNumber}</p>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                <div style={{ flex: 1, position: "relative", height: "2rem", backgroundColor: "#f3f4f6", borderRadius: "0.25rem" }}>
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      height: "100%",
+                      borderRadius: "0.25rem",
+                      backgroundColor: getStatusColorHex(order.status),
+                      opacity: 0.8,
+                      left: `${(startOffset / 31) * 100}%`,
+                      width: `${(totalDays / 31) * 100}%`,
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      height: "100%",
+                      borderRadius: "0.25rem",
+                      backgroundColor: getStatusColorHex(order.status),
+                      left: `${(startOffset / 31) * 100}%`,
+                      width: `${(totalDays / 31) * (order.progress / 100) * 100}%`,
+                    }}
+                  />
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", color: "white", fontWeight: 500 }}>{order.progress}%</div>
+                </div>
+                <div style={{ width: "5rem", fontSize: "0.75rem", color: "#6b7280" }}>{formatDate(order.dueDate)}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* 상세 정보 모달 */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">{selectedOrder.productName} 상세 정보</h2>
-              <Button variant="ghost" onClick={() => setSelectedOrder(null)}>
+        <div style={modalOverlayStyle} onClick={() => setSelectedOrder(null)}>
+          <div style={{...modalStyle, maxWidth: "64rem"}} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+              <h2 style={{ fontSize: "1.5rem", fontWeight: "bold" }}>{selectedOrder.productName} 상세 정보</h2>
+              <button style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer" }} onClick={() => setSelectedOrder(null)}>
                 ✕
-              </Button>
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>기본 정보</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.5rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div style={cardStyle}>
+                  <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e5e7eb", marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.125rem", fontWeight: 600 }}>기본 정보</h3>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                       <div>
-                        <p className="text-sm text-gray-500">오더 번호</p>
-                        <p className="font-medium">{selectedOrder.orderNumber}</p>
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>오더 번호</p>
+                        <p style={{ fontWeight: 500 }}>{selectedOrder.orderNumber}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">제품 코드</p>
-                        <p className="font-medium">{selectedOrder.productCode}</p>
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>제품 코드</p>
+                        <p style={{ fontWeight: 500 }}>{selectedOrder.productCode}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">수량</p>
-                        <p className="font-medium">
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>수량</p>
+                        <p style={{ fontWeight: 500 }}>
                           {selectedOrder.quantity.toLocaleString()} {selectedOrder.unit}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">완료 수량</p>
-                        <p className="font-medium">
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>완료 수량</p>
+                        <p style={{ fontWeight: 500 }}>
                           {selectedOrder.completedQuantity.toLocaleString()} {selectedOrder.unit}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">고객사</p>
-                        <p className="font-medium">{selectedOrder.customer}</p>
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>고객사</p>
+                        <p style={{ fontWeight: 500 }}>{selectedOrder.customer}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">담당팀</p>
-                        <p className="font-medium">{selectedOrder.assignedTeam}</p>
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>담당팀</p>
+                        <p style={{ fontWeight: 500 }}>{selectedOrder.assignedTeam}</p>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>일정 및 진행률</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-500">시작일</p>
-                          <p className="font-medium">{selectedOrder.startDate.toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">완료 예정일</p>
-                          <p className="font-medium">{selectedOrder.dueDate.toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">예상 시간</p>
-                          <p className="font-medium">{selectedOrder.estimatedHours}시간</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">실제 시간</p>
-                          <p className="font-medium">{selectedOrder.actualHours}시간</p>
-                        </div>
+                <div style={cardStyle}>
+                  <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e5e7eb", marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.125rem", fontWeight: 600 }}>일정 및 진행률</h3>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                      <div>
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>시작일</p>
+                        <p style={{ fontWeight: 500 }}>{selectedOrder.startDate.toLocaleDateString()}</p>
                       </div>
                       <div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span>진행률</span>
-                          <span>{selectedOrder.progress}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div className="h-3 bg-blue-500 rounded-full transition-all" style={{ width: `${selectedOrder.progress}%` }} />
-                        </div>
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>완료 예정일</p>
+                        <p style={{ fontWeight: 500 }}>{selectedOrder.dueDate.toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>예상 시간</p>
+                        <p style={{ fontWeight: 500 }}>{selectedOrder.estimatedHours}시간</p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>실제 시간</p>
+                        <p style={{ fontWeight: 500 }}>{selectedOrder.actualHours}시간</p>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem", marginBottom: "0.5rem" }}>
+                        <span>진행률</span>
+                        <span>{selectedOrder.progress}%</span>
+                      </div>
+                      <div style={{ width: "100%", backgroundColor: "#e5e7eb", borderRadius: "9999px", height: "0.75rem" }}>
+                        <div style={{ height: "0.75rem", backgroundColor: "#3b82f6", borderRadius: "9999px", transition: "all 0.3s", width: `${selectedOrder.progress}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>자재 현황</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {selectedOrder.materials.map((material) => (
-                        <div key={material.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                          <div>
-                            <p className="font-medium">{material.name}</p>
-                            <p className="text-sm text-gray-500">
-                              {material.availableQuantity}/{material.requiredQuantity} {material.unit}
-                            </p>
-                          </div>
-                          <Badge
-                            className={
-                              material.status === "available"
-                                ? "bg-green-100 text-green-600"
-                                : material.status === "shortage"
-                                ? "bg-red-100 text-red-600"
-                                : "bg-yellow-100 text-yellow-600"
-                            }
-                          >
-                            {material.status === "available" ? "충분" : material.status === "shortage" ? "부족" : "주문됨"}
-                          </Badge>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div style={cardStyle}>
+                  <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e5e7eb", marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.125rem", fontWeight: 600 }}>자재 현황</h3>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    {selectedOrder.materials.map((material) => (
+                      <div key={material.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.25rem" }}>
+                        <div>
+                          <p style={{ fontWeight: 500 }}>{material.name}</p>
+                          <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+                            {material.availableQuantity}/{material.requiredQuantity} {material.unit}
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <span
+                          style={{
+                            ...badgeStyle,
+                            backgroundColor: material.status === "available" ? "#dcfce7" : material.status === "shortage" ? "#fecaca" : "#fef3c7",
+                            color: material.status === "available" ? "#16a34a" : material.status === "shortage" ? "#dc2626" : "#d97706"
+                          }}
+                        >
+                          {material.status === "available" ? "충분" : material.status === "shortage" ? "부족" : "주문됨"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 {selectedOrder.notes && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>특이사항</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{selectedOrder.notes}</p>
-                    </CardContent>
-                  </Card>
+                  <div style={cardStyle}>
+                    <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e5e7eb", marginBottom: "1rem" }}>
+                      <h3 style={{ fontSize: "1.125rem", fontWeight: 600 }}>특이사항</h3>
+                    </div>
+                    <p style={{ fontSize: "0.875rem" }}>{selectedOrder.notes}</p>
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
-              <Button variant="outline" onClick={() => setSelectedOrder(null)}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
+              <button style={secondaryButtonStyle} onClick={() => setSelectedOrder(null)}>
                 닫기
-              </Button>
-              <Button>편집</Button>
+              </button>
+              <button style={primaryButtonStyle}>
+                편집
+              </button>
             </div>
           </div>
         </div>

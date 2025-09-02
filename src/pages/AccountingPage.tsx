@@ -9,16 +9,19 @@ import {
   Filter,
   Eye,
   Download,
-  DollarSign,
   TrendingUp,
   TrendingDown,
+  Receipt,
+  PieChart,
+  Building,
+  Check,
+  X,
+  Edit,
   Calculator,
   FileText,
   Calendar,
   CreditCard,
-  Receipt,
-  Building,
-  PieChart,
+  DollarSign,
 } from "lucide-react";
 import styles from "./AccountingPage.module.css";
 
@@ -121,8 +124,13 @@ export const AccountingPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newTransaction, setNewTransaction] = useState<Partial<Transaction>>({});
+  const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
+  const [editedTransaction, setEditedTransaction] = useState<Partial<Transaction>>({});
+  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
 
-  const filteredTransactions = mockTransactions.filter((transaction) => {
+  const filteredTransactions = transactions.filter((transaction) => {
     const matchesSearch =
       transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transaction.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -139,14 +147,134 @@ export const AccountingPage: React.FC = () => {
     }).format(amount);
   };
 
-  // 계산된 통계
-  const totalIncome = mockTransactions.filter((t) => t.type === "income" && t.status === "completed").reduce((sum, t) => sum + t.amount, 0);
+  // 거래 처리 함수들
+  const generateTransactionId = () => {
+    return `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  };
 
-  const totalExpense = mockTransactions.filter((t) => t.type === "expense" && t.status === "completed").reduce((sum, t) => sum + t.amount, 0);
+  const generateReferenceNumber = (type: "income" | "expense") => {
+    const prefix = type === "income" ? "INV" : "EXP";
+    const year = new Date().getFullYear();
+    const count = transactions.filter(t => t.type === type).length + 1;
+    return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
+  };
+
+  const handleAddTransaction = () => {
+    if (!newTransaction.description || !newTransaction.category || !newTransaction.account || !newTransaction.amount) {
+      alert("모든 필수 필드를 입력해주세요.");
+      return;
+    }
+
+    const transaction: Transaction = {
+      id: generateTransactionId(),
+      date: newTransaction.date || new Date().toISOString().split('T')[0],
+      description: newTransaction.description,
+      category: newTransaction.category,
+      type: newTransaction.type || "expense",
+      amount: Number(newTransaction.amount),
+      account: newTransaction.account,
+      status: newTransaction.status || "completed",
+      reference: newTransaction.reference || generateReferenceNumber(newTransaction.type || "expense"),
+      taxDeductible: newTransaction.taxDeductible || false,
+    };
+
+    setTransactions([transaction, ...transactions]);
+    setNewTransaction({
+      date: new Date().toISOString().split('T')[0],
+      description: "",
+      category: "",
+      type: "expense",
+      amount: 0,
+      account: "",
+      status: "completed",
+      reference: "",
+      taxDeductible: false,
+    });
+    setShowAddModal(false);
+  };
+
+  const handleInputChange = (field: keyof Transaction, value: any) => {
+    setNewTransaction(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Edit transaction handlers
+  const handleEditTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction.id);
+    setEditedTransaction(transaction);
+  };
+
+  const handleSaveTransaction = () => {
+    if (!editingTransaction || !editedTransaction.description || !editedTransaction.category || !editedTransaction.account || !editedTransaction.amount) {
+      alert("모든 필수 필드를 입력해주세요.");
+      return;
+    }
+
+    setTransactions(prev => prev.map(t => 
+      t.id === editingTransaction 
+        ? { ...editedTransaction } as Transaction
+        : t
+    ));
+    
+    setEditingTransaction(null);
+    setEditedTransaction({});
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTransaction(null);
+    setEditedTransaction({});
+  };
+
+  const handleEditInputChange = (field: keyof Transaction, value: any) => {
+    setEditedTransaction(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Download transaction receipt
+  const handleDownloadReceipt = (transaction: Transaction) => {
+    const receiptContent = `
+거래 영수증
+==========================================
+
+거래 정보:
+- 거래일: ${transaction.date}
+- 설명: ${transaction.description}
+- 참조번호: ${transaction.reference}
+- 유형: ${transaction.type === "income" ? "수입" : "지출"}
+- 금액: ${formatCurrency(transaction.amount)}
+- 카테고리: ${transaction.category}
+- 계좌: ${transaction.account}
+- 상태: ${statusConfig[transaction.status]?.label}
+- 세금공제: ${transaction.taxDeductible ? "가능" : "불가능"}
+
+==========================================
+발행일: ${new Date().toLocaleDateString('ko-KR')}
+발행시간: ${new Date().toLocaleTimeString('ko-KR')}
+    `.trim();
+
+    const blob = new Blob([receiptContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `거래영수증_${transaction.reference}_${transaction.date}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // 계산된 통계
+  const totalIncome = transactions.filter((t) => t.type === "income" && t.status === "completed").reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpense = transactions.filter((t) => t.type === "expense" && t.status === "completed").reduce((sum, t) => sum + t.amount, 0);
 
   const netProfit = totalIncome - totalExpense;
 
-  const taxDeductibleExpense = mockTransactions
+  const taxDeductibleExpense = transactions
     .filter((t) => t.type === "expense" && t.taxDeductible && t.status === "completed")
     .reduce((sum, t) => sum + t.amount, 0);
 
@@ -158,7 +286,7 @@ export const AccountingPage: React.FC = () => {
             <h1 className={styles.title}>회계 관리</h1>
             <p className={styles.subtitle}>수입과 지출을 관리하고 재무 현황을 파악하세요</p>
           </div>
-          <Button className={styles.addButton}>
+          <Button className={styles.addButton} onClick={() => setShowAddModal(true)}>
             <Plus className={styles.icon} />
             거래 등록
           </Button>
@@ -247,21 +375,56 @@ export const AccountingPage: React.FC = () => {
               <div className={styles.cardHeader}>
                 <div className={styles.transactionInfo}>
                   <div className={styles.transactionMeta}>
-                    <span className={styles.transactionDate}>{transaction.date}</span>
+                    {editingTransaction === transaction.id ? (
+                      <Input
+                        type="date"
+                        value={editedTransaction.date || transaction.date}
+                        onChange={(e) => handleEditInputChange("date", e.target.value)}
+                        className={styles.editInput}
+                      />
+                    ) : (
+                      <span className={styles.transactionDate}>{transaction.date}</span>
+                    )}
                     <Badge variant={statusConfig[transaction.status]?.color as any} className={styles.statusBadge}>
                       {statusConfig[transaction.status]?.label}
                     </Badge>
                   </div>
-                  <h3 className={styles.transactionDescription}>{transaction.description}</h3>
+                  {editingTransaction === transaction.id ? (
+                    <Input
+                      type="text"
+                      value={editedTransaction.description || transaction.description}
+                      onChange={(e) => handleEditInputChange("description", e.target.value)}
+                      className={styles.editInput}
+                      placeholder="거래 설명"
+                    />
+                  ) : (
+                    <h3 className={styles.transactionDescription}>{transaction.description}</h3>
+                  )}
                   <span className={styles.transactionReference}>{transaction.reference}</span>
                 </div>
                 <div className={styles.cardActions}>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedTransaction(transaction)}>
-                    <Eye className={styles.actionIcon} />
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Download className={styles.actionIcon} />
-                  </Button>
+                  {editingTransaction === transaction.id ? (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={handleSaveTransaction}>
+                        <Check className={styles.actionIcon} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={handleCancelEdit}>
+                        <X className={styles.actionIcon} />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedTransaction(transaction)}>
+                        <Eye className={styles.actionIcon} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(transaction)}>
+                        <Edit className={styles.actionIcon} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDownloadReceipt(transaction)}>
+                        <Download className={styles.actionIcon} />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -271,10 +434,20 @@ export const AccountingPage: React.FC = () => {
                     {transaction.type === "income" ? <TrendingUp className={styles.amountIcon} /> : <TrendingDown className={styles.amountIcon} />}
                     <div className={styles.amountData}>
                       <span className={styles.amountLabel}>{transaction.type === "income" ? "수입" : "지출"}</span>
-                      <span className={styles.amountValue}>
-                        {transaction.type === "income" ? "+" : "-"}
-                        {formatCurrency(transaction.amount)}
-                      </span>
+                      {editingTransaction === transaction.id ? (
+                        <Input
+                          type="number"
+                          value={editedTransaction.amount || transaction.amount}
+                          onChange={(e) => handleEditInputChange("amount", parseFloat(e.target.value) || 0)}
+                          className={styles.editInput}
+                          placeholder="금액"
+                        />
+                      ) : (
+                        <span className={styles.amountValue}>
+                          {transaction.type === "income" ? "+" : "-"}
+                          {formatCurrency(transaction.amount)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {transaction.taxDeductible && (
@@ -290,14 +463,34 @@ export const AccountingPage: React.FC = () => {
                     <PieChart className={styles.detailIcon} />
                     <div className={styles.detailInfo}>
                       <span className={styles.detailLabel}>카테고리</span>
-                      <span className={styles.detailValue}>{transaction.category}</span>
+                      {editingTransaction === transaction.id ? (
+                        <Input
+                          type="text"
+                          value={editedTransaction.category || transaction.category}
+                          onChange={(e) => handleEditInputChange("category", e.target.value)}
+                          className={styles.editInput}
+                          placeholder="카테고리"
+                        />
+                      ) : (
+                        <span className={styles.detailValue}>{transaction.category}</span>
+                      )}
                     </div>
                   </div>
                   <div className={styles.detailItem}>
                     <Building className={styles.detailIcon} />
                     <div className={styles.detailInfo}>
                       <span className={styles.detailLabel}>계좌</span>
-                      <span className={styles.detailValue}>{transaction.account}</span>
+                      {editingTransaction === transaction.id ? (
+                        <Input
+                          type="text"
+                          value={editedTransaction.account || transaction.account}
+                          onChange={(e) => handleEditInputChange("account", e.target.value)}
+                          className={styles.editInput}
+                          placeholder="계좌"
+                        />
+                      ) : (
+                        <span className={styles.detailValue}>{transaction.account}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -313,7 +506,7 @@ export const AccountingPage: React.FC = () => {
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>거래 상세 정보</h2>
               <div className={styles.modalActions}>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => handleDownloadReceipt(selectedTransaction)}>
                   <Download className={styles.icon} />
                   영수증 다운로드
                 </Button>
@@ -386,6 +579,133 @@ export const AccountingPage: React.FC = () => {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className={styles.modal} onClick={() => setShowAddModal(false)}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>새 거래 등록</h2>
+              <Button variant="ghost" onClick={() => setShowAddModal(false)} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>거래 유형</label>
+                  <select 
+                    value={newTransaction.type || "expense"} 
+                    onChange={(e) => handleInputChange("type", e.target.value)}
+                    className={styles.formSelect}
+                  >
+                    <option value="income">수입</option>
+                    <option value="expense">지출</option>
+                  </select>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>거래일</label>
+                  <Input
+                    type="date"
+                    value={newTransaction.date || ""}
+                    onChange={(e) => handleInputChange("date", e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>설명 *</label>
+                  <Input
+                    type="text"
+                    placeholder="거래 설명을 입력하세요"
+                    value={newTransaction.description || ""}
+                    onChange={(e) => handleInputChange("description", e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>카테고리 *</label>
+                  <Input
+                    type="text"
+                    placeholder="카테고리를 입력하세요"
+                    value={newTransaction.category || ""}
+                    onChange={(e) => handleInputChange("category", e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>금액 *</label>
+                  <Input
+                    type="number"
+                    placeholder="금액을 입력하세요"
+                    value={newTransaction.amount || ""}
+                    onChange={(e) => handleInputChange("amount", e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>계좌 *</label>
+                  <Input
+                    type="text"
+                    placeholder="계좌명을 입력하세요"
+                    value={newTransaction.account || ""}
+                    onChange={(e) => handleInputChange("account", e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>상태</label>
+                  <select 
+                    value={newTransaction.status || "completed"} 
+                    onChange={(e) => handleInputChange("status", e.target.value)}
+                    className={styles.formSelect}
+                  >
+                    <option value="completed">완료</option>
+                    <option value="pending">대기중</option>
+                    <option value="cancelled">취소</option>
+                  </select>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>참조번호</label>
+                  <Input
+                    type="text"
+                    placeholder="참조번호 (자동 생성됨)"
+                    value={newTransaction.reference || ""}
+                    onChange={(e) => handleInputChange("reference", e.target.value)}
+                    className={styles.formInput}
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={newTransaction.taxDeductible || false}
+                      onChange={(e) => handleInputChange("taxDeductible", e.target.checked)}
+                      className={styles.checkbox}
+                    />
+                    세금공제 가능
+                  </label>
+                </div>
+              </div>
+
+              <div className={styles.modalActions}>
+                <Button variant="outline" onClick={() => setShowAddModal(false)}>
+                  취소
+                </Button>
+                <Button onClick={handleAddTransaction}>
+                  저장
+                </Button>
               </div>
             </div>
           </Card>
