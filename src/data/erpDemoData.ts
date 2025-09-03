@@ -1,5 +1,6 @@
-// ERP 데모 데이터 - AI 챗봇 "단비" 시나리오용
+// ERP 데모 데이터 - AI 챗봇 "단비" 시나리오용 (3-6개월 대량 데이터)
 
+// 기본 인터페이스들
 export interface InventoryItem {
   id: string;
   name: string;
@@ -11,6 +12,153 @@ export interface InventoryItem {
   status: "sufficient" | "low" | "critical";
   location: string;
   lastUpdated: Date;
+  unitPrice: number;
+  totalValue: number;
+}
+
+// 입고/출고 추적을 위한 새로운 인터페이스들
+export interface MaterialInbound {
+  id: string;
+  materialCode: string;
+  materialName: string;
+  supplierId: string;
+  supplierName: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalAmount: number;
+  inboundDate: Date;
+  lotNumber: string;
+  qualityStatus: "passed" | "pending" | "failed";
+  warehouseLocation: string;
+  purchaseOrderId: string;
+}
+
+export interface MaterialOutbound {
+  id: string;
+  materialCode: string;
+  materialName: string;
+  quantity: number;
+  unit: string;
+  outboundDate: Date;
+  lotNumber: string;
+  productionOrderId: string;
+  workOrderId: string;
+  usedBy: string; // 작업자
+  purpose: "production" | "maintenance" | "sample";
+}
+
+export interface ProductionRecord {
+  id: string;
+  workOrderId: string;
+  productCode: string;
+  productName: string;
+  plannedQuantity: number;
+  actualQuantity: number;
+  defectQuantity: number;
+  startTime: Date;
+  endTime: Date;
+  workerId: string;
+  workerName: string;
+  shiftId: string;
+  materialsUsed: MaterialUsage[];
+  qualityCheckId: string;
+  status: "completed" | "in-progress" | "paused" | "cancelled";
+}
+
+export interface MaterialUsage {
+  materialCode: string;
+  materialName: string;
+  plannedQuantity: number;
+  actualQuantity: number;
+  lotNumber: string;
+  unit: string;
+}
+
+export interface DeliveryRecord {
+  id: string;
+  deliveryOrderId: string;
+  customerId: string;
+  customerName: string;
+  productCode: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  deliveryDate: Date;
+  scheduledDate: Date;
+  onTimeDelivery: boolean;
+  deliveryAddress: string;
+  driverName: string;
+  vehicleNumber: string;
+  deliveryCost: number;
+  productionRecordIds: string[]; // 추적성을 위한 생산 기록 연결
+}
+
+export interface AttendanceRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  position: string;
+  date: Date;
+  checkIn: Date | null;
+  checkOut: Date | null;
+  workHours: number;
+  overtimeHours: number;
+  shiftType: "day" | "night" | "weekend" | "holiday";
+  status: "present" | "absent" | "late" | "early_leave";
+}
+
+export interface PayrollRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  position: string;
+  month: string; // YYYY-MM
+  baseSalary: number;
+  overtimePay: number;
+  nightShiftAllowance: number;
+  weekendAllowance: number;
+  totalWorkHours: number;
+  totalOvertimeHours: number;
+  totalPay: number;
+  deductions: number;
+  netPay: number;
+}
+
+export interface AccountingEntry {
+  id: string;
+  date: Date;
+  accountCode: string;
+  accountName: string;
+  debitAmount: number;
+  creditAmount: number;
+  description: string;
+  referenceType: "purchase" | "production" | "sales" | "payroll" | "delivery" | "other";
+  referenceId: string;
+  department: string;
+}
+
+export interface SalesOrder {
+  id: string;
+  orderNumber: string;
+  customerId: string;
+  customerName: string;
+  orderDate: Date;
+  requestedDeliveryDate: Date;
+  items: SalesOrderItem[];
+  totalAmount: number;
+  status: "pending" | "confirmed" | "in_production" | "ready" | "delivered" | "cancelled";
+}
+
+export interface SalesOrderItem {
+  productCode: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
 }
 
 export interface ProductionPlan {
@@ -59,7 +207,9 @@ export const INVENTORY_DEMO_DATA: InventoryItem[] = [
     customer: "현대자동차",
     status: "sufficient",
     location: "창고 A-1",
-    lastUpdated: new Date("2024-01-15T09:30:00")
+    lastUpdated: new Date("2024-01-15T09:30:00"),
+    unitPrice: 45000,
+    totalValue: 54000000
   },
   {
     id: "inv-002", 
@@ -71,7 +221,9 @@ export const INVENTORY_DEMO_DATA: InventoryItem[] = [
     customer: "제네시스",
     status: "low",
     location: "창고 B-2",
-    lastUpdated: new Date("2024-01-15T10:15:00")
+    lastUpdated: new Date("2024-01-15T10:15:00"),
+    unitPrice: 78000,
+    totalValue: 35100000
   },
   {
     id: "inv-003",
@@ -83,7 +235,9 @@ export const INVENTORY_DEMO_DATA: InventoryItem[] = [
     customer: "현대자동차",
     status: "critical",
     location: "창고 C-1",
-    lastUpdated: new Date("2024-01-15T11:00:00")
+    lastUpdated: new Date("2024-01-15T11:00:00"),
+    unitPrice: 32000,
+    totalValue: 2560000
   }
 ];
 

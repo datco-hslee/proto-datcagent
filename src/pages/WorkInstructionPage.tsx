@@ -9,6 +9,7 @@ import {
   Filter,
   Eye,
   Edit3,
+  Trash2,
   PlayCircle,
   PauseCircle,
   CheckCircle,
@@ -195,6 +196,21 @@ export const WorkInstructionPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [selectedInstruction, setSelectedInstruction] = useState<WorkInstruction | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingInstruction, setEditingInstruction] = useState<WorkInstruction | null>(null);
+  const [newInstructionData, setNewInstructionData] = useState({
+    productName: "",
+    productCode: "",
+    quantity: 1,
+    unit: "EA",
+    priority: "normal" as "low" | "normal" | "high" | "urgent",
+    assignedWorker: "",
+    workStation: "",
+    estimatedTime: 480,
+    startDate: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    instructions: ""
+  });
 
   const filteredInstructions = mockWorkInstructions.filter((instruction) => {
     const matchesSearch =
@@ -227,6 +243,124 @@ export const WorkInstructionPage: React.FC = () => {
     return { totalItems, availableItems, percentage: (availableItems / totalItems) * 100 };
   };
 
+  // Handler functions
+  const handleCreateInstruction = () => {
+    if (!newInstructionData.productName || !newInstructionData.productCode || !newInstructionData.assignedWorker) {
+      alert('제품명, 제품코드, 작업자를 입력해주세요.');
+      return;
+    }
+
+    const newInstruction: WorkInstruction = {
+      id: `wi-${Date.now()}`,
+      instructionNumber: `WI-2024-${String(mockWorkInstructions.length + 1).padStart(3, '0')}`,
+      productName: newInstructionData.productName,
+      productCode: newInstructionData.productCode,
+      bomId: `BOM-${newInstructionData.productCode}`,
+      quantity: newInstructionData.quantity,
+      unit: newInstructionData.unit,
+      priority: newInstructionData.priority,
+      status: "pending",
+      assignedWorker: newInstructionData.assignedWorker,
+      workStation: newInstructionData.workStation,
+      estimatedTime: newInstructionData.estimatedTime,
+      startDate: newInstructionData.startDate,
+      dueDate: newInstructionData.dueDate,
+      instructions: newInstructionData.instructions,
+      qualityCheck: false,
+      materials: []
+    };
+
+    // 실제 구현에서는 상태 관리를 통해 추가해야 합니다
+    mockWorkInstructions.push(newInstruction);
+    setShowCreateModal(false);
+    setNewInstructionData({
+      productName: "",
+      productCode: "",
+      quantity: 1,
+      unit: "EA",
+      priority: "normal",
+      assignedWorker: "",
+      workStation: "",
+      estimatedTime: 480,
+      startDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      instructions: ""
+    });
+    alert(`새 작업지시서 "${newInstruction.instructionNumber}"이 생성되었습니다.`);
+  };
+
+  const handleEditInstruction = (instruction: WorkInstruction) => {
+    setEditingInstruction(instruction);
+    setNewInstructionData({
+      productName: instruction.productName,
+      productCode: instruction.productCode,
+      quantity: instruction.quantity,
+      unit: instruction.unit,
+      priority: instruction.priority,
+      assignedWorker: instruction.assignedWorker,
+      workStation: instruction.workStation,
+      estimatedTime: instruction.estimatedTime,
+      startDate: instruction.startDate,
+      dueDate: instruction.dueDate,
+      instructions: instruction.instructions
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleUpdateInstruction = () => {
+    if (!editingInstruction || !newInstructionData.productName || !newInstructionData.productCode || !newInstructionData.assignedWorker) {
+      alert('제품명, 제품코드, 작업자를 입력해주세요.');
+      return;
+    }
+
+    // 실제 구현에서는 상태 관리를 통해 업데이트해야 합니다
+    const index = mockWorkInstructions.findIndex(i => i.id === editingInstruction.id);
+    if (index !== -1) {
+      mockWorkInstructions[index] = {
+        ...editingInstruction,
+        productName: newInstructionData.productName,
+        productCode: newInstructionData.productCode,
+        quantity: newInstructionData.quantity,
+        unit: newInstructionData.unit,
+        priority: newInstructionData.priority,
+        assignedWorker: newInstructionData.assignedWorker,
+        workStation: newInstructionData.workStation,
+        estimatedTime: newInstructionData.estimatedTime,
+        startDate: newInstructionData.startDate,
+        dueDate: newInstructionData.dueDate,
+        instructions: newInstructionData.instructions
+      };
+    }
+
+    setShowCreateModal(false);
+    setEditingInstruction(null);
+    setNewInstructionData({
+      productName: "",
+      productCode: "",
+      quantity: 1,
+      unit: "EA",
+      priority: "normal",
+      assignedWorker: "",
+      workStation: "",
+      estimatedTime: 480,
+      startDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      instructions: ""
+    });
+    alert(`작업지시서 "${editingInstruction.instructionNumber}"이 수정되었습니다.`);
+  };
+
+  const handleDeleteInstruction = (instruction: WorkInstruction) => {
+    if (window.confirm(`"${instruction.instructionNumber} - ${instruction.productName}" 작업지시서를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
+      // 실제 구현에서는 상태 관리를 통해 삭제해야 합니다
+      const index = mockWorkInstructions.findIndex(i => i.id === instruction.id);
+      if (index !== -1) {
+        mockWorkInstructions.splice(index, 1);
+      }
+      alert(`작업지시서 "${instruction.instructionNumber}"이 삭제되었습니다.`);
+    }
+  };
+
   // 통계 계산
   const totalInstructions = mockWorkInstructions.length;
   const inProgressCount = mockWorkInstructions.filter((i) => i.status === "in_progress").length;
@@ -241,7 +375,7 @@ export const WorkInstructionPage: React.FC = () => {
             <h1 className={styles.title}>작업 지시서</h1>
             <p className={styles.subtitle}>생산 작업 지시를 관리하고 진행 상황을 추적하세요</p>
           </div>
-          <Button className={styles.addButton}>
+          <Button className={styles.addButton} onClick={() => setShowCreateModal(true)}>
             <Plus className={styles.icon} />
             작업지시 생성
           </Button>
@@ -352,7 +486,10 @@ export const WorkInstructionPage: React.FC = () => {
                     <Button variant="ghost" size="sm" onClick={() => setSelectedInstruction(instruction)}>
                       <Eye className={styles.actionIcon} />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteInstruction(instruction)}>
+                      <Trash2 className={styles.actionIcon} style={{ color: '#dc2626' }} />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditInstruction(instruction)}>
                       <Edit3 className={styles.actionIcon} />
                     </Button>
                   </div>
@@ -595,6 +732,238 @@ export const WorkInstructionPage: React.FC = () => {
                   <div className={styles.notesModalContent}>{selectedInstruction.notes}</div>
                 </div>
               )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* 작업지시 생성/편집 모달 */}
+      {showCreateModal && (
+        <div className={styles.modal} onClick={() => {
+          setShowCreateModal(false);
+          setEditingInstruction(null);
+        }}>
+          <Card className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>
+                {editingInstruction ? '작업지시서 편집' : '새 작업지시서 생성'}
+              </h2>
+              <Button variant="ghost" onClick={() => {
+                setShowCreateModal(false);
+                setEditingInstruction(null);
+              }} className={styles.closeButton}>
+                ✕
+              </Button>
+            </div>
+            <div className={styles.modalBody}>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>제품명</label>
+                    <input
+                      type="text"
+                      placeholder="제품명을 입력하세요"
+                      value={newInstructionData.productName}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, productName: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>제품코드</label>
+                    <input
+                      type="text"
+                      placeholder="제품코드를 입력하세요"
+                      value={newInstructionData.productCode}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, productCode: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>수량</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newInstructionData.quantity}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, quantity: Number(e.target.value)})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>단위</label>
+                    <select
+                      value={newInstructionData.unit}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, unit: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      <option value="EA">EA</option>
+                      <option value="SET">SET</option>
+                      <option value="KG">KG</option>
+                      <option value="M">M</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>우선순위</label>
+                    <select
+                      value={newInstructionData.priority}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, priority: e.target.value as any})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      <option value="low">낮음</option>
+                      <option value="normal">보통</option>
+                      <option value="high">높음</option>
+                      <option value="urgent">긴급</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>작업자</label>
+                    <input
+                      type="text"
+                      placeholder="작업자명을 입력하세요"
+                      value={newInstructionData.assignedWorker}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, assignedWorker: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>작업장</label>
+                    <input
+                      type="text"
+                      placeholder="작업장을 입력하세요"
+                      value={newInstructionData.workStation}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, workStation: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>예상시간 (분)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newInstructionData.estimatedTime}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, estimatedTime: Number(e.target.value)})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>시작일</label>
+                    <input
+                      type="date"
+                      value={newInstructionData.startDate}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, startDate: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>완료예정일</label>
+                    <input
+                      type="date"
+                      value={newInstructionData.dueDate}
+                      onChange={(e) => setNewInstructionData({...newInstructionData, dueDate: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>작업 지시사항</label>
+                  <textarea
+                    placeholder="작업 지시사항을 입력하세요 (각 단계는 새 줄로 구분)"
+                    value={newInstructionData.instructions}
+                    onChange={(e) => setNewInstructionData({...newInstructionData, instructions: e.target.value})}
+                    rows={4}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.875rem',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '1rem' }}>
+                  <Button variant="outline" onClick={() => {
+                    setShowCreateModal(false);
+                    setEditingInstruction(null);
+                  }}>
+                    취소
+                  </Button>
+                  <Button onClick={editingInstruction ? handleUpdateInstruction : handleCreateInstruction}>
+                    <Plus size={16} />
+                    {editingInstruction ? '수정' : '생성'}
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
         </div>

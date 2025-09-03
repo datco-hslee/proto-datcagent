@@ -4,6 +4,9 @@ import {
   generateProductionResponse, 
   generateSolutionResponse 
 } from "@/data/erpDemoData";
+import { 
+  generateTraceabilityResponse
+} from "@/data/chatbotIntegration";
 
 export interface TutorialMessage {
   id: string;
@@ -46,21 +49,56 @@ export interface TutorialActions {
 
 // AI 챗봇 "단비" ERP 시나리오 정의
 const TUTORIAL_SCENARIOS: TutorialScenario[] = [
-  // ERP 재고 조회 시나리오
+  // 추적성 관련 쿼리
+  {
+    trigger: /추적|이력|트레이스|어디서.*왔|어떻게.*만들어/i,
+    response: generateTraceabilityResponse("추적"),
+    highlightPath: ['[data-menu="production-orders"]'],
+    additionalActions: [{ type: "expandSection", target: "production-mrp", delay: 100 }],
+  },
+  // 납기 준수율 분석
+  {
+    trigger: /납기.*준수|납기.*율|정시.*납품|지연.*납품|납기.*분석/i,
+    response: generateTraceabilityResponse("납기"),
+    highlightPath: ['[data-menu="shipping"]'],
+    additionalActions: [{ type: "expandSection", target: "logistics-shipping", delay: 100 }],
+  },
+  // 생산 효율성 분석
+  {
+    trigger: /생산.*효율|생산.*실적|생산.*분석|불량률|생산성/i,
+    response: generateTraceabilityResponse("생산 효율"),
+    highlightPath: ['[data-menu="production-orders"]'],
+    additionalActions: [{ type: "expandSection", target: "production-mrp", delay: 100 }],
+  },
+  // 재고 회전율 분석
+  {
+    trigger: /재고.*회전|재고.*소모|재고.*분석|재고.*효율/i,
+    response: generateTraceabilityResponse("재고 회전"),
+    highlightPath: ['[data-menu="inventory"]'],
+    additionalActions: [{ type: "expandSection", target: "inventory-purchase", delay: 100 }],
+  },
+  // 인건비 분석
+  {
+    trigger: /인건비|급여.*분석|노무비|인력.*비용|급여.*현황/i,
+    response: generateTraceabilityResponse("인건비"),
+    highlightPath: ['[data-menu="payroll"]'],
+    additionalActions: [{ type: "expandSection", target: "hr-payroll", delay: 100 }],
+  },
+  // ERP 재고 조회 시나리오 (기존)
   {
     trigger: /단비.*EV9|EV9.*시트.*레일.*재고|EV9.*재고|시트.*레일.*재고/i,
     response: generateInventoryResponse("EV9 전기차용 시트 레일"),
     highlightPath: ['[data-menu="inventory"]'],
     additionalActions: [{ type: "expandSection", target: "inventory-purchase", delay: 100 }],
   },
-  // ERP 납품 일정 확인 시나리오  
+  // ERP 납품 일정 확인 시나리오 (기존)
   {
     trigger: /단비.*우신.*납품|우신.*납품.*물량|이번.*주.*우신|우신.*문제/i,
     response: generateProductionResponse("우신"),
     highlightPath: ['[data-menu="production-orders"]'],
     additionalActions: [{ type: "expandSection", target: "production-mrp", delay: 100 }],
   },
-  // ERP 해결책 요청 시나리오
+  // ERP 해결책 요청 시나리오 (기존)
   {
     trigger: /단비.*해결책|해결책.*무엇|어떻게.*해결|대안.*요청/i,
     response: generateSolutionResponse(),
@@ -99,8 +137,11 @@ const DEFAULT_QUICK_REPLIES = [
   "단비, EV9 전기차용 시트 레일 재고 얼마나 남았어?",
   "단비, 이번주 우신 납품 물량 문제 없지?",
   "단비, 해결책이 무엇일까?",
-  "재고 현황을 확인하려면?",
-  "생산 일정은 어디서 보나요?",
+  "제품 추적 이력을 보여줘",
+  "납기 준수율은 어떻게 되나요?",
+  "생산 효율성 분석해줘",
+  "재고 회전율 확인하고 싶어요",
+  "인건비 분석 결과 알려줘",
 ];
 
 export const useTutorialStore = create<TutorialState & TutorialActions>((set, get) => ({
@@ -256,18 +297,36 @@ export const useTutorialStore = create<TutorialState & TutorialActions>((set, ge
       // 관련 빠른 응답 제안
       setQuickReplies(["다른 기능도 궁금해요", "이 메뉴에서 뭘 할 수 있나요?", "처음부터 다시 알려주세요"]);
     } else {
-      // 매칭되지 않은 경우 기본 응답
-      const defaultResponses = [
-        "죄송합니다. 그 기능에 대해서는 아직 준비된 가이드가 없어요. 😅\n\n다른 질문을 해보시거나, 아래 추천 질문을 선택해보세요!",
-        "음... 정확히 어떤 기능을 찾고 계신가요? 🤔\n\n더 구체적으로 말씀해주시면 도움을 드릴 수 있어요!",
-        "제가 도움드릴 수 있는 주요 기능들을 아래에서 선택해보세요! ✨",
-      ];
-
-      const randomResponse = defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+      // 매칭되지 않은 경우 포괄적 분석 시도
+      let fallbackResponse = "";
+      
+      // 일반적인 ERP 키워드로 포괄적 응답 시도
+      if (input.includes("분석") || input.includes("현황") || input.includes("상태")) {
+        fallbackResponse = generateTraceabilityResponse(input);
+      } else if (input.includes("데이터") || input.includes("정보") || input.includes("조회")) {
+        fallbackResponse = "📊 **ERP 데이터 현황**\n\n" +
+          "현재 시스템에는 6개월간의 완전한 추적 가능한 데이터가 준비되어 있습니다:\n\n" +
+          "• **자재 입고**: 500+ 건의 입고 기록\n" +
+          "• **생산 실적**: 800+ 건의 생산 기록\n" +
+          "• **납품 이력**: 600+ 건의 납품 기록\n" +
+          "• **근태 관리**: 650+ 건의 출근 기록\n" +
+          "• **급여 처리**: 30+ 건의 급여 기록\n" +
+          "• **회계 분개**: 2000+ 건의 회계 기록\n\n" +
+          "구체적인 분석이나 조회를 원하시면 아래 추천 질문을 선택해보세요!";
+      } else {
+        // 기본 응답
+        const defaultResponses = [
+          "ERP 시스템의 다양한 기능을 활용해보세요! 📊\n\n아래 추천 질문으로 시작해보시거나, 구체적인 업무 관련 질문을 해주세요:",
+          "어떤 ERP 데이터나 분석이 필요하신가요? 🤔\n\n추적성, 생산성, 재고, 납기, 인건비 등 다양한 분석이 가능합니다!",
+          "6개월간의 완전한 ERP 데이터로 근거 기반 답변을 제공할 수 있습니다! ✨\n\n아래에서 관심 있는 분야를 선택해보세요:",
+        ];
+        
+        fallbackResponse = defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+      }
 
       addMessage({
         sender: "bot",
-        content: randomResponse,
+        content: fallbackResponse,
         type: "text",
       });
 
