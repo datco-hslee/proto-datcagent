@@ -1,5 +1,6 @@
 // AI 챗봇 "단비"를 위한 데이터 통합 및 분석 함수들
 import { generateComprehensiveERPData } from './comprehensiveData';
+import { analyzeLaborCostsFromContext } from './employeeDataIntegration';
 
 // 전체 데이터 생성 및 캐싱
 let cachedERPData: any = null;
@@ -130,9 +131,32 @@ export const analyzeInventoryTurnover = (materialCode?: string) => {
 };
 
 export const analyzeLaborCosts = (department?: string, month?: string) => {
-  // 통합된 직원 데이터 사용
-  const { analyzeUnifiedLaborCosts } = require('./employeeDataIntegration');
-  return analyzeUnifiedLaborCosts(department, month);
+  const data = getERPData();
+  let payrolls = data.payrollRecords;
+  
+  if (department) {
+    payrolls = payrolls.filter((p: any) => p.department === department);
+  }
+  
+  if (month) {
+    payrolls = payrolls.filter((p: any) => p.month === month);
+  }
+  
+  const totalBaseSalary = payrolls.reduce((sum: number, p: any) => sum + p.baseSalary, 0);
+  const totalOvertimePay = payrolls.reduce((sum: number, p: any) => sum + p.overtimePay, 0);
+  const totalPay = payrolls.reduce((sum: number, p: any) => sum + p.totalPay, 0);
+  const totalWorkHours = payrolls.reduce((sum: number, p: any) => sum + p.totalWorkHours, 0);
+  const totalOvertimeHours = payrolls.reduce((sum: number, p: any) => sum + p.totalOvertimeHours, 0);
+  
+  return {
+    employeeCount: payrolls.length,
+    totalBaseSalary,
+    totalOvertimePay,
+    totalPay,
+    totalWorkHours,
+    totalOvertimeHours,
+    averageHourlyRate: totalWorkHours > 0 ? totalPay / totalWorkHours : 0
+  };
 };
 
 // 챗봇 응답 생성 함수들
@@ -196,16 +220,18 @@ export const generateTraceabilityResponse = (query: string): string => {
         analysis.turnoverRate >= 60 ? '⚠️ 재고 최적화 필요' : '🚨 재고 과다 보유'}`;
   }
   
-  // 인건비 분석 쿼리
+  // 인건비 분석 쿼리 (통합된 직원 데이터 사용)
   if (query.includes('인건비') || query.includes('급여') || query.includes('노무비')) {
-    const analysis = analyzeLaborCosts('생산부');
+    // 통합 모듈에서 실제 직원 데이터 기반 분석 사용
+    const analysis = analyzeLaborCostsFromContext('생산부');
     return `💰 **인건비 분석 (생산부)**\n\n` +
       `• 직원 수: ${analysis.employeeCount}명\n` +
       `• 기본급 총액: ${analysis.totalBaseSalary.toLocaleString()}원\n` +
       `• 연장근무 수당: ${analysis.totalOvertimePay.toLocaleString()}원\n` +
       `• **총 인건비: ${analysis.totalPay.toLocaleString()}원**\n` +
       `• 총 근무시간: ${analysis.totalWorkHours.toLocaleString()}시간\n` +
-      `• 평균 시급: ${Math.round(analysis.averageHourlyRate).toLocaleString()}원`;
+      `• 평균 시급: ${Math.round(analysis.averageHourlyRate).toLocaleString()}원\n\n` +
+      `📋 *실제 직원 관리 페이지 데이터 기반 분석 결과입니다.*`;
   }
   
   return "죄송합니다. 해당 쿼리에 대한 분석 결과를 찾을 수 없습니다. 다른 질문을 해주세요.";

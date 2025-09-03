@@ -1786,9 +1786,32 @@ export const analyzeInventoryTurnover = (materialCode?: string) => {
 };
 
 export const analyzeLaborCosts = (department?: string, month?: string) => {
-  // 통합된 직원 데이터 사용
-  const { analyzeUnifiedLaborCosts } = require('./employeeDataIntegration');
-  return analyzeUnifiedLaborCosts(department, month);
+  const data = generateMassiveERPData();
+  let payrolls = data.payrollRecords;
+  
+  if (department) {
+    payrolls = payrolls.filter((p: Payroll) => p.department === department);
+  }
+  
+  if (month) {
+    payrolls = payrolls.filter((p: Payroll) => p.payPeriod === month);
+  }
+  
+  const totalBaseSalary = payrolls.reduce((sum: number, p: Payroll) => sum + p.baseSalary, 0);
+  const totalOvertimePay = payrolls.reduce((sum: number, p: Payroll) => sum + p.overtimePay, 0);
+  const totalGrossPay = payrolls.reduce((sum: number, p: Payroll) => sum + p.grossPay, 0);
+  const totalWorkHours = payrolls.reduce((sum: number, p: Payroll) => sum + p.totalWorkHours, 0);
+  const totalOvertimeHours = payrolls.reduce((sum: number, p: Payroll) => sum + p.totalOvertimeHours, 0);
+  
+  return {
+    employeeCount: payrolls.length,
+    totalBaseSalary,
+    totalOvertimePay,
+    totalGrossPay,
+    totalWorkHours,
+    totalOvertimeHours,
+    averageHourlyRate: totalWorkHours > 0 ? totalGrossPay / totalWorkHours : 0
+  };
 };
 
 export const analyzeFinancialSummary = (month?: string) => {
@@ -1909,24 +1932,11 @@ export const generateChatbotResponse = (query: string): string => {
       `자재 조달 주기 최적화, 생산 계획 정확도 향상`;
   }
   
-  // 인건비 분석 쿼리
+  // 인건비 분석 쿼리 - 통합 모듈로 리다이렉트
   if (query.includes('인건비') || query.includes('급여') || query.includes('노무비') || query.includes('인력비용')) {
-    const analysis = analyzeLaborCosts('생산부');
-    const recentMonth = '2024-03';
-    const monthlyAnalysis = analyzeLaborCosts('생산부', recentMonth);
-    
-    return `💰 **인건비 분석** (생산부 기준)\n\n` +
-      `**전체 기간 (6개월)**:\n` +
-      `• 총 직원 수: ${analysis.employeeCount}명\n` +
-      `• 기본급 총액: ${analysis.totalBaseSalary.toLocaleString()}원\n` +
-      `• 연장근무 수당: ${analysis.totalOvertimePay.toLocaleString()}원\n` +
-      `• **총 인건비: ${analysis.totalGrossPay.toLocaleString()}원**\n` +
-      `• 평균 시급: ${Math.round(analysis.averageHourlyRate).toLocaleString()}원\n\n` +
-      `**최근 월 (${recentMonth})**:\n` +
-      `• 월 인건비: ${monthlyAnalysis.totalGrossPay.toLocaleString()}원\n` +
-      `• 연장근무 비율: ${monthlyAnalysis.totalOvertimeHours > 0 ? 
-        Math.round((monthlyAnalysis.totalOvertimeHours / monthlyAnalysis.totalWorkHours) * 100) : 0}%\n\n` +
-      `**원가 영향**: 제품당 평균 인건비 ${Math.round(analysis.totalGrossPay / analysis.totalWorkHours * 5).toLocaleString()}원`;
+    // 통합된 직원 데이터 사용을 위해 chatbotIntegration으로 리다이렉트
+    const { processERPQuery } = require('./chatbotIntegration');
+    return processERPQuery(query);
   }
   
   // 재무 분석 쿼리

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Employee } from '../types/employee';
+import { setEmployeeContextData } from '../data/employeeDataIntegration';
 
 interface EmployeeContextType {
   employees: Employee[];
@@ -60,7 +61,7 @@ const INITIAL_EMPLOYEES: Employee[] = [
     status: "재직",
     workType: "정규직",
     manager: "김대표",
-    skills: ["품질관리", "검사장비", "데이터분석"],
+    skills: ["품질검사", "데이터분석", "ISO관리"],
     performanceScore: 85,
   },
   {
@@ -125,7 +126,7 @@ const INITIAL_EMPLOYEES: Employee[] = [
     workType: "정규직",
     manager: "김대표",
     skills: ["영업전략", "고객관리", "계약협상"],
-    performanceScore: 87,
+    performanceScore: 95,
   },
   {
     id: "EMP-008",
@@ -140,13 +141,18 @@ const INITIAL_EMPLOYEES: Employee[] = [
     status: "재직",
     workType: "정규직",
     manager: "김대표",
-    skills: ["품질시스템", "ISO관리", "프로세스개선"],
-    performanceScore: 84,
+    skills: ["품질시스템", "프로세스개선", "데이터분석"],
+    performanceScore: 87,
   },
 ];
 
 export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+
+  // 직원 데이터가 변경될 때마다 통합 모듈에 동기화
+  useEffect(() => {
+    setEmployeeContextData(employees);
+  }, [employees]);
 
   const addEmployee = (employee: Employee) => {
     setEmployees(prev => [...prev, employee]);

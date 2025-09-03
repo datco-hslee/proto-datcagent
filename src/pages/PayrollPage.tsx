@@ -23,29 +23,28 @@ import {
 } from "lucide-react";
 import styles from "./PayrollPage.module.css";
 
-// 통합된 급여 기록 생성 함수
+
+// 실제 직원 데이터를 기반으로 급여 기록을 생성하는 함수
 const generatePayrollRecordsFromEmployees = (employees: any[]) => {
-  const { generateUnifiedPayrollRecords } = require('../data/employeeDataIntegration');
-  const unifiedRecords = generateUnifiedPayrollRecords(employees);
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM 형식
   
-  // PayrollPage에서 사용하는 형식으로 변환
-  return unifiedRecords
-    .filter((record: any) => record.payPeriod === '2024-03') // 최근 월만 표시
-    .map((record: any) => ({
-      id: record.id,
-      employeeId: record.employeeId,
-      employeeName: record.employeeName,
-      department: record.department,
-      position: record.position,
-      period: record.payPeriod,
-      baseSalary: record.baseSalary,
-      allowances: record.overtimePay + record.nightShiftPay + record.weekendPay + record.holidayPay,
-      overtimeAllowance: record.overtimePay,
-      deductions: record.socialInsurance,
-      tax: record.incomeTax,
-      netPay: record.netPay,
-      status: "지급완료",
-      payDate: record.payDate.toISOString().split('T')[0]
+  return employees
+    .filter(emp => emp.status === "재직")
+    .map((employee) => ({
+      id: `payroll-${employee.employeeId}`,
+      employeeId: employee.employeeId,
+      employeeName: employee.name,
+      department: employee.department,
+      position: employee.position,
+      period: currentMonth,
+      baseSalary: employee.salary,
+      allowances: Math.floor(employee.salary * 0.1), // 기본급의 10%로 설정
+      overtime: 0, // 초기값 0
+      deductions: Math.floor(employee.salary * 0.03), // 기본급의 3%로 설정
+      tax: Math.floor(employee.salary * 0.15), // 기본급의 15%로 설정
+      netPay: employee.salary + Math.floor(employee.salary * 0.1) - Math.floor(employee.salary * 0.03) - Math.floor(employee.salary * 0.15),
+      status: "draft" as const,
+      payDate: "",
     }));
 };
 

@@ -1,12 +1,11 @@
 import { create } from "zustand";
 import { 
   generateInventoryResponse, 
-  generateProductionResponse, 
   generateSolutionResponse 
-} from "@/data/erpDemoData";
+} from '../data/chatbotDataIntegration';
 import { 
   generateTraceabilityResponse
-} from "@/data/chatbotIntegration";
+} from '../data/chatbotIntegration';
 
 export interface TutorialMessage {
   id: string;
@@ -94,7 +93,7 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
   // ERP 납품 일정 확인 시나리오 (기존)
   {
     trigger: /단비.*우신.*납품|우신.*납품.*물량|이번.*주.*우신|우신.*문제/i,
-    response: generateProductionResponse("우신"),
+    response: generateInventoryResponse("우신 납품"),
     highlightPath: ['[data-menu="production-orders"]'],
     additionalActions: [{ type: "expandSection", target: "production-mrp", delay: 100 }],
   },
