@@ -1,19 +1,20 @@
 import React, { useState } from "react";
 import {
   Factory,
+  Search,
   Calendar,
   Clock,
-  CheckCircle,
-  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
   Play,
   Pause,
-  RotateCcw,
-  TrendingUp,
+  Edit,
   Filter,
   Plus,
-  Search,
   Eye,
-  Edit,
+  CheckCircle,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 
 interface ProductionOrder {
@@ -183,6 +184,31 @@ export function ProductionOrderPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [showDetailedFilters, setShowDetailedFilters] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(null);
+  const [orders, setOrders] = useState<ProductionOrder[]>(PRODUCTION_ORDERS);
+  
+  // Additional filter states
+  const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [customerFilter, setCustomerFilter] = useState<string>("all");
+  const [dateRangeFilter, setDateRangeFilter] = useState({ start: "", end: "" });
+  const [progressFilter, setProgressFilter] = useState({ min: 0, max: 100 });
+
+  // Create order form state
+  const [newOrder, setNewOrder] = useState({
+    productName: "",
+    productCode: "",
+    quantity: "",
+    unit: "개",
+    customer: "",
+    assignedTeam: "",
+    priority: "medium" as ProductionOrder["priority"],
+    startDate: "",
+    dueDate: "",
+    notes: ""
+  });
 
   // 스타일 정의
   const cardStyle: React.CSSProperties = {
@@ -353,15 +379,94 @@ export function ProductionOrderPage() {
     }
   };
 
-  const filteredOrders = PRODUCTION_ORDERS.filter((order) => {
+  // Handler functions
+  const handleCreateOrder = () => {
+    if (!newOrder.productName || !newOrder.quantity || !newOrder.customer || !newOrder.assignedTeam || !newOrder.startDate || !newOrder.dueDate) {
+      alert("모든 필수 필드를 입력해주세요.");
+      return;
+    }
+
+    const orderNumber = `PO-${Date.now().toString().slice(-6)}`;
+    const createdOrder: ProductionOrder = {
+      id: Date.now().toString(),
+      orderNumber,
+      productName: newOrder.productName,
+      productCode: newOrder.productCode || `PC-${Date.now().toString().slice(-4)}`,
+      quantity: parseInt(newOrder.quantity),
+      unit: newOrder.unit,
+      status: "planned",
+      priority: newOrder.priority,
+      customer: newOrder.customer,
+      assignedTeam: newOrder.assignedTeam,
+      startDate: new Date(newOrder.startDate),
+      dueDate: new Date(newOrder.dueDate),
+      progress: 0,
+      completedQuantity: 0,
+      estimatedHours: 0,
+      actualHours: 0,
+      materials: [],
+      notes: newOrder.notes
+    };
+
+    setOrders(prev => [createdOrder, ...prev]);
+    setShowCreateModal(false);
+    setNewOrder({
+      productName: "",
+      productCode: "",
+      quantity: "",
+      unit: "개",
+      customer: "",
+      assignedTeam: "",
+      priority: "medium",
+      startDate: "",
+      dueDate: "",
+      notes: ""
+    });
+    alert("새 생산 오더가 생성되었습니다.");
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+    setNewOrder({
+      productName: "",
+      productCode: "",
+      quantity: "",
+      unit: "개",
+      customer: "",
+      assignedTeam: "",
+      priority: "medium",
+      startDate: "",
+      dueDate: "",
+      notes: ""
+    });
+  };
+
+  const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customer.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || order.priority === priorityFilter;
+    const matchesTeam = teamFilter === "all" || order.assignedTeam === teamFilter;
+    const matchesCustomer = customerFilter === "all" || order.customer === customerFilter;
+    
+    // Date range filter
+    let matchesDateRange = true;
+    if (dateRangeFilter.start || dateRangeFilter.end) {
+      const orderDate = new Date(order.startDate);
+      if (dateRangeFilter.start) {
+        matchesDateRange = matchesDateRange && orderDate >= new Date(dateRangeFilter.start);
+      }
+      if (dateRangeFilter.end) {
+        matchesDateRange = matchesDateRange && orderDate <= new Date(dateRangeFilter.end);
+      }
+    }
+    
+    // Progress filter
+    const matchesProgress = order.progress >= progressFilter.min && order.progress <= progressFilter.max;
 
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus && matchesPriority && matchesTeam && matchesCustomer && matchesDateRange && matchesProgress;
   });
 
   const formatDate = (date: Date) => {
@@ -376,6 +481,67 @@ export function ProductionOrderPage() {
     const timeDiff = dueDate.getTime() - today.getTime();
     const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
     return daysDiff;
+  };
+
+  // 오더 상태 변경 핸들러
+  const handleStartOrder = (orderId: string) => {
+    setOrders(prevOrders => 
+      prevOrders.map(order => 
+        order.id === orderId 
+          ? { ...order, status: "in-progress" as const }
+          : order
+      )
+    );
+  };
+
+  const handlePauseOrder = (orderId: string) => {
+    setOrders(prevOrders => 
+      prevOrders.map(order => 
+        order.id === orderId 
+          ? { ...order, status: "on-hold" as const }
+          : order
+      )
+    );
+  };
+
+  const handleResumeOrder = (orderId: string) => {
+    setOrders(prevOrders => 
+      prevOrders.map(order => 
+        order.id === orderId 
+          ? { ...order, status: "in-progress" as const }
+          : order
+      )
+    );
+  };
+
+  // 오더 편집 핸들러
+  const handleEditOrder = (order: ProductionOrder) => {
+    setEditingOrder(order);
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingOrder(null);
+  };
+
+  const handleSaveEditOrder = () => {
+    if (!editingOrder) return;
+
+    // 유효성 검사
+    if (!editingOrder.productName || !editingOrder.productCode || editingOrder.quantity <= 0) {
+      alert("필수 필드를 모두 입력해주세요.");
+      return;
+    }
+
+    // 오더 업데이트
+    setOrders(prevOrders =>
+      prevOrders.map(order =>
+        order.id === editingOrder.id ? editingOrder : order
+      )
+    );
+
+    handleCloseEditModal();
   };
 
   const getActionButton = (order: ProductionOrder) => {
@@ -394,21 +560,30 @@ export function ProductionOrderPage() {
     switch (order.status) {
       case "planned":
         return (
-          <button style={{...buttonBaseStyle, backgroundColor: "#3b82f6", color: "white"}}>
+          <button 
+            style={{...buttonBaseStyle, backgroundColor: "#3b82f6", color: "white"}}
+            onClick={() => handleStartOrder(order.id)}
+          >
             <Play size={12} />
             시작
           </button>
         );
       case "in-progress":
         return (
-          <button style={{...buttonBaseStyle, backgroundColor: "white", color: "#374151", border: "1px solid #d1d5db"}}>
+          <button 
+            style={{...buttonBaseStyle, backgroundColor: "white", color: "#374151", border: "1px solid #d1d5db"}}
+            onClick={() => handlePauseOrder(order.id)}
+          >
             <Pause size={12} />
             일시정지
           </button>
         );
       case "on-hold":
         return (
-          <button style={{...buttonBaseStyle, backgroundColor: "#10b981", color: "white"}}>
+          <button 
+            style={{...buttonBaseStyle, backgroundColor: "#10b981", color: "white"}}
+            onClick={() => handleResumeOrder(order.id)}
+          >
             <RotateCcw size={12} />
             재개
           </button>
@@ -431,7 +606,10 @@ export function ProductionOrderPage() {
             <Filter size={16} />
             상세 필터
           </button>
-          <button style={{...primaryButtonStyle}}>
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            style={{...primaryButtonStyle}}
+          >
             <Plus size={16} />새 오더 생성
           </button>
         </div>
@@ -467,11 +645,14 @@ export function ProductionOrderPage() {
             style={{...inputStyle, paddingLeft: "2.5rem"}}
           />
         </div>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          {/* 상태 필터 */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={inputStyle}
+
+            // 모든 상태 css
+            style={{...inputStyle, width: "40px", minWidth: "150px"}}
           >
             <option value="all">모든 상태</option>
             <option value="planned">계획됨</option>
@@ -482,7 +663,8 @@ export function ProductionOrderPage() {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            style={inputStyle}
+            // 모든 우선순위 css
+            style={{...inputStyle, width: "40px", minWidth: "150px"}}
           >
             <option value="all">모든 우선순위</option>
             <option value="urgent">긴급</option>
@@ -490,7 +672,141 @@ export function ProductionOrderPage() {
             <option value="medium">보통</option>
             <option value="low">낮음</option>
           </select>
+          <button
+            onClick={() => setShowDetailedFilters(!showDetailedFilters)}
+            style={{
+              ...primaryButtonStyle,
+              backgroundColor: showDetailedFilters ? "#1d4ed8" : "#3b82f6",
+            }}
+          >
+            <Filter size={18} />
+            상세 필터
+          </button>
         </div>
+        
+        {/* 상세 필터 */}
+        {showDetailedFilters && (
+          <div style={{
+            ...cardStyle,
+            padding: "1rem",
+            backgroundColor: "#f8fafc",
+            border: "1px solid #e2e8f0"
+          }}>
+            <h4 style={{ fontSize: "1rem", fontWeight: 600, color: "#374151", marginBottom: "1rem" }}>상세 필터</h4>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+              {/* 팀 필터 */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  담당팀
+                </label>
+                <select
+                  value={teamFilter}
+                  onChange={(e) => setTeamFilter(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="all">모든 팀</option>
+                  <option value="생산팀 A">생산팀 A</option>
+                  <option value="생산팀 B">생산팀 B</option>
+                  <option value="생산팀 C">생산팀 C</option>
+                  <option value="품질관리팀">품질관리팀</option>
+                </select>
+              </div>
+              
+              {/* 고객사 필터 */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  고객사
+                </label>
+                <select
+                  value={customerFilter}
+                  onChange={(e) => setCustomerFilter(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="all">모든 고객사</option>
+                  <option value="ABC 전자">ABC 전자</option>
+                  <option value="XYZ 산업">XYZ 산업</option>
+                  <option value="DEF 기업">DEF 기업</option>
+                  <option value="GHI 코퍼레이션">GHI 코퍼레이션</option>
+                </select>
+              </div>
+              
+              {/* 시작일 필터 */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  시작일 (시작)
+                </label>
+                <input
+                  type="date"
+                  value={dateRangeFilter.start}
+                  onChange={(e) => setDateRangeFilter(prev => ({ ...prev, start: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+              
+              {/* 종료일 필터 */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  시작일 (종료)
+                </label>
+                <input
+                  type="date"
+                  value={dateRangeFilter.end}
+                  onChange={(e) => setDateRangeFilter(prev => ({ ...prev, end: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+              
+              {/* 진행률 필터 */}
+              <div style={{ gridColumn: "span 2" }}>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  진행률 범위: {progressFilter.min}% - {progressFilter.max}%
+                </label>
+                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={progressFilter.min}
+                    onChange={(e) => setProgressFilter(prev => ({ ...prev, min: parseInt(e.target.value) }))}
+                    style={{ flex: 1 }}
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={progressFilter.max}
+                    onChange={(e) => setProgressFilter(prev => ({ ...prev, max: parseInt(e.target.value) }))}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* 필터 초기화 버튼 */}
+            <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  setTeamFilter("all");
+                  setCustomerFilter("all");
+                  setDateRangeFilter({ start: "", end: "" });
+                  setProgressFilter({ min: 0, max: 100 });
+                }}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: "0.375rem",
+                  border: "1px solid #d1d5db",
+                  backgroundColor: "white",
+                  color: "#374151",
+                  cursor: "pointer",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                }}
+              >
+                필터 초기화
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 생산 오더 목록 */}
@@ -533,21 +849,22 @@ export function ProductionOrderPage() {
               </div>
 
               {/* 진행률 바 */}
-              <div>
+              <div style={{ width: "100%", overflow: "hidden" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem", marginBottom: "0.25rem" }}>
                   <span>진행률</span>
                   <span>
                     {order.completedQuantity}/{order.quantity}
                   </span>
                 </div>
-                <div style={{ width: "100%", backgroundColor: "#e5e7eb", borderRadius: "9999px", height: "0.5rem" }}>
+                <div style={{ width: "100%", backgroundColor: "#e5e7eb", borderRadius: "9999px", height: "0.5rem", overflow: "hidden" }}>
                   <div
                     style={{
                       height: "0.5rem",
                       borderRadius: "9999px",
                       transition: "all 0.3s",
                       backgroundColor: order.progress === 100 ? "#10b981" : order.progress > 50 ? "#3b82f6" : "#f59e0b",
-                      width: `${order.progress}%`
+                      width: `${Math.min(order.progress, 100)}%`,
+                      maxWidth: "100%"
                     }}
                   />
                 </div>
@@ -604,7 +921,10 @@ export function ProductionOrderPage() {
                   <Eye size={12} />
                   상세보기
                 </button>
-                <button style={{...secondaryButtonStyle, fontSize: "0.75rem", padding: "0.25rem 0.5rem", backgroundColor: "transparent", border: "none"}}>
+                <button 
+                  style={{...secondaryButtonStyle, fontSize: "0.75rem", padding: "0.25rem 0.5rem", backgroundColor: "transparent", border: "none"}}
+                  onClick={() => handleEditOrder(order)}
+                >
                   <Edit size={12} />
                 </button>
               </div>
@@ -632,31 +952,34 @@ export function ProductionOrderPage() {
                   <p style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{order.productName}</p>
                   <p style={{ color: "#6b7280", fontSize: "0.75rem" }}>{order.orderNumber}</p>
                 </div>
-                <div style={{ flex: 1, position: "relative", height: "2rem", backgroundColor: "#f3f4f6", borderRadius: "0.25rem" }}>
+                <div style={{ flex: 1, position: "relative", height: "2rem", backgroundColor: "#f3f4f6", borderRadius: "0.25rem", overflow: "hidden" }}>
+                  {/* 전체 기간 배경 바 (100% 너비) */}
                   <div
                     style={{
                       position: "absolute",
                       top: 0,
+                      left: 0,
                       height: "100%",
+                      width: "100%",
                       borderRadius: "0.25rem",
                       backgroundColor: getStatusColorHex(order.status),
-                      opacity: 0.8,
-                      left: `${(startOffset / 31) * 100}%`,
-                      width: `${(totalDays / 31) * 100}%`,
+                      opacity: 0.2
                     }}
                   />
+                  {/* 진행률 바 - 0%부터 시작해서 진행률만큼 표시 */}
                   <div
                     style={{
                       position: "absolute",
                       top: 0,
+                      left: 0,
                       height: "100%",
                       borderRadius: "0.25rem",
                       backgroundColor: getStatusColorHex(order.status),
-                      left: `${(startOffset / 31) * 100}%`,
-                      width: `${(totalDays / 31) * (order.progress / 100) * 100}%`,
+                      width: `${Math.min(order.progress, 100)}%`,
+                      maxWidth: "100%"
                     }}
                   />
-                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", color: "white", fontWeight: 500 }}>{order.progress}%</div>
+                  <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", color: "#000000", fontWeight: 600, textShadow: "0 0 2px rgba(255,255,255,0.8)" }}>{order.progress}%</div>
                 </div>
                 <div style={{ width: "5rem", fontSize: "0.75rem", color: "#6b7280" }}>{formatDate(order.dueDate)}</div>
               </div>
@@ -797,6 +1120,408 @@ export function ProductionOrderPage() {
               </button>
               <button style={primaryButtonStyle}>
                 편집
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Order Modal */}
+      {showCreateModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: "white",
+            borderRadius: "0.5rem",
+            padding: "2rem",
+            width: "90%",
+            maxWidth: "600px",
+            maxHeight: "90vh",
+            overflow: "auto"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+              <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", color: "#111827" }}>새 생산 오더 생성</h2>
+              <button
+                onClick={handleCloseCreateModal}
+                style={{
+                  backgroundColor: "transparent",
+                  border: "none",
+                  fontSize: "1.5rem",
+                  cursor: "pointer",
+                  color: "#6b7280"
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  제품명 *
+                </label>
+                <input
+                  type="text"
+                  value={newOrder.productName}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, productName: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="제품명을 입력하세요"
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  제품 코드
+                </label>
+                <input
+                  type="text"
+                  value={newOrder.productCode}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, productCode: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="자동 생성됩니다"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  수량 *
+                </label>
+                <input
+                  type="number"
+                  value={newOrder.quantity}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, quantity: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="수량"
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  단위
+                </label>
+                <select
+                  value={newOrder.unit}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, unit: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="개">개</option>
+                  <option value="kg">kg</option>
+                  <option value="L">L</option>
+                  <option value="m">m</option>
+                  <option value="세트">세트</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  고객사 *
+                </label>
+                <input
+                  type="text"
+                  value={newOrder.customer}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, customer: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="고객사명"
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  담당팀 *
+                </label>
+                <select
+                  value={newOrder.assignedTeam}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, assignedTeam: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="">팀 선택</option>
+                  <option value="생산팀 A">생산팀 A</option>
+                  <option value="생산팀 B">생산팀 B</option>
+                  <option value="생산팀 C">생산팀 C</option>
+                  <option value="품질관리팀">품질관리팀</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  시작일 *
+                </label>
+                <input
+                  type="date"
+                  value={newOrder.startDate}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, startDate: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  완료 예정일 *
+                </label>
+                <input
+                  type="date"
+                  value={newOrder.dueDate}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, dueDate: e.target.value }))}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                우선순위
+              </label>
+              <select
+                value={newOrder.priority}
+                onChange={(e) => setNewOrder(prev => ({ ...prev, priority: e.target.value as ProductionOrder["priority"] }))}
+                style={inputStyle}
+              >
+                <option value="low">낮음</option>
+                <option value="medium">보통</option>
+                <option value="high">높음</option>
+                <option value="urgent">긴급</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                특이사항
+              </label>
+              <textarea
+                value={newOrder.notes}
+                onChange={(e) => setNewOrder(prev => ({ ...prev, notes: e.target.value }))}
+                style={{
+                  ...inputStyle,
+                  minHeight: "80px",
+                  resize: "vertical"
+                }}
+                placeholder="특이사항이나 추가 정보를 입력하세요"
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button
+                onClick={handleCloseCreateModal}
+                style={secondaryButtonStyle}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleCreateOrder}
+                style={primaryButtonStyle}
+              >
+                생성
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 오더 편집 모달 */}
+      {showEditModal && editingOrder && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: "white",
+            borderRadius: "0.5rem",
+            padding: "1.5rem",
+            width: "90%",
+            maxWidth: "600px",
+            maxHeight: "90vh",
+            overflow: "auto"
+          }}>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#111827", marginBottom: "1.5rem" }}>
+              생산 오더 편집
+            </h2>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  제품명 *
+                </label>
+                <input
+                  type="text"
+                  value={editingOrder.productName}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, productName: e.target.value } : null)}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  제품 코드 *
+                </label>
+                <input
+                  type="text"
+                  value={editingOrder.productCode}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, productCode: e.target.value } : null)}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  수량 *
+                </label>
+                <input
+                  type="number"
+                  value={editingOrder.quantity}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, quantity: parseInt(e.target.value) || 0 } : null)}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  단위
+                </label>
+                <input
+                  type="text"
+                  value={editingOrder.unit}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, unit: e.target.value } : null)}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  고객사
+                </label>
+                <input
+                  type="text"
+                  value={editingOrder.customer}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, customer: e.target.value } : null)}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  담당팀
+                </label>
+                <select
+                  value={editingOrder.assignedTeam}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, assignedTeam: e.target.value } : null)}
+                  style={inputStyle}
+                >
+                  <option value="생산팀 A">생산팀 A</option>
+                  <option value="생산팀 B">생산팀 B</option>
+                  <option value="생산팀 C">생산팀 C</option>
+                  <option value="품질관리팀">품질관리팀</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  시작일 *
+                </label>
+                <input
+                  type="date"
+                  value={editingOrder.startDate instanceof Date ? editingOrder.startDate.toISOString().split('T')[0] : editingOrder.startDate}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, startDate: new Date(e.target.value) } : null)}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  완료 예정일 *
+                </label>
+                <input
+                  type="date"
+                  value={editingOrder.dueDate instanceof Date ? editingOrder.dueDate.toISOString().split('T')[0] : editingOrder.dueDate}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, dueDate: new Date(e.target.value) } : null)}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  상태
+                </label>
+                <select
+                  value={editingOrder.status}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, status: e.target.value as ProductionOrder["status"] } : null)}
+                  style={inputStyle}
+                >
+                  <option value="planned">계획됨</option>
+                  <option value="in-progress">진행중</option>
+                  <option value="completed">완료</option>
+                  <option value="on-hold">일시정지</option>
+                  <option value="cancelled">취소</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                  우선순위
+                </label>
+                <select
+                  value={editingOrder.priority}
+                  onChange={(e) => setEditingOrder(prev => prev ? { ...prev, priority: e.target.value as ProductionOrder["priority"] } : null)}
+                  style={inputStyle}
+                >
+                  <option value="low">낮음</option>
+                  <option value="medium">보통</option>
+                  <option value="high">높음</option>
+                  <option value="urgent">긴급</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label style={{ display: "block", fontSize: "0.875rem", fontWeight: 500, color: "#374151", marginBottom: "0.5rem" }}>
+                특이사항
+              </label>
+              <textarea
+                value={editingOrder.notes || ""}
+                onChange={(e) => setEditingOrder(prev => prev ? { ...prev, notes: e.target.value } : null)}
+                style={{
+                  ...inputStyle,
+                  minHeight: "80px",
+                  resize: "vertical"
+                }}
+                placeholder="특이사항이나 추가 정보를 입력하세요"
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button
+                onClick={handleCloseEditModal}
+                style={secondaryButtonStyle}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSaveEditOrder}
+                style={primaryButtonStyle}
+              >
+                저장
               </button>
             </div>
           </div>

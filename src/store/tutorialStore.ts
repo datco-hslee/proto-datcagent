@@ -1,4 +1,9 @@
 import { create } from "zustand";
+import { 
+  generateInventoryResponse, 
+  generateProductionResponse, 
+  generateSolutionResponse 
+} from "@/data/erpDemoData";
 
 export interface TutorialMessage {
   id: string;
@@ -39,8 +44,33 @@ export interface TutorialActions {
   setQuickReplies: (replies: string[]) => void;
 }
 
-// 튜토리얼 시나리오 정의 (페이지 이동 제거)
+// AI 챗봇 "단비" ERP 시나리오 정의
 const TUTORIAL_SCENARIOS: TutorialScenario[] = [
+  // ERP 재고 조회 시나리오
+  {
+    trigger: /단비.*EV9|EV9.*시트.*레일.*재고|EV9.*재고|시트.*레일.*재고/i,
+    response: generateInventoryResponse("EV9 전기차용 시트 레일"),
+    highlightPath: ['[data-menu="inventory"]'],
+    additionalActions: [{ type: "expandSection", target: "inventory-purchase", delay: 100 }],
+  },
+  // ERP 납품 일정 확인 시나리오  
+  {
+    trigger: /단비.*우신.*납품|우신.*납품.*물량|이번.*주.*우신|우신.*문제/i,
+    response: generateProductionResponse("우신"),
+    highlightPath: ['[data-menu="production-orders"]'],
+    additionalActions: [{ type: "expandSection", target: "production-mrp", delay: 100 }],
+  },
+  // ERP 해결책 요청 시나리오
+  {
+    trigger: /단비.*해결책|해결책.*무엇|어떻게.*해결|대안.*요청/i,
+    response: generateSolutionResponse(),
+    highlightPath: ['[data-menu="production-orders"]', '[data-menu="purchase-orders"]'],
+    additionalActions: [
+      { type: "expandSection", target: "production-mrp", delay: 100 },
+      { type: "expandSection", target: "inventory-purchase", delay: 200 }
+    ],
+  },
+  // 기존 튜토리얼 시나리오들
   {
     trigger: /고객.*정보.*관리|CRM|영업.*관리|고객.*어떻게/i,
     response:
@@ -56,20 +86,6 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
     additionalActions: [{ type: "expandSection", target: "inventory-purchase", delay: 100 }],
   },
   {
-    trigger: /휴가.*승인|직원.*휴가|인사.*관리|휴가.*어디/i,
-    response:
-      "직원 휴가 승인은 직원 관리 메뉴에서 처리할 수 있습니다! 👥\n\n✨ 화면에서 파란색으로 하이라이트된 '직원 관리' 메뉴를 확인해보세요!\n\n📌 하이라이트된 메뉴를 클릭하면 직원 관리 페이지로 이동하여:\n• 휴가 승인 대기 목록 확인\n• 원클릭 승인/반려 처리\n• 직원별 휴가 현황 조회\n\n💡 지금 바로 클릭해보세요!",
-    highlightPath: ['[data-menu="hr-management"]'],
-    additionalActions: [{ type: "expandSection", target: "hr-payroll", delay: 100 }],
-  },
-  {
-    trigger: /견적서.*만들|견적.*작성|견적.*어떻게/i,
-    response:
-      "견적서는 견적 관리 메뉴에서 작성할 수 있습니다! 📋\n\n✨ 화면에서 파란색으로 하이라이트된 '견적 관리' 메뉴를 확인해보세요!\n\n📌 하이라이트된 메뉴를 클릭하면 견적 관리 페이지로 이동하여:\n• 고객별 맞춤 견적서 작성\n• 제품별 가격 자동 계산\n• 견적서 승인 및 발송\n\n💡 지금 바로 클릭해보세요!",
-    highlightPath: ['[data-menu="quote-management"]'],
-    additionalActions: [{ type: "expandSection", target: "sales-customer", delay: 100 }],
-  },
-  {
     trigger: /생산.*일정|생산.*계획|MRP|제조.*일정/i,
     response:
       "생산 일정은 생산 오더 메뉴에서 확인할 수 있습니다! 🏭\n\n✨ 화면에서 파란색으로 하이라이트된 '생산 오더' 메뉴를 확인해보세요!\n\n📌 하이라이트된 메뉴를 클릭하면 생산 관리 페이지로 이동하여:\n• 실시간 생산 진행 상황\n• 일별/주별 생산 계획\n• 설비별 가동 현황\n\n💡 지금 바로 클릭해보세요!",
@@ -78,12 +94,12 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
   },
 ];
 
-// 기본 빠른 응답 질문들
+// AI 챗봇 "단비" 빠른 응답 질문들
 const DEFAULT_QUICK_REPLIES = [
-  "고객 정보를 어떻게 관리하나요?",
+  "단비, EV9 전기차용 시트 레일 재고 얼마나 남았어?",
+  "단비, 이번주 우신 납품 물량 문제 없지?",
+  "단비, 해결책이 무엇일까?",
   "재고 현황을 확인하려면?",
-  "직원 휴가 승인은 어디서 하나요?",
-  "견적서는 어떻게 만드나요?",
   "생산 일정은 어디서 보나요?",
 ];
 
@@ -101,17 +117,17 @@ export const useTutorialStore = create<TutorialState & TutorialActions>((set, ge
     console.log("Tutorial activated");
     set({ isActive: true });
 
-    // 웰컴 메시지 추가
+    // AI 챗봇 "단비" 웰컴 메시지 추가
     const welcomeMessage: TutorialMessage = {
       id: Date.now().toString(),
       sender: "bot",
       content:
-        "안녕하세요! 👋 테크솔루션 업무 시스템 도우미입니다.\n\n궁금한 기능이나 메뉴에 대해 언제든 물어보세요. 아래 질문을 선택하거나 직접 입력해주세요!",
+        "안녕하세요! 👋 저는 닷코 AI 챗봇 단비입니다.\n\n자연어 기반 인터페이스로 ERP 데이터 조회 및 업무 요청을 도와드립니다! 아래 예시처럼 편하게 말씀해주세요:\n\n• \"단비, EV9 시트 레일 재고 얼마나 남았어?\"\n• \"단비, 이번주 우신 납품 물량 문제 없지?\"\n• \"단비, 해결책이 무엇일까?\"",
       timestamp: new Date(),
       type: "text",
     };
 
-    set((state) => ({
+    set(() => ({
       messages: [welcomeMessage],
       quickReplies: DEFAULT_QUICK_REPLIES,
     }));

@@ -220,8 +220,8 @@ export function TutorialOverlay() {
                   <Bot size={24} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontWeight: "700", fontSize: "18px" }}>튜토리얼 도우미</h3>
-                  <p style={{ margin: 0, fontSize: "13px", opacity: 0.9 }}>궁금한 것을 물어보세요!</p>
+                  <h3 style={{ margin: 0, fontWeight: "700", fontSize: "18px" }}>닷코 AI 챗봇 "단비"</h3>
+                  <p style={{ margin: 0, fontSize: "13px", opacity: 0.9 }}>ERP 업무를 도와드려요!</p>
                 </div>
               </div>
               <button
