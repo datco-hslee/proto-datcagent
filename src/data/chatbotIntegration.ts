@@ -222,9 +222,27 @@ export const generateTraceabilityResponse = (query: string): string => {
   
   // 인건비 분석 쿼리 (통합된 직원 데이터 사용)
   if (query.includes('인건비') || query.includes('급여') || query.includes('노무비')) {
+    // 쿼리에서 부서명 추출
+    let department = undefined;
+    let departmentName = '전체';
+    
+    if (query.includes('생산부') || query.includes('생산팀') || query.includes('생산')) {
+      department = '생산부';
+      departmentName = '생산부';
+    } else if (query.includes('품질부') || query.includes('품질팀') || query.includes('품질')) {
+      department = '품질부';
+      departmentName = '품질부';
+    } else if (query.includes('구매부') || query.includes('구매팀') || query.includes('구매')) {
+      department = '구매부';
+      departmentName = '구매부';
+    } else if (query.includes('영업부') || query.includes('영업팀') || query.includes('영업')) {
+      department = '영업부';
+      departmentName = '영업부';
+    }
+    
     // 통합 모듈에서 실제 직원 데이터 기반 분석 사용
-    const analysis = analyzeLaborCostsFromContext('생산부');
-    return `💰 **인건비 분석 (생산부)**\n\n` +
+    const analysis = analyzeLaborCostsFromContext(department);
+    return `💰 **인건비 분석 (${departmentName})**\n\n` +
       `• 직원 수: ${analysis.employeeCount}명\n` +
       `• 기본급 총액: ${analysis.totalBaseSalary.toLocaleString()}원\n` +
       `• 연장근무 수당: ${analysis.totalOvertimePay.toLocaleString()}원\n` +
