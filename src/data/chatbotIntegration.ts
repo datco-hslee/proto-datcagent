@@ -130,32 +130,9 @@ export const analyzeInventoryTurnover = (materialCode?: string) => {
 };
 
 export const analyzeLaborCosts = (department?: string, month?: string) => {
-  const data = getERPData();
-  let payrolls = data.payrollRecords;
-  
-  if (department) {
-    payrolls = payrolls.filter((p: any) => p.department === department);
-  }
-  
-  if (month) {
-    payrolls = payrolls.filter((p: any) => p.month === month);
-  }
-  
-  const totalBaseSalary = payrolls.reduce((sum: number, p: any) => sum + p.baseSalary, 0);
-  const totalOvertimePay = payrolls.reduce((sum: number, p: any) => sum + p.overtimePay, 0);
-  const totalPay = payrolls.reduce((sum: number, p: any) => sum + p.totalPay, 0);
-  const totalWorkHours = payrolls.reduce((sum: number, p: any) => sum + p.totalWorkHours, 0);
-  const totalOvertimeHours = payrolls.reduce((sum: number, p: any) => sum + p.totalOvertimeHours, 0);
-  
-  return {
-    employeeCount: payrolls.length,
-    totalBaseSalary,
-    totalOvertimePay,
-    totalPay,
-    totalWorkHours,
-    totalOvertimeHours,
-    averageHourlyRate: totalWorkHours > 0 ? totalPay / totalWorkHours : 0
-  };
+  // 통합된 직원 데이터 사용
+  const { analyzeUnifiedLaborCosts } = require('./employeeDataIntegration');
+  return analyzeUnifiedLaborCosts(department, month);
 };
 
 // 챗봇 응답 생성 함수들

@@ -1786,32 +1786,9 @@ export const analyzeInventoryTurnover = (materialCode?: string) => {
 };
 
 export const analyzeLaborCosts = (department?: string, month?: string) => {
-  const data = generateMassiveERPData();
-  let payrolls = data.payrollRecords;
-  
-  if (department) {
-    payrolls = payrolls.filter((p: Payroll) => p.department === department);
-  }
-  
-  if (month) {
-    payrolls = payrolls.filter((p: Payroll) => p.payPeriod === month);
-  }
-  
-  const totalBaseSalary = payrolls.reduce((sum: number, p: Payroll) => sum + p.baseSalary, 0);
-  const totalOvertimePay = payrolls.reduce((sum: number, p: Payroll) => sum + p.overtimePay, 0);
-  const totalGrossPay = payrolls.reduce((sum: number, p: Payroll) => sum + p.grossPay, 0);
-  const totalWorkHours = payrolls.reduce((sum: number, p: Payroll) => sum + p.totalWorkHours, 0);
-  const totalOvertimeHours = payrolls.reduce((sum: number, p: Payroll) => sum + p.totalOvertimeHours, 0);
-  
-  return {
-    employeeCount: payrolls.length,
-    totalBaseSalary,
-    totalOvertimePay,
-    totalGrossPay,
-    totalWorkHours,
-    totalOvertimeHours,
-    averageHourlyRate: totalWorkHours > 0 ? totalGrossPay / totalWorkHours : 0
-  };
+  // 통합된 직원 데이터 사용
+  const { analyzeUnifiedLaborCosts } = require('./employeeDataIntegration');
+  return analyzeUnifiedLaborCosts(department, month);
 };
 
 export const analyzeFinancialSummary = (month?: string) => {
