@@ -43,12 +43,14 @@ interface BOMSufficiencyResult {
 }
 
 export function ERPDataManagementPage() {
-  const [erpData, setErpData] = useState<any>(null);
+  const [erpData, setErpData] = useState<any>({});
   const [stats, setStats] = useState<ERPDataStats | null>(null);
   const [bomAnalysis, setBomAnalysis] = useState<BOMSufficiencyResult[]>([]);
   const [inventoryStatus, setInventoryStatus] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'bom-analysis' | 'inventory' | 'bom-detail'>('overview');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [showAllOrders, setShowAllOrders] = useState<{[key: string]: boolean}>({});
   const [searchTerm, setSearchTerm] = useState('');
 
   const pageStyle: React.CSSProperties = {
@@ -84,25 +86,23 @@ export function ERPDataManagementPage() {
     paddingBottom: '1rem',
   };
 
-  const tabStyle: React.CSSProperties = {
+  const tabButtonStyle: React.CSSProperties = {
     padding: '0.75rem 1.5rem',
     border: 'none',
     background: 'transparent',
     color: '#64748b',
+    fontSize: '0.95rem',
+    fontWeight: '500',
     cursor: 'pointer',
     borderRadius: '0.5rem',
-    fontSize: '0.875rem',
-    fontWeight: 500,
     transition: 'all 0.2s ease',
   };
 
   const activeTabStyle: React.CSSProperties = {
-    ...tabStyle,
+    ...tabButtonStyle,
     background: '#3b82f6',
     color: 'white',
-    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)',
   };
-
 
   const cardGridStyle: React.CSSProperties = {
     display: 'grid',
@@ -263,7 +263,7 @@ export function ERPDataManagementPage() {
       </div>
 
       <div style={cardGridStyle}>
-        <div style={{ padding: '1.5rem', background: 'white', borderRadius: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', border: '1px solid #e2e8f0' }}>
+        <Card style={{ padding: '1.5rem' }}>
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1e293b' }}>
             <BarChart3 style={{ width: '1.25rem', height: '1.25rem', display: 'inline', marginRight: '0.5rem' }} />
             데이터 생성 현황
@@ -286,9 +286,9 @@ export function ERPDataManagementPage() {
               <Badge variant="secondary">{stats?.accountingEntries?.toLocaleString() || 0}건</Badge>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div style={{ padding: '1.5rem', background: 'white', borderRadius: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', border: '1px solid #e2e8f0' }}>
+        <Card style={{ padding: '1.5rem' }}>
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1e293b' }}>
             <Clock style={{ width: '1.25rem', height: '1.25rem', display: 'inline', marginRight: '0.5rem' }} />
             데이터 생성 기간
@@ -370,10 +370,10 @@ export function ERPDataManagementPage() {
                     )}
                   </td>
                   <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                    {item.insufficientMaterials > 0 ? (
-                      <Badge variant="destructive">부족</Badge>
+                    {parseInt(item.overallSufficiency) >= 90 ? (
+                      <CheckCircle style={{ width: '1.25rem', height: '1.25rem', color: '#10b981' }} />
                     ) : (
-                      <Badge variant="default">충분</Badge>
+                      <AlertTriangle style={{ width: '1.25rem', height: '1.25rem', color: '#f59e0b' }} />
                     )}
                   </td>
                 </tr>
@@ -387,19 +387,6 @@ export function ERPDataManagementPage() {
 
   const renderInventoryTab = () => (
     <div>
-      <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-        <Input
-          placeholder="자재명 또는 코드로 검색..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ maxWidth: '300px' }}
-        />
-        <Button variant="outline">
-          <Search style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }} />
-          검색
-        </Button>
-      </div>
-
       <Card style={{ padding: '1.5rem' }}>
         <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1e293b' }}>
           재고 현황 분석
@@ -408,31 +395,29 @@ export function ERPDataManagementPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>자재명</th>
                 <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>자재코드</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>입고량</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>소모량</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>잔여량</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>회전율</th>
-                <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', color: '#374151' }}>상태</th>
+                <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', color: '#374151' }}>자재명</th>
+                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>입고수량</th>
+                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>소모수량</th>
+                <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600', color: '#374151' }}>잔여수량</th>
+                <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', color: '#374151' }}>회전율</th>
               </tr>
             </thead>
             <tbody>
-              {inventoryStatus.map((item) => (
+              {inventoryStatus.map((item, index) => (
                 <tr key={item.materialCode} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '0.75rem' }}>{item.materialName}</td>
                   <td style={{ padding: '0.75rem', fontFamily: 'monospace' }}>{item.materialCode}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.inboundQty}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.consumedQty}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.remainingQty}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.turnoverRate}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.inboundQuantity.toLocaleString()}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.consumedQuantity.toLocaleString()}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.remainingQuantity.toLocaleString()}</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.turnoverRate.toFixed(2)}</td>
+                  <td style={{ padding: '0.75rem' }}>{item.materialName}</td>
+                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.inboundQty.toLocaleString()}</td>
+                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.consumedQty.toLocaleString()}</td>
+                  <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                    <span style={{ color: item.remainingQty < 100 ? '#ef4444' : '#374151' }}>
+                      {item.remainingQty.toLocaleString()}
+                    </span>
+                  </td>
                   <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                    <Badge variant={item.status === 'sufficient' ? 'default' : 'destructive'}>
-                      {item.status === 'sufficient' ? '충분' : '부족'}
+                    <Badge variant={parseInt(item.turnoverRate) > 80 ? "default" : "secondary"}>
+                      {item.turnoverRate}
                     </Badge>
                   </td>
                 </tr>
@@ -443,41 +428,201 @@ export function ERPDataManagementPage() {
       </Card>
     </div>
   );
-};
+
+  const toggleOrderDetails = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
+  };
+
+  const toggleShowAllOrders = (groupRange: string) => {
+    setShowAllOrders(prev => ({
+      ...prev,
+      [groupRange]: !prev[groupRange]
+    }));
+  };
 
   const renderBOMDetailTab = () => {
-    const allERPData = generateMassiveERPData();
+    const { purchaseOrders, bom } = erpData;
+    
+    // 구매 주문이 없는 경우 처리
+    if (!purchaseOrders || purchaseOrders.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b' }}>
+          <p>구매 주문 데이터가 없습니다.</p>
+        </div>
+      );
+    }
+    
+    // 구매 주문을 100개씩 그룹화
+    const groupedPurchaseOrders = [];
+    for (let i = 0; i < purchaseOrders.length; i += 100) {
+      const group = purchaseOrders.slice(i, i + 100);
+      groupedPurchaseOrders.push({
+        range: `${i}~${Math.min(i + 99, purchaseOrders.length - 1)}`,
+        orders: group,
+        totalValue: group.reduce((sum: number, order: any) => sum + (order.totalAmount || order.amount || 0), 0),
+        materialCount: new Set(group.map((order: any) => order.materialCode || order.material)).size
+      });
+    }
     
     return (
-      <div>
-        <div style={{ marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center' }}>
           <Input
-            placeholder="데이터 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ maxWidth: '400px' }}
+            type="text"
+            placeholder="구매 주문 범위 또는 자재 검색..."
+            style={{ maxWidth: '300px' }}
           />
+          <Badge variant="outline">
+            총 {purchaseOrders.length}개 주문 / {groupedPurchaseOrders.length}개 그룹
+          </Badge>
         </div>
 
-        <Card style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1e293b' }}>
-            BOM 세부 분석 - 전체 ERP 데이터
-          </h3>
-          <div style={{ display: 'grid', gap: '1.5rem' }}>
-            <div>
-              <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>구매 주문</h4>
-              <p>총 {allERPData.purchaseOrders?.length || 0}건</p>
-            </div>
-            <div>
-              <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>판매 주문</h4>
-              <p>총 {allERPData.salesOrders?.length || 0}건</p>
-            </div>
-            <div>
-              <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>생산 주문</h4>
-              <p>총 {allERPData.productionOrders?.length || 0}건</p>
-            </div>
-          </div>
-        </Card>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1rem' }}>
+          {groupedPurchaseOrders.map((group, groupIndex) => (
+            <Card key={groupIndex} className="p-6">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>
+                  구매 주문 {group.range}
+                </h4>
+                <Badge variant="secondary">
+                  {group.orders.length}개 주문
+                </Badge>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>총 주문 금액:</span>
+                  <div style={{ fontWeight: 600, color: '#059669', fontSize: '1.1rem' }}>
+                    ₩{group.totalValue.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>자재 종류:</span>
+                  <div style={{ fontWeight: 600, color: '#1d4ed8', fontSize: '1.1rem' }}>
+                    {group.materialCount}개 자재
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '0.5rem' }}>
+                <table style={{ width: '100%', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <th style={{ textAlign: 'left', padding: '0.25rem', color: '#64748b' }}>주문번호</th>
+                      <th style={{ textAlign: 'left', padding: '0.25rem', color: '#64748b' }}>자재</th>
+                      <th style={{ textAlign: 'right', padding: '0.25rem', color: '#64748b' }}>수량</th>
+                      <th style={{ textAlign: 'right', padding: '0.25rem', color: '#64748b' }}>금액</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(showAllOrders[group.range] ? group.orders : group.orders.slice(0, 10)).map((order: any, orderIndex: number) => (
+                      <React.Fragment key={orderIndex}>
+                        <tr style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }} 
+                            onClick={() => toggleOrderDetails(order.id || order.orderNumber || `${group.range}-${orderIndex}`)}>
+                          <td style={{ padding: '0.25rem', fontWeight: 500, color: '#3b82f6' }}>
+                            {order.orderNumber || order.id || `PO-${orderIndex}`}
+                            {expandedOrders.has(order.id || order.orderNumber || `${group.range}-${orderIndex}`) ? ' ▼' : ' ▶'}
+                          </td>
+                          <td style={{ padding: '0.25rem' }}>
+                            {order.items ? `${order.items.length}개 자재` : (order.materialCode || order.material || 'N/A')}
+                          </td>
+                          <td style={{ padding: '0.25rem', textAlign: 'right' }}>
+                            {order.items ? order.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0).toLocaleString() : (order.quantity || 0).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '0.25rem', textAlign: 'right', color: '#059669' }}>
+                            ₩{(order.totalAmount || order.amount || 0).toLocaleString()}
+                          </td>
+                        </tr>
+                        {expandedOrders.has(order.id || order.orderNumber || `${group.range}-${orderIndex}`) && order.items && (
+                          <tr>
+                            <td colSpan={4} style={{ padding: '0', backgroundColor: '#f8fafc' }}>
+                              <div style={{ padding: '1rem', margin: '0.5rem' }}>
+                                <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: 600, color: '#374151' }}>
+                                  주문 세부 항목
+                                </h5>
+                                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                                  {order.items.map((item: any, itemIndex: number) => (
+                                    <div key={itemIndex} style={{ 
+                                      display: 'grid', 
+                                      gridTemplateColumns: '2fr 1fr 1fr 1fr', 
+                                      gap: '0.5rem', 
+                                      padding: '0.5rem', 
+                                      backgroundColor: 'white', 
+                                      borderRadius: '0.25rem',
+                                      fontSize: '0.8rem'
+                                    }}>
+                                      <div>
+                                        <div style={{ fontWeight: 600 }}>{item.materialName || item.name}</div>
+                                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{item.materialCode}</div>
+                                      </div>
+                                      <div style={{ textAlign: 'right' }}>
+                                        {(item.quantity || 0).toLocaleString()} {item.unit || 'EA'}
+                                      </div>
+                                      <div style={{ textAlign: 'right' }}>
+                                        ₩{(item.unitPrice || 0).toLocaleString()}
+                                      </div>
+                                      <div style={{ textAlign: 'right', fontWeight: 600, color: '#059669' }}>
+                                        ₩{(item.totalPrice || 0).toLocaleString()}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                    {group.orders.length > 10 && !showAllOrders[group.range] && (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '0.5rem', textAlign: 'center' }}>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => toggleShowAllOrders(group.range)}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            모두 보기 ({group.orders.length}개 주문)
+                          </Button>
+                        </td>
+                      </tr>
+                    )}
+                    {showAllOrders[group.range] && group.orders.length > 10 && (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '0.5rem', textAlign: 'center' }}>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => toggleShowAllOrders(group.range)}
+                            style={{ fontSize: '0.875rem' }}
+                          >
+                            접기
+                          </Button>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {Array.from(new Set(group.orders.slice(0, 5).map((order: any) => order.materialCode || order.material).filter(Boolean))).map((materialCode: unknown, matIndex: number) => {
+                  const materialStr = String(materialCode);
+                  const bomItem = bom?.find((b: any) => b.materialCode === materialStr);
+                  return (
+                    <Badge key={matIndex} variant="outline" className="text-xs">
+                      {materialStr} {bomItem ? `(BOM: ${bomItem.requiredQuantity})` : ''}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   };
@@ -486,7 +631,7 @@ export function ERPDataManagementPage() {
     <div style={pageStyle}>
       <div style={headerStyle}>
         <h1 style={titleStyle}>
-          <Database style={{ width: '2rem', height: '2rem' }} />
+          <Database style={{ width: '2rem', height: '2rem', color: '#3b82f6' }} />
           ERP 데이터 관리
         </h1>
         <p style={subtitleStyle}>
@@ -511,26 +656,26 @@ export function ERPDataManagementPage() {
 
       <div style={tabsStyle}>
         <button
-          style={activeTab === 'overview' ? activeTabStyle : tabStyle}
+          style={activeTab === 'overview' ? activeTabStyle : tabButtonStyle}
           onClick={() => setActiveTab('overview')}
         >
           개요
         </button>
         <button
-          style={activeTab === 'bom-analysis' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('bom-analysis')}
+          style={activeTab === 'bom' ? activeTabStyle : tabButtonStyle}
+          onClick={() => setActiveTab('bom')}
         >
-          BOM 충족성 분석
+          BOM 분석
         </button>
         <button
-          style={activeTab === 'inventory' ? activeTabStyle : tabStyle}
+          style={activeTab === 'inventory' ? activeTabStyle : tabButtonStyle}
           onClick={() => setActiveTab('inventory')}
         >
           재고 현황
         </button>
         <button
-          style={activeTab === 'bom-detail' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('bom-detail')}
+          style={activeTab === 'bomDetail' ? activeTabStyle : tabButtonStyle}
+          onClick={() => setActiveTab('bomDetail')}
         >
           BOM 세부 분석
         </button>
@@ -544,9 +689,9 @@ export function ERPDataManagementPage() {
       ) : (
         <>
           {activeTab === 'overview' && renderOverviewTab()}
-          {activeTab === 'bom-analysis' && renderBOMAnalysisTab()}
+          {activeTab === 'bom' && renderBOMAnalysisTab()}
           {activeTab === 'inventory' && renderInventoryTab()}
-          {activeTab === 'bom-detail' && renderBOMDetailTab()}
+          {activeTab === 'bomDetail' && renderBOMDetailTab()}
         </>
       )}
     </div>
