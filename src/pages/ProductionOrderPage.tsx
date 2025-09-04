@@ -1,21 +1,22 @@
-import React, { useState } from "react";
-import {
-  Factory,
+import React, { useState, useMemo } from "react";
+import { 
+  Clock, 
+  AlertTriangle, 
+  CheckCircle, 
+  Play, 
+  Pause, 
+  Plus,
+  Filter,
   Search,
   Calendar,
-  Clock,
   TrendingUp,
-  TrendingDown,
-  Play,
-  Pause,
-  Edit,
-  Filter,
-  Plus,
-  Eye,
-  CheckCircle,
-  AlertTriangle,
+  Factory,
   RotateCcw,
+  Eye,
+  Edit
 } from "lucide-react";
+import { useCustomers } from "../context/CustomerContext";
+import { generateDynamicERPData } from "../data/dynamicERPData";
 
 interface ProductionOrder {
   id: string;
@@ -55,98 +56,6 @@ interface ProductionMetric {
   color: string;
 }
 
-// 가상 데이터
-const PRODUCTION_ORDERS: ProductionOrder[] = [
-  {
-    id: "po-001",
-    orderNumber: "PO-2024-001",
-    productName: "스마트 센서 모듈",
-    productCode: "SSM-100",
-    quantity: 500,
-    unit: "EA",
-    status: "in-progress",
-    priority: "high",
-    startDate: new Date("2024-01-15"),
-    dueDate: new Date("2024-01-25"),
-    completedQuantity: 320,
-    assignedTeam: "생산팀 A",
-    estimatedHours: 120,
-    actualHours: 78,
-    progress: 64,
-    customer: "A전자",
-    materials: [
-      { id: "m1", name: "PCB 기판", requiredQuantity: 500, availableQuantity: 500, unit: "EA", status: "available" },
-      { id: "m2", name: "센서 칩", requiredQuantity: 500, availableQuantity: 320, unit: "EA", status: "shortage" },
-      { id: "m3", name: "외부 케이스", requiredQuantity: 500, availableQuantity: 500, unit: "EA", status: "available" },
-    ],
-  },
-  {
-    id: "po-002",
-    orderNumber: "PO-2024-002",
-    productName: "IoT 제어기",
-    productCode: "IOT-200",
-    quantity: 200,
-    unit: "EA",
-    status: "planned",
-    priority: "medium",
-    startDate: new Date("2024-01-20"),
-    dueDate: new Date("2024-02-05"),
-    completedQuantity: 0,
-    assignedTeam: "생산팀 B",
-    estimatedHours: 80,
-    actualHours: 0,
-    progress: 0,
-    customer: "B기술",
-    materials: [
-      { id: "m4", name: "메인보드", requiredQuantity: 200, availableQuantity: 150, unit: "EA", status: "shortage" },
-      { id: "m5", name: "디스플레이", requiredQuantity: 200, availableQuantity: 200, unit: "EA", status: "available" },
-    ],
-  },
-  {
-    id: "po-003",
-    orderNumber: "PO-2024-003",
-    productName: "자동화 컨트롤러",
-    productCode: "AC-300",
-    quantity: 100,
-    unit: "EA",
-    status: "completed",
-    priority: "low",
-    startDate: new Date("2024-01-05"),
-    dueDate: new Date("2024-01-18"),
-    completedQuantity: 100,
-    assignedTeam: "생산팀 A",
-    estimatedHours: 60,
-    actualHours: 55,
-    progress: 100,
-    customer: "C솔루션",
-    materials: [
-      { id: "m6", name: "프로세서", requiredQuantity: 100, availableQuantity: 100, unit: "EA", status: "available" },
-      { id: "m7", name: "커넥터", requiredQuantity: 400, availableQuantity: 400, unit: "EA", status: "available" },
-    ],
-  },
-  {
-    id: "po-004",
-    orderNumber: "PO-2024-004",
-    productName: "무선 모니터링 장치",
-    productCode: "WMD-150",
-    quantity: 300,
-    unit: "EA",
-    status: "on-hold",
-    priority: "urgent",
-    startDate: new Date("2024-01-22"),
-    dueDate: new Date("2024-02-10"),
-    completedQuantity: 50,
-    assignedTeam: "생산팀 C",
-    estimatedHours: 150,
-    actualHours: 25,
-    progress: 17,
-    customer: "D시스템",
-    materials: [
-      { id: "m8", name: "무선 모듈", requiredQuantity: 300, availableQuantity: 50, unit: "EA", status: "shortage" },
-      { id: "m9", name: "배터리", requiredQuantity: 300, availableQuantity: 300, unit: "EA", status: "available" },
-    ],
-  },
-];
 
 const PRODUCTION_METRICS: ProductionMetric[] = [
   {
@@ -180,6 +89,7 @@ const PRODUCTION_METRICS: ProductionMetric[] = [
 ];
 
 export function ProductionOrderPage() {
+  const { customers } = useCustomers();
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -188,7 +98,43 @@ export function ProductionOrderPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(null);
-  const [orders, setOrders] = useState<ProductionOrder[]>(PRODUCTION_ORDERS);
+  
+  // Generate dynamic production orders from customer data
+  const dynamicERPData = useMemo(() => generateDynamicERPData(customers), [customers]);
+  const [orders, setOrders] = useState<ProductionOrder[]>(() => {
+    // Convert dynamic production orders to ProductionOrder format
+    return dynamicERPData.productionOrders.map((order: any, index: number) => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      productName: order.productName,
+      productCode: order.productCode,
+      quantity: order.quantity,
+      unit: "EA",
+      status: order.status === "계획" ? "planned" : 
+             order.status === "진행중" ? "in-progress" :
+             order.status === "완료" ? "completed" : "on-hold",
+      priority: order.priority === "높음" ? "high" :
+               order.priority === "보통" ? "medium" : "low",
+      startDate: new Date(order.plannedStartDate),
+      dueDate: new Date(order.plannedEndDate),
+      completedQuantity: Math.floor(order.quantity * Math.random()),
+      assignedTeam: `생산팀 ${String.fromCharCode(65 + (index % 3))}`,
+      estimatedHours: Math.floor(order.quantity * 0.2),
+      actualHours: Math.floor(order.quantity * 0.15),
+      progress: Math.floor(Math.random() * 100),
+      customer: order.customerName || "고객정보없음",
+      materials: [
+        { 
+          id: `m${index}-1`, 
+          name: "주요 부품", 
+          requiredQuantity: order.quantity, 
+          availableQuantity: Math.floor(order.quantity * (0.8 + Math.random() * 0.4)), 
+          unit: "EA", 
+          status: Math.random() > 0.3 ? "available" : "shortage" 
+        }
+      ]
+    }));
+  });
   
   // Additional filter states
   const [teamFilter, setTeamFilter] = useState<string>("all");

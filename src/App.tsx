@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { EmployeeProvider } from "./context/EmployeeContext";
+import { CustomerProvider } from "./context/CustomerContext";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { CustomersPage } from "./pages/CustomersPage";
 import { OrdersPage } from "./pages/OrdersPage";
@@ -28,7 +29,8 @@ import { ERPDataManagementPage } from "./pages/ERPDataManagementPage";
 function App() {
   return (
     <EmployeeProvider>
-      <AppLayout>
+      <CustomerProvider>
+        <AppLayout>
         <Routes>
         <Route path="/" element={<Dashboard />} />
         {/* 고객 비즈니스 모듈 */}
@@ -58,7 +60,8 @@ function App() {
         <Route path="/erp-data" element={<ERPDataManagementPage />} />
         <Route path="/documents" element={<div style={{ padding: "2rem" }}>문서 관리 페이지</div>} />
         </Routes>
-      </AppLayout>
+        </AppLayout>
+      </CustomerProvider>
     </EmployeeProvider>
   );
 }

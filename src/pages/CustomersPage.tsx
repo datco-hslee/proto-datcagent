@@ -1,27 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Search, Plus, Filter, Download, Edit, Phone, Mail, Building } from "lucide-react";
-
-interface Customer {
-  id: string;
-  name: string;
-  company: string;
-  email: string;
-  phone: string;
-  address: string;
-  status: "활성" | "비활성" | "잠재";
-  totalOrders: number;
-  totalAmount: number;
-  lastContact: string;
-  representative: string;
-}
+import { useCustomers } from "../context/CustomerContext";
+import type { Customer } from "../context/CustomerContext";
 
 export function CustomersPage() {
+  const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("전체");
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [customersList, setCustomersList] = useState<Customer[]>([]);
   
   // 새 고객 추가 폼 데이터
   const [newCustomerForm, setNewCustomerForm] = useState({
@@ -54,11 +42,6 @@ export function CustomersPage() {
     location: "",
   });
 
-  // 초기 데이터 로드
-  useEffect(() => {
-    setCustomersList(sampleCustomers);
-  }, []);
-
   // 새 고객 추가 핸들러
   const handleAddCustomer = () => {
     setNewCustomerForm({
@@ -79,15 +62,7 @@ export function CustomersPage() {
       return;
     }
 
-    const newCustomer: Customer = {
-      id: `CUST-${String(customersList.length + 1).padStart(3, '0')}`,
-      ...newCustomerForm,
-      totalOrders: 0,
-      totalAmount: 0,
-      lastContact: new Date().toISOString().split('T')[0],
-    };
-
-    setCustomersList([...customersList, newCustomer]);
+    addCustomer(newCustomerForm);
     setShowAddCustomerModal(false);
     alert('새 고객이 추가되었습니다.');
   };
@@ -129,7 +104,25 @@ export function CustomersPage() {
     ];
 
     // 고객 데이터를 CSV 형식으로 변환
-    const csvData = filteredCustomers.map(customer => [
+    const csvData = customers.filter((customer) => {
+      const matchesSearch =
+        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = selectedStatus === "전체" || customer.status === selectedStatus;
+      
+      // 고급 필터 적용
+      const matchesCompany = !advancedFilters.company || 
+        customer.company.toLowerCase().includes(advancedFilters.company.toLowerCase());
+      const matchesMinOrders = !advancedFilters.minOrders || 
+        customer.totalOrders >= parseInt(advancedFilters.minOrders);
+      const matchesMaxOrders = !advancedFilters.maxOrders || 
+        customer.totalOrders <= parseInt(advancedFilters.maxOrders);
+      const matchesLocation = !advancedFilters.location || 
+        customer.address.toLowerCase().includes(advancedFilters.location.toLowerCase());
+      
+      return matchesSearch && matchesStatus && matchesCompany && matchesMinOrders && matchesMaxOrders && matchesLocation;
+    }).map(customer => [
       customer.name,
       customer.company,
       customer.email,
@@ -164,13 +157,14 @@ export function CustomersPage() {
       link.click();
       document.body.removeChild(link);
       
-      alert(`${filteredCustomers.length}개의 고객 데이터가 CSV 파일로 내보내졌습니다.`);
+      alert(`${csvData.length}개의 고객 데이터가 CSV 파일로 내보내졌습니다.`);
     } else {
       alert('파일 다운로드가 지원되지 않는 브라우저입니다.');
     }
   };
 
   const handleEditCustomer = (customer: Customer) => {
+    setEditingCustomer(customer);
     setEditForm({
       name: customer.name,
       company: customer.company,
@@ -180,24 +174,19 @@ export function CustomersPage() {
       status: customer.status,
       representative: customer.representative,
     });
-    setEditingCustomer(customer);
   };
 
-  const handleSaveEditCustomer = () => {
+  const handleUpdateCustomer = () => {
     if (!editForm.name || !editForm.company || !editForm.email) {
       alert('필수 항목을 모두 입력해주세요.');
       return;
     }
 
-    const updatedCustomers = customersList.map(customer => 
-      customer.id === editingCustomer?.id 
-        ? { ...customer, ...editForm }
-        : customer
-    );
-
-    setCustomersList(updatedCustomers);
-    setEditingCustomer(null);
-    alert('고객 정보가 수정되었습니다.');
+    if (editingCustomer) {
+      updateCustomer(editingCustomer.id, editForm);
+      setEditingCustomer(null);
+      alert('고객 정보가 업데이트되었습니다.');
+    }
   };
 
   const handleCallCustomer = (customer: Customer) => {
@@ -209,6 +198,12 @@ export function CustomersPage() {
     setShowAddCustomerModal(false);
     setShowFilterModal(false);
     setEditingCustomer(null);
+  };
+
+  // 정렬 함수
+  const handleSort = (row: any, field: any) => {
+    // 정렬 로직 구현
+    console.log('정렬:', field);
   };
 
   // 모달 스타일들
@@ -413,80 +408,11 @@ export function CustomersPage() {
     transition: "all 0.2s ease",
   };
 
-  // 샘플 데이터
-  const sampleCustomers: Customer[] = [
-    {
-      id: "CUST-001",
-      name: "김철수",
-      company: "ABC 제조업체",
-      email: "kim@abc.com",
-      phone: "010-1234-5678",
-      address: "서울시 강남구 테헤란로 123",
-      status: "활성",
-      totalOrders: 45,
-      totalAmount: 125000000,
-      lastContact: "2024-01-15",
-      representative: "이영희",
-    },
-    {
-      id: "CUST-002",
-      name: "박영희",
-      company: "XYZ 솔루션",
-      email: "park@xyz.com",
-      phone: "010-9876-5432",
-      address: "경기도 성남시 분당구 정자로 456",
-      status: "활성",
-      totalOrders: 32,
-      totalAmount: 89500000,
-      lastContact: "2024-01-18",
-      representative: "김대표",
-    },
-    {
-      id: "CUST-003",
-      name: "정민수",
-      company: "DEF 엔지니어링",
-      email: "jung@def.com",
-      phone: "010-5555-7777",
-      address: "인천시 연수구 컨벤시아대로 789",
-      status: "잠재",
-      totalOrders: 12,
-      totalAmount: 34000000,
-      lastContact: "2024-01-10",
-      representative: "이영희",
-    },
-    {
-      id: "CUST-004",
-      name: "최수진",
-      company: "GHI 테크놀로지",
-      email: "choi@ghi.com",
-      phone: "010-3333-4444",
-      address: "대전시 유성구 과학로 321",
-      status: "비활성",
-      totalOrders: 8,
-      totalAmount: 15000000,
-      lastContact: "2023-12-20",
-      representative: "김대표",
-    },
-    {
-      id: "CUST-005",
-      name: "윤정호",
-      company: "JKL 시스템즈",
-      email: "yun@jkl.com",
-      phone: "010-7777-8888",
-      address: "부산시 해운대구 센텀로 654",
-      status: "활성",
-      totalOrders: 28,
-      totalAmount: 76500000,
-      lastContact: "2024-01-17",
-      representative: "이영희",
-    },
-  ];
-
-  const filteredCustomers = customersList.filter((customer) => {
-    const matchesSearch =
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+  // 필터링된 고객 목록
+  const filteredCustomers = customers.filter((customer: Customer) => {
+    const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         customer.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         customer.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = selectedStatus === "전체" || customer.status === selectedStatus;
     
     // 고급 필터 적용
@@ -581,7 +507,7 @@ export function CustomersPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredCustomers.map((customer) => (
+            {filteredCustomers.map((customer, index) => (
               <tr key={customer.id} style={{ transition: "background-color 0.2s ease" }}>
                 <td style={tdStyle}>{customer.id}</td>
                 <td style={tdStyle}>
@@ -660,7 +586,7 @@ export function CustomersPage() {
           color: "#6b7280",
         }}
       >
-        총 {filteredCustomers.length}명의 고객이 표시됨 (전체 {customersList.length}명 중)
+        총 {filteredCustomers.length}명의 고객이 표시됨 (전체 {customers.length}명 중)
       </div>
 
       {/* 모달들 */}
@@ -1124,7 +1050,7 @@ export function CustomersPage() {
                     취소
                   </button>
                   <button
-                    onClick={handleSaveEditCustomer}
+                    onClick={handleUpdateCustomer}
                     style={{
                       padding: "0.5rem 1rem",
                       border: "none",

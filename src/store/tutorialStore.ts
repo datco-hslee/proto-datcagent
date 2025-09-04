@@ -46,7 +46,7 @@ export interface TutorialActions {
   setQuickReplies: (replies: string[]) => void;
 }
 
-// AI 챗봇 "단비" ERP 시나리오 정의
+// DATCO AI 어시스턴트 ERP 시나리오 정의
 const TUTORIAL_SCENARIOS: TutorialScenario[] = [
   // 인건비 분석 (우선순위 높임 - 다른 패턴과 겹치지 않도록)
   {
@@ -85,21 +85,21 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
   },
   // ERP 재고 조회 시나리오 (기존)
   {
-    trigger: /단비.*EV9|EV9.*시트.*레일.*재고|EV9.*재고|시트.*레일.*재고/i,
+    trigger: /EV9.*시트.*레일.*재고|EV9.*재고|시트.*레일.*재고/i,
     response: generateInventoryResponse("EV9 전기차용 시트 레일"),
     highlightPath: ['[data-menu="inventory"]'],
     additionalActions: [{ type: "expandSection", target: "inventory-purchase", delay: 100 }],
   },
   // ERP 납품 일정 확인 시나리오 (기존)
   {
-    trigger: /단비.*우신.*납품|우신.*납품.*물량|이번.*주.*우신|우신.*문제/i,
+    trigger: /우신.*납품|우신.*납품.*물량|이번.*주.*우신|우신.*문제/i,
     response: generateInventoryResponse("우신 납품"),
     highlightPath: ['[data-menu="production-orders"]'],
     additionalActions: [{ type: "expandSection", target: "production-mrp", delay: 100 }],
   },
   // ERP 해결책 요청 시나리오 (기존)
   {
-    trigger: /단비.*해결책|해결책.*무엇|어떻게.*해결|대안.*요청/i,
+    trigger: /해결책.*무엇|어떻게.*해결|대안.*요청/i,
     response: generateSolutionResponse(),
     highlightPath: ['[data-menu="production-orders"]', '[data-menu="purchase-orders"]'],
     additionalActions: [
@@ -131,11 +131,11 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
   },
 ];
 
-// AI 챗봇 "단비" 빠른 응답 질문들
+// DATCO AI 어시스턴트 빠른 응답 질문들
 const DEFAULT_QUICK_REPLIES = [
-  "단비, EV9 전기차용 시트 레일 재고 얼마나 남았어?",
-  "단비, 이번주 우신 납품 물량 문제 없지?",
-  "단비, 해결책이 무엇일까?",
+  "EV9 전기차용 시트 레일 재고 얼마나 남았어?",
+  "이번주 우신 납품 물량 문제 없지?",
+  "해결책이 무엇일까?",
   "제품 추적 이력을 보여줘",
   "납기 준수율은 어떻게 되나요?",
   "생산 효율성 분석해줘",
@@ -157,12 +157,12 @@ export const useTutorialStore = create<TutorialState & TutorialActions>((set, ge
     console.log("Tutorial activated");
     set({ isActive: true });
 
-    // AI 챗봇 "단비" 웰컴 메시지 추가
+    // DATCO AI 어시스턴트 웰컴 메시지 추가
     const welcomeMessage: TutorialMessage = {
       id: Date.now().toString(),
       sender: "bot",
       content:
-        "안녕하세요! 👋 저는 닷코 AI 챗봇 단비입니다.\n\n자연어 기반 인터페이스로 ERP 데이터 조회 및 업무 요청을 도와드립니다! 아래 예시처럼 편하게 말씀해주세요:\n\n• \"단비, EV9 시트 레일 재고 얼마나 남았어?\"\n• \"단비, 이번주 우신 납품 물량 문제 없지?\"\n• \"단비, 해결책이 무엇일까?\"",
+        "안녕하세요! 👋 저는 DATCO AI 어시스턴트입니다.\n\n자연어 기반 인터페이스로 ERP 데이터 조회 및 업무 요청을 도와드립니다! 아래 예시처럼 편하게 말씀해주세요:\n\n• \"EV9 시트 레일 재고 얼마나 남았어?\"\n• \"이번주 우신 납품 물량 문제 없지?\"\n• \"해결책이 무엇일까?\"",
       timestamp: new Date(),
       type: "text",
     };

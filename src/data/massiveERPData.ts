@@ -323,53 +323,53 @@ export interface FinancialData {
 const CUSTOMERS: Customer[] = [
   {
     id: 'CUST-001',
-    name: '현대자동차',
-    industry: '자동차제조',
+    name: 'ABC 제조업체',
+    industry: '제조업',
     creditRating: 'AAA',
     paymentTerms: 60,
-    address: '서울시 서초구 헌릉로 12',
-    contactPerson: '김현대',
-    phone: '02-3464-1234'
+    address: '서울시 강남구 테헤란로 123',
+    contactPerson: '김철수',
+    phone: '010-1234-5678'
   },
   {
     id: 'CUST-002',
-    name: '기아자동차',
-    industry: '자동차제조',
+    name: 'XYZ 솔루션',
+    industry: 'IT솔루션',
     creditRating: 'AAA',
     paymentTerms: 45,
-    address: '서울시 서초구 헌릉로 12',
-    contactPerson: '박기아',
-    phone: '02-3464-2222'
+    address: '경기도 성남시 분당구 정자로 456',
+    contactPerson: '박영희',
+    phone: '010-9876-5432'
   },
   {
     id: 'CUST-003',
-    name: '제네시스',
-    industry: '자동차제조',
+    name: 'DEF 엔지니어링',
+    industry: '엔지니어링',
     creditRating: 'AA',
     paymentTerms: 30,
-    address: '서울시 강남구 테헤란로 152',
-    contactPerson: '이제네',
-    phone: '02-6270-1234'
+    address: '인천시 연수구 컨벤시아대로 789',
+    contactPerson: '정민수',
+    phone: '010-5555-7777'
   },
   {
     id: 'CUST-004',
-    name: '현대모비스',
-    industry: '자동차부품',
+    name: 'GHI 테크놀로지',
+    industry: '기술서비스',
     creditRating: 'AA',
     paymentTerms: 45,
-    address: '서울시 강남구 테헤란로 203',
-    contactPerson: '최모비',
-    phone: '02-2018-5114'
+    address: '대전시 유성구 과학로 321',
+    contactPerson: '최수진',
+    phone: '010-3333-4444'
   },
   {
     id: 'CUST-005',
-    name: '만도',
-    industry: '자동차부품',
+    name: 'JKL 시스템즈',
+    industry: '시스템개발',
     creditRating: 'A',
     paymentTerms: 30,
-    address: '경기도 성남시 분당구 판교로 255',
-    contactPerson: '정만도',
-    phone: '031-710-3114'
+    address: '부산시 해운대구 센텀로 654',
+    contactPerson: '윤정호',
+    phone: '010-7777-8888'
   }
 ];
 
