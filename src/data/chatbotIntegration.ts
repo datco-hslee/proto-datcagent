@@ -1,5 +1,6 @@
 // AI 챗봇 "단비"를 위한 데이터 통합 및 분석 함수들
 import { generateComprehensiveERPData } from './comprehensiveData';
+import { analyzeLaborCostsFromContext } from './employeeDataIntegration';
 
 // 전체 데이터 생성 및 캐싱
 let cachedERPData: any = null;
@@ -219,16 +220,36 @@ export const generateTraceabilityResponse = (query: string): string => {
         analysis.turnoverRate >= 60 ? '⚠️ 재고 최적화 필요' : '🚨 재고 과다 보유'}`;
   }
   
-  // 인건비 분석 쿼리
+  // 인건비 분석 쿼리 (통합된 직원 데이터 사용)
   if (query.includes('인건비') || query.includes('급여') || query.includes('노무비')) {
-    const analysis = analyzeLaborCosts('생산부');
-    return `💰 **인건비 분석 (생산부)**\n\n` +
+    // 쿼리에서 부서명 추출
+    let department = undefined;
+    let departmentName = '전체';
+    
+    if (query.includes('생산부') || query.includes('생산팀') || query.includes('생산')) {
+      department = '생산부';
+      departmentName = '생산부';
+    } else if (query.includes('품질부') || query.includes('품질팀') || query.includes('품질')) {
+      department = '품질부';
+      departmentName = '품질부';
+    } else if (query.includes('구매부') || query.includes('구매팀') || query.includes('구매')) {
+      department = '구매부';
+      departmentName = '구매부';
+    } else if (query.includes('영업부') || query.includes('영업팀') || query.includes('영업')) {
+      department = '영업부';
+      departmentName = '영업부';
+    }
+    
+    // 통합 모듈에서 실제 직원 데이터 기반 분석 사용
+    const analysis = analyzeLaborCostsFromContext(department);
+    return `💰 **인건비 분석 (${departmentName})**\n\n` +
       `• 직원 수: ${analysis.employeeCount}명\n` +
       `• 기본급 총액: ${analysis.totalBaseSalary.toLocaleString()}원\n` +
       `• 연장근무 수당: ${analysis.totalOvertimePay.toLocaleString()}원\n` +
       `• **총 인건비: ${analysis.totalPay.toLocaleString()}원**\n` +
       `• 총 근무시간: ${analysis.totalWorkHours.toLocaleString()}시간\n` +
-      `• 평균 시급: ${Math.round(analysis.averageHourlyRate).toLocaleString()}원`;
+      `• 평균 시급: ${Math.round(analysis.averageHourlyRate).toLocaleString()}원\n\n` +
+      `📋 *실제 직원 관리 페이지 데이터 기반 분석 결과입니다.*`;
   }
   
   return "죄송합니다. 해당 쿼리에 대한 분석 결과를 찾을 수 없습니다. 다른 질문을 해주세요.";

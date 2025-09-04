@@ -119,7 +119,7 @@ export interface ProductionOrder {
   plannedEndDate: Date;
   actualStartDate: Date | null;
   actualEndDate: Date | null;
-  status: 'planned' | 'released' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'planned' | 'released' | 'in_progress' | 'completed' | 'partially_completed' | 'cancelled';
   priority: 'low' | 'normal' | 'high' | 'urgent';
   workOrders: WorkOrder[];
 }
@@ -386,7 +386,7 @@ const MATERIALS = [
   { code: 'MAT-002', name: '알루미늄 프레임 소재', unitPrice: 25000, supplier: 'SUP-002', category: '금속' },
   { code: 'MAT-003', name: '플라스틱 커버 소재', unitPrice: 8000, supplier: 'SUP-005', category: '플라스틱' },
   { code: 'MAT-004', name: '볼트 및 너트 세트', unitPrice: 500, supplier: 'SUP-001', category: '체결재' },
-  { code: 'MAT-005', name: '전동 모터 어셈블리', unitPrice: 120000, supplier: 'SUP-004', category: '전자부품' },
+  { code: 'MAT-005', name: '전동 모터 어셈블리', unitPrice: 85000, supplier: 'SUP-004', category: '전자부품' },
   { code: 'MAT-006', name: '베어링 세트', unitPrice: 8500, supplier: 'SUP-002', category: '기계부품' },
   { code: 'MAT-007', name: '스프링 세트', unitPrice: 3500, supplier: 'SUP-001', category: '기계부품' },
   { code: 'MAT-008', name: '전선 하네스', unitPrice: 12000, supplier: 'SUP-004', category: '전자부품' },
@@ -402,7 +402,7 @@ const PRODUCTS: Product[] = [
     category: '시트부품',
     unitPrice: 55000,
     unit: 'EA',
-    standardCost: 41250,
+    standardCost: 45000,
     leadTime: 3,
     bomItems: [
       { materialCode: 'MAT-001', materialName: '스틸 레일 원재료', quantity: 2, unit: 'EA' },
@@ -448,7 +448,7 @@ const PRODUCTS: Product[] = [
     category: '시트어셈블리',
     unitPrice: 180000,
     unit: 'EA',
-    standardCost: 135000,
+    standardCost: 155000,
     leadTime: 5,
     bomItems: [
       { materialCode: 'MAT-002', materialName: '알루미늄 프레임 소재', quantity: 1, unit: 'EA' },
@@ -464,7 +464,7 @@ const PRODUCTS: Product[] = [
     category: '전동부품',
     unitPrice: 150000,
     unit: 'EA',
-    standardCost: 112500,
+    standardCost: 125000,
     leadTime: 4,
     bomItems: [
       { materialCode: 'MAT-005', materialName: '전동 모터 어셈블리', quantity: 1, unit: 'EA' },
@@ -667,8 +667,8 @@ const addBusinessDays = (date: Date, days: number): Date => {
 
 // ==================== 데이터 생성 기간 설정 ====================
 
-const DATA_START_DATE = new Date('2023-10-01');
-const DATA_END_DATE = new Date('2024-03-31');
+const DATA_START_DATE = new Date('2023-07-01');
+const DATA_END_DATE = new Date('2024-06-30');
 const ALL_DATES = generateDateRange(DATA_START_DATE, DATA_END_DATE);
 const WORKING_DAYS = generateWorkingDays(DATA_START_DATE, DATA_END_DATE);
 
@@ -678,18 +678,18 @@ export const generateSalesOrders = (): SalesOrder[] => {
   const salesOrders: SalesOrder[] = [];
   let orderCounter = 1;
 
-  // 매주 5-15개 주문 생성 (6개월간)
+  // 매일 8-20개 주문 생성 (12개월간)
   WORKING_DAYS.forEach((date, index) => {
-    if (Math.random() < 0.7) { // 70% 확률로 주문 발생
+    if (Math.random() < 0.85) { // 85% 확률로 주문 발생
       const customer = getRandomElement(CUSTOMERS);
       const salesPerson = getRandomElement(EMPLOYEES.filter(e => e.department === '영업부'));
       const orderItems: SalesOrderItem[] = [];
       
-      // 1-3개 제품 주문
-      const itemCount = Math.floor(Math.random() * 3) + 1;
+      // 1-5개 제품 주문 (더 많은 아이템)
+      const itemCount = Math.floor(Math.random() * 5) + 1;
       for (let i = 0; i < itemCount; i++) {
         const product = getRandomElement(PRODUCTS);
-        const quantity = Math.floor(Math.random() * 200) + 50; // 50-250개
+        const quantity = Math.floor(Math.random() * 50) + 10; // 10-60개 (현실적 수량)
         const requestedDate = addBusinessDays(date, product.leadTime + Math.floor(Math.random() * 7));
         
         orderItems.push({
@@ -768,8 +768,8 @@ export const generatePurchaseOrders = (salesOrders: SalesOrder[]): PurchaseOrder
         supplierGroups.set(supplier, []);
       }
       
-      // 안전재고 고려하여 10-30% 추가 주문
-      const safetyStock = Math.floor(quantity * (0.1 + Math.random() * 0.2));
+      // 안전재고 고려하여 20-50% 추가 주문 (더 현실적)
+      const safetyStock = Math.floor(quantity * (0.2 + Math.random() * 0.3));
       const orderQuantity = quantity + safetyStock;
       
       supplierGroups.get(supplier)!.push({
@@ -998,28 +998,61 @@ export const generateMaterialConsumptions = (
           .filter(inbound => 
             inbound.materialCode === bomItem.materialCode && 
             inbound.qualityStatus === 'passed' &&
-            inbound.inboundDate <= (po.actualStartDate || po.plannedStartDate)
+            inbound.inboundDate <= (po.actualStartDate || po.plannedStartDate) &&
+            inbound.currentStock > 0
           )
           .sort((a, b) => a.inboundDate.getTime() - b.inboundDate.getTime());
         
-        if (availableStock.length > 0) {
-          const stockToUse = getRandomElement(availableStock);
-          const plannedQuantity = bomItem.quantity * po.plannedQuantity;
-          const actualQuantity = bomItem.quantity * po.actualQuantity;
+        const plannedQuantity = bomItem.quantity * po.plannedQuantity;
+        const actualQuantity = bomItem.quantity * po.actualQuantity;
+        let remainingQuantity = actualQuantity;
+        
+        // FIFO: 가장 오래된 재고부터 순서대로 사용
+        for (const stockItem of availableStock) {
+          if (remainingQuantity <= 0) break;
           
+          const quantityToConsume = Math.min(remainingQuantity, stockItem.currentStock);
+          
+          if (quantityToConsume > 0) {
+            materialsConsumed.push({
+              materialCode: bomItem.materialCode,
+              materialName: bomItem.materialName,
+              lotNumber: stockItem.lotNumber,
+              plannedQuantity: quantityToConsume === actualQuantity ? plannedQuantity : (plannedQuantity * quantityToConsume / actualQuantity),
+              actualQuantity: quantityToConsume,
+              unit: bomItem.unit,
+              consumptionTime: firstWorkOrder.actualStartTime || firstWorkOrder.plannedStartTime,
+              warehouseLocation: stockItem.warehouseLocation
+            });
+            
+            // 재고 차감
+            stockItem.currentStock -= quantityToConsume;
+            remainingQuantity -= quantityToConsume;
+          }
+        }
+        
+        // 재고 부족 시 부족분 기록 (실제 생산에서는 생산 중단 또는 대체재 사용)
+        if (remainingQuantity > 0) {
+          // 부족분에 대해서는 가상의 소모 기록 생성 (실제로는 생산 지연 발생)
           materialsConsumed.push({
             materialCode: bomItem.materialCode,
-            materialName: bomItem.materialName,
-            lotNumber: stockToUse.lotNumber,
-            plannedQuantity,
-            actualQuantity,
+            materialName: bomItem.materialName + ' (부족분)',
+            lotNumber: 'SHORTAGE-' + Date.now(),
+            plannedQuantity: plannedQuantity * remainingQuantity / actualQuantity,
+            actualQuantity: remainingQuantity,
             unit: bomItem.unit,
             consumptionTime: firstWorkOrder.actualStartTime || firstWorkOrder.plannedStartTime,
-            warehouseLocation: stockToUse.warehouseLocation
+            warehouseLocation: '재고부족'
           });
           
-          // 재고 차감
-          stockToUse.currentStock = Math.max(0, stockToUse.currentStock - actualQuantity);
+          // 생산 수량 조정 (재고 부족으로 인한 실제 생산량 감소)
+          const shortageRatio = remainingQuantity / actualQuantity;
+          po.actualQuantity = Math.max(0, po.actualQuantity * (1 - shortageRatio));
+          
+          // 생산 상태를 부분 완료로 변경
+          if (po.status === 'completed' && shortageRatio > 0.1) {
+            po.status = 'partially_completed';
+          }
         }
       });
       
@@ -1635,9 +1668,8 @@ export const generateMassiveERPData = () => {
 
 export const getDataSummary = () => {
   const data = generateMassiveERPData();
-  
   return {
-    period: `${DATA_START_DATE.toLocaleDateString('ko-KR')} ~ ${DATA_END_DATE.toLocaleDateString('ko-KR')} (6개월)`,
+    period: `${DATA_START_DATE.toLocaleDateString('ko-KR')} ~ ${DATA_END_DATE.toLocaleDateString('ko-KR')} (12개월)`,
     customers: `${data.customers.length}개 고객사`,
     suppliers: `${data.suppliers.length}개 공급업체`,
     materials: `${data.materials.length}종 자재`,
@@ -1932,24 +1964,11 @@ export const generateChatbotResponse = (query: string): string => {
       `자재 조달 주기 최적화, 생산 계획 정확도 향상`;
   }
   
-  // 인건비 분석 쿼리
+  // 인건비 분석 쿼리 - 통합 모듈로 리다이렉트
   if (query.includes('인건비') || query.includes('급여') || query.includes('노무비') || query.includes('인력비용')) {
-    const analysis = analyzeLaborCosts('생산부');
-    const recentMonth = '2024-03';
-    const monthlyAnalysis = analyzeLaborCosts('생산부', recentMonth);
-    
-    return `💰 **인건비 분석** (생산부 기준)\n\n` +
-      `**전체 기간 (6개월)**:\n` +
-      `• 총 직원 수: ${analysis.employeeCount}명\n` +
-      `• 기본급 총액: ${analysis.totalBaseSalary.toLocaleString()}원\n` +
-      `• 연장근무 수당: ${analysis.totalOvertimePay.toLocaleString()}원\n` +
-      `• **총 인건비: ${analysis.totalGrossPay.toLocaleString()}원**\n` +
-      `• 평균 시급: ${Math.round(analysis.averageHourlyRate).toLocaleString()}원\n\n` +
-      `**최근 월 (${recentMonth})**:\n` +
-      `• 월 인건비: ${monthlyAnalysis.totalGrossPay.toLocaleString()}원\n` +
-      `• 연장근무 비율: ${monthlyAnalysis.totalOvertimeHours > 0 ? 
-        Math.round((monthlyAnalysis.totalOvertimeHours / monthlyAnalysis.totalWorkHours) * 100) : 0}%\n\n` +
-      `**원가 영향**: 제품당 평균 인건비 ${Math.round(analysis.totalGrossPay / analysis.totalWorkHours * 5).toLocaleString()}원`;
+    // 통합된 직원 데이터 사용을 위해 chatbotIntegration으로 리다이렉트
+    const { processERPQuery } = require('./chatbotIntegration');
+    return processERPQuery(query);
   }
   
   // 재무 분석 쿼리
@@ -2027,4 +2046,206 @@ export const generateChatbotResponse = (query: string): string => {
     `• 긴급 상황 대응 방안\n\n` +
     `더 구체적인 질문을 해주시면 정확한 데이터 기반 답변을 제공해드리겠습니다.`;
 };
+
+// 브라우저 콘솔에서 ERP 데이터에 접근할 수 있도록 전역 함수 추가
+declare global {
+  interface Window {
+    getERPData: () => any;
+    analyzeShortages: () => any;
+    getBOMAnalysis: (productCode?: string) => any;
+    analyzeBOMSufficiency: (purchaseOrderId?: string) => any;
+    getInventoryStatus: () => any;
+  }
+}
+
+// 브라우저 환경에서만 전역 함수 등록
+if (typeof window !== 'undefined') {
+  window.getERPData = () => {
+    const data = generateMassiveERPData();
+    console.log('📊 ERP 데이터 요약:');
+    console.log(`• 영업 주문: ${data.salesOrders.length}건`);
+    console.log(`• 구매 주문: ${data.purchaseOrders.length}건`);
+    console.log(`• 자재 입고: ${data.materialInbounds.length}건`);
+    console.log(`• 생산 주문: ${data.productionOrders.length}건`);
+    console.log(`• 출하/납품: ${data.shipments.length}건`);
+    return data;
+  };
+
+  window.analyzeShortages = () => {
+    const data = generateMassiveERPData();
+    const shortageAnalysis = {
+      totalProductionOrders: data.productionOrders.length,
+      partiallyCompleted: data.productionOrders.filter((po: any) => po.status === 'partially_completed').length,
+      shortageRate: 0
+    };
+    shortageAnalysis.shortageRate = parseFloat((shortageAnalysis.partiallyCompleted / shortageAnalysis.totalProductionOrders * 100).toFixed(2));
+    
+    console.log('🚨 부족 분석 결과:');
+    console.log(`• 총 생산 주문: ${shortageAnalysis.totalProductionOrders}건`);
+    console.log(`• 부분 완료 (부족): ${shortageAnalysis.partiallyCompleted}건`);
+    console.log(`• 부족률: ${shortageAnalysis.shortageRate}%`);
+    
+    return shortageAnalysis;
+  };
+
+  window.getBOMAnalysis = (productCode?: string) => {
+    const targetProducts = productCode ? 
+      PRODUCTS.filter(p => p.code === productCode) : 
+      PRODUCTS;
+    
+    const bomAnalysis = targetProducts.map(product => {
+      const totalMaterialCost = product.bomItems.reduce((sum: number, item: any) => {
+        const material = MATERIALS.find(m => m.code === item.materialCode);
+        return sum + (material ? material.unitPrice * item.quantity : 0);
+      }, 0);
+      
+      const grossMargin = ((product.unitPrice - totalMaterialCost) / product.unitPrice * 100).toFixed(2);
+      
+      return {
+        productCode: product.code,
+        productName: product.name,
+        unitPrice: product.unitPrice,
+        materialCost: totalMaterialCost,
+        grossMargin: `${grossMargin}%`,
+        bomItems: product.bomItems.length
+      };
+    });
+    
+    console.log('🔧 BOM 분석 결과:');
+    console.table(bomAnalysis);
+    return bomAnalysis;
+  };
+
+  window.analyzeBOMSufficiency = (purchaseOrderId?: string) => {
+    const data = generateMassiveERPData();
+    const targetPOs = purchaseOrderId ? 
+      data.purchaseOrders.filter(po => po.id === purchaseOrderId) : 
+      data.purchaseOrders.slice(0, 5); // 처음 5개만 분석
+    
+    const analysis = targetPOs.map(po => {
+      console.log(`🔍 분석 중: ${po.orderNumber}`);
+      
+      // 해당 PO와 연관된 영업 주문들 찾기
+      const relatedSOs = data.salesOrders.filter(so => 
+        Math.abs(new Date(so.orderDate).getTime() - new Date(po.orderDate).getTime()) < 30 * 24 * 60 * 60 * 1000
+      );
+      
+      // 필요한 BOM 자재 계산
+      const requiredMaterials = new Map();
+      relatedSOs.forEach(so => {
+        so.items.forEach(item => {
+          const product = PRODUCTS.find(p => p.id === item.productId);
+          if (product) {
+            product.bomItems.forEach(bomItem => {
+              const totalNeeded = bomItem.quantity * item.quantity;
+              requiredMaterials.set(bomItem.materialCode, 
+                (requiredMaterials.get(bomItem.materialCode) || 0) + totalNeeded);
+            });
+          }
+        });
+      });
+      
+      // PO에서 구매한 자재와 비교
+      const purchasedMaterials = new Map();
+      po.items.forEach(item => {
+        purchasedMaterials.set(item.materialCode, item.quantity);
+      });
+      
+      // 충족도 분석
+      const sufficiencyAnalysis = [];
+      requiredMaterials.forEach((required, materialCode) => {
+        const purchased = purchasedMaterials.get(materialCode) || 0;
+        const sufficiency = purchased >= required;
+        const material = MATERIALS.find(m => m.code === materialCode);
+        
+        sufficiencyAnalysis.push({
+          materialCode,
+          materialName: material?.name || 'Unknown',
+          required,
+          purchased,
+          surplus: purchased - required,
+          sufficient: sufficiency,
+          sufficiencyRate: required > 0 ? ((purchased / required) * 100).toFixed(1) + '%' : '100%'
+        });
+      });
+      
+      const totalSufficient = sufficiencyAnalysis.filter(s => s.sufficient).length;
+      const overallSufficiency = (totalSufficient / sufficiencyAnalysis.length * 100).toFixed(1);
+      
+      return {
+        purchaseOrderId: po.id,
+        orderNumber: po.orderNumber,
+        supplier: po.supplierName,
+        overallSufficiency: overallSufficiency + '%',
+        totalMaterials: sufficiencyAnalysis.length,
+        sufficientMaterials: totalSufficient,
+        insufficientMaterials: sufficiencyAnalysis.length - totalSufficient,
+        details: sufficiencyAnalysis
+      };
+    });
+    
+    console.log('📊 BOM 충족도 분석 결과:');
+    console.table(analysis.map(a => ({
+      주문번호: a.orderNumber,
+      공급업체: a.supplier,
+      전체충족도: a.overallSufficiency,
+      충족자재: `${a.sufficientMaterials}/${a.totalMaterials}`,
+      부족자재: a.insufficientMaterials
+    })));
+    
+    return analysis;
+  };
+
+  window.getInventoryStatus = () => {
+    const data = generateMassiveERPData();
+    console.log('📋 데이터 구조 확인:', Object.keys(data));
+    const inventoryMap = new Map();
+    
+    // 입고 수량 집계 (안전한 접근)
+    if (data.materialInbounds && Array.isArray(data.materialInbounds)) {
+      data.materialInbounds.forEach((inbound: any) => {
+        if (inbound.items && Array.isArray(inbound.items)) {
+          inbound.items.forEach((item: any) => {
+            const current = inventoryMap.get(item.materialCode) || { inbound: 0, consumed: 0 };
+            current.inbound += item.quantity;
+            inventoryMap.set(item.materialCode, current);
+          });
+        }
+      });
+    } else {
+      console.warn('⚠️ materialInbounds 데이터가 없습니다.');
+    }
+    
+    // 소모 수량 집계
+    if (data.productionOrders && Array.isArray(data.productionOrders)) {
+      data.productionOrders.forEach((po: any) => {
+        if (po.materialConsumptions && Array.isArray(po.materialConsumptions)) {
+          po.materialConsumptions.forEach((consumption: any) => {
+            const current = inventoryMap.get(consumption.materialCode) || { inbound: 0, consumed: 0 };
+            current.consumed += consumption.consumedQuantity;
+            inventoryMap.set(consumption.materialCode, current);
+          });
+        }
+      });
+    } else {
+      console.warn('⚠️ productionOrders 데이터가 없습니다.');
+    }
+    
+    const inventoryStatus = Array.from(inventoryMap.entries()).map(([materialCode, data]) => {
+      const material = MATERIALS.find(m => m.code === materialCode);
+      return {
+        materialCode,
+        materialName: material?.name || 'Unknown',
+        inboundQty: data.inbound,
+        consumedQty: data.consumed,
+        remainingQty: data.inbound - data.consumed,
+        turnoverRate: data.inbound > 0 ? (data.consumed / data.inbound * 100).toFixed(2) + '%' : '0%'
+      };
+    });
+    
+    console.log('📦 재고 현황:');
+    console.table(inventoryStatus);
+    return inventoryStatus;
+  };
+}
 

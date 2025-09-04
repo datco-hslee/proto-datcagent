@@ -22,6 +22,7 @@ import {
   PieChart,
   ChevronDown,
   ChevronRight,
+  Database,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -223,6 +224,7 @@ export function Sidebar({ className }: SidebarProps) {
         { name: "설정", icon: Settings, path: "/settings", badge: null },
         { name: "사용자 권한", icon: Shield, path: "/permissions", badge: null },
         { name: "통합 관리", icon: Layers, path: "/integrations", badge: null },
+        { name: "ERP 데이터 관리", icon: Database, path: "/erp-data", badge: null },
       ],
     },
   ];

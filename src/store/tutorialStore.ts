@@ -1,12 +1,11 @@
 import { create } from "zustand";
 import { 
   generateInventoryResponse, 
-  generateProductionResponse, 
   generateSolutionResponse 
-} from "@/data/erpDemoData";
+} from '../data/chatbotDataIntegration';
 import { 
   generateTraceabilityResponse
-} from "@/data/chatbotIntegration";
+} from '../data/chatbotIntegration';
 
 export interface TutorialMessage {
   id: string;
@@ -49,6 +48,13 @@ export interface TutorialActions {
 
 // AI 챗봇 "단비" ERP 시나리오 정의
 const TUTORIAL_SCENARIOS: TutorialScenario[] = [
+  // 인건비 분석 (우선순위 높임 - 다른 패턴과 겹치지 않도록)
+  {
+    trigger: /인건비|급여.*분석|노무비|인력.*비용|급여.*현황|.*부.*인건비|.*부.*급여|.*팀.*인건비|.*팀.*급여/i,
+    response: generateTraceabilityResponse("인건비"),
+    highlightPath: ['[data-menu="payroll"]'],
+    additionalActions: [{ type: "expandSection", target: "hr-payroll", delay: 100 }],
+  },
   // 추적성 관련 쿼리
   {
     trigger: /추적|이력|트레이스|어디서.*왔|어떻게.*만들어/i,
@@ -63,9 +69,9 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
     highlightPath: ['[data-menu="shipping"]'],
     additionalActions: [{ type: "expandSection", target: "logistics-shipping", delay: 100 }],
   },
-  // 생산 효율성 분석
+  // 생산 효율성 분석 (인건비와 겹치지 않도록 패턴 수정)
   {
-    trigger: /생산.*효율|생산.*실적|생산.*분석|불량률|생산성/i,
+    trigger: /(?!.*인건비)(?!.*급여)생산.*효율|생산.*실적|(?!.*인건비)(?!.*급여)생산.*분석|불량률|생산성/i,
     response: generateTraceabilityResponse("생산 효율"),
     highlightPath: ['[data-menu="production-orders"]'],
     additionalActions: [{ type: "expandSection", target: "production-mrp", delay: 100 }],
@@ -77,13 +83,6 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
     highlightPath: ['[data-menu="inventory"]'],
     additionalActions: [{ type: "expandSection", target: "inventory-purchase", delay: 100 }],
   },
-  // 인건비 분석
-  {
-    trigger: /인건비|급여.*분석|노무비|인력.*비용|급여.*현황/i,
-    response: generateTraceabilityResponse("인건비"),
-    highlightPath: ['[data-menu="payroll"]'],
-    additionalActions: [{ type: "expandSection", target: "hr-payroll", delay: 100 }],
-  },
   // ERP 재고 조회 시나리오 (기존)
   {
     trigger: /단비.*EV9|EV9.*시트.*레일.*재고|EV9.*재고|시트.*레일.*재고/i,
@@ -94,7 +93,7 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
   // ERP 납품 일정 확인 시나리오 (기존)
   {
     trigger: /단비.*우신.*납품|우신.*납품.*물량|이번.*주.*우신|우신.*문제/i,
-    response: generateProductionResponse("우신"),
+    response: generateInventoryResponse("우신 납품"),
     highlightPath: ['[data-menu="production-orders"]'],
     additionalActions: [{ type: "expandSection", target: "production-mrp", delay: 100 }],
   },

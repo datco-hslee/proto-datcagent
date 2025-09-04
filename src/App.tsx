@@ -23,6 +23,7 @@ import { TaxPage } from "./pages/TaxPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { AccountingPage } from "./pages/AccountingPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { ERPDataManagementPage } from "./pages/ERPDataManagementPage";
 
 function App() {
   return (
@@ -54,6 +55,7 @@ function App() {
         <Route path="/budget" element={<BudgetPage />} />
         <Route path="/taxes" element={<TaxPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/erp-data" element={<ERPDataManagementPage />} />
         <Route path="/documents" element={<div style={{ padding: "2rem" }}>문서 관리 페이지</div>} />
         </Routes>
       </AppLayout>
