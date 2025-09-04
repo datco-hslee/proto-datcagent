@@ -667,8 +667,8 @@ const addBusinessDays = (date: Date, days: number): Date => {
 
 // ==================== 데이터 생성 기간 설정 ====================
 
-const DATA_START_DATE = new Date('2023-07-01');
-const DATA_END_DATE = new Date('2024-06-30');
+const DATA_START_DATE = new Date('2024-07-01');
+const DATA_END_DATE = new Date('2025-09-30');
 const ALL_DATES = generateDateRange(DATA_START_DATE, DATA_END_DATE);
 const WORKING_DAYS = generateWorkingDays(DATA_START_DATE, DATA_END_DATE);
 

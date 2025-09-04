@@ -20,6 +20,12 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { generateMassiveERPData } from '../data/massiveERPData';
+import { 
+  getDateRange, 
+  generateCompanyProductTimeline, 
+  generatePeriodStatistics,
+  type DateRangeType 
+} from '../data/timelineAnalysis';
 
 interface ERPDataStats {
   salesOrders: number;
@@ -52,6 +58,12 @@ export function ERPDataManagementPage() {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [showAllOrders, setShowAllOrders] = useState<{[key: string]: boolean}>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDateRange, setSelectedDateRange] = useState<DateRangeType>('this_week');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [selectedTimelineItem, setSelectedTimelineItem] = useState<any>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [timelineData, setTimelineData] = useState<any>(null);
 
   const pageStyle: React.CSSProperties = {
     padding: '2rem',
@@ -140,6 +152,46 @@ export function ERPDataManagementPage() {
     color: '#1e293b',
   };
 
+  const loadTimelineDataWithCustomDates = () => {
+    if (erpData.salesOrders && erpData.purchaseOrders && erpData.productionOrders && erpData.shipments) {
+      let dateRange;
+      
+      if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+        dateRange = getDateRange('custom', new Date(customStartDate), new Date(customEndDate));
+      } else {
+        dateRange = getDateRange(selectedDateRange);
+      }
+      
+      const companyTimelines = generateCompanyProductTimeline(
+        erpData.salesOrders,
+        erpData.purchaseOrders,
+        erpData.productionOrders,
+        erpData.shipments,
+        dateRange
+      );
+      const statistics = generatePeriodStatistics(companyTimelines, dateRange);
+      
+      setTimelineData({
+        dateRange,
+        companyTimelines,
+        statistics
+      });
+    }
+  };
+
+  // 날짜 범위가 변경될 때마다 타임라인 데이터 새로고침
+  useEffect(() => {
+    if (erpData.salesOrders && selectedDateRange !== 'custom') {
+      loadTimelineDataWithCustomDates();
+    }
+  }, [selectedDateRange, erpData.salesOrders]);
+
+  useEffect(() => {
+    if (erpData.salesOrders && selectedDateRange === 'custom' && customStartDate && customEndDate) {
+      loadTimelineDataWithCustomDates();
+    }
+  }, [customStartDate, customEndDate, erpData.salesOrders]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -204,6 +256,507 @@ export function ERPDataManagementPage() {
       remainingQty: Math.floor(Math.random() * 400 + 100),
       turnoverRate: `${Math.floor(Math.random() * 40 + 60)}%`,
     }));
+  };
+
+  const loadTimelineData = () => {
+    if (erpData.salesOrders && erpData.purchaseOrders && erpData.productionOrders && erpData.shipments) {
+      const dateRange = getDateRange(selectedDateRange);
+      const companyTimelines = generateCompanyProductTimeline(
+        erpData.salesOrders,
+        erpData.purchaseOrders,
+        erpData.productionOrders,
+        erpData.shipments,
+        dateRange
+      );
+      const statistics = generatePeriodStatistics(companyTimelines, dateRange);
+      
+      setTimelineData({
+        dateRange,
+        companyTimelines,
+        statistics
+      });
+    }
+  };
+
+  const renderTimelineTab = () => {
+    // ERP 데이터가 없으면 먼저 로드하라고 안내
+    if (!erpData.salesOrders || !erpData.purchaseOrders) {
+      return (
+        <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b' }}>
+          <Clock style={{ width: '3rem', height: '3rem', margin: '0 auto 1rem' }} />
+          <p>먼저 "데이터 새로고침" 버튼을 클릭하여 ERP 데이터를 로드해주세요.</p>
+        </div>
+      );
+    }
+
+    if (!timelineData) {
+      loadTimelineData();
+      return (
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+          <Clock style={{ width: '2rem', height: '2rem', margin: '0 auto 1rem' }} />
+          <p>타임라인 데이터를 로딩 중...</p>
+        </div>
+      );
+    }
+
+    const { dateRange, companyTimelines, statistics } = timelineData;
+
+    return (
+      <div>
+        {/* 기간 선택 */}
+        <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#1e293b', fontSize: '1.25rem', fontWeight: '600' }}>📅 기간별 타임라인 분석</h3>
+          
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>기간 선택:</label>
+              <select 
+                value={selectedDateRange} 
+                onChange={(e) => {
+                  setSelectedDateRange(e.target.value as DateRangeType);
+                  setTimelineData(null);
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="today">오늘</option>
+                <option value="yesterday">어제</option>
+                <option value="this_week">이번 주</option>
+                <option value="last_week">지난 주</option>
+                <option value="2_weeks_ago">2주 전</option>
+                <option value="this_month">이번 달</option>
+                <option value="last_month">지난 달</option>
+                <option value="2_months_ago">2달 전</option>
+                <option value="this_quarter">이번 분기</option>
+                <option value="last_quarter">지난 분기</option>
+                <option value="this_year">올해</option>
+                <option value="custom">사용자 지정</option>
+              </select>
+            </div>
+            
+            {selectedDateRange === 'custom' && (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>시작일:</label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  style={{
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem'
+                  }}
+                />
+                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>종료일:</label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  style={{
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem'
+                  }}
+                />
+                <Button
+                  onClick={() => {
+                    if (customStartDate && customEndDate) {
+                      setTimelineData(null);
+                    }
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  적용
+                </Button>
+              </div>
+            )}
+            
+            <div style={{ marginLeft: 'auto', fontSize: '0.875rem', color: '#6b7280', fontWeight: '500' }}>
+              📊 선택된 기간: <span style={{ color: '#1f2937', fontWeight: '600' }}>{dateRange.label}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 통계 요약 */}
+        <div style={cardGridStyle}>
+          <div style={statCardStyle}>
+            <div style={statHeaderStyle}>
+              <div style={statTitleStyle}>총 고객사</div>
+              <Users style={{ width: '1.5rem', height: '1.5rem', color: '#3b82f6' }} />
+            </div>
+            <div style={statValueStyle}>{statistics.summary.totalCustomers}</div>
+            <div style={{ color: '#64748b', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              {dateRange.label} 기간
+            </div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statHeaderStyle}>
+              <div style={statTitleStyle}>총 매출액</div>
+              <TrendingUp style={{ width: '1.5rem', height: '1.5rem', color: '#10b981' }} />
+            </div>
+            <div style={statValueStyle}>₩{statistics.summary.totalSalesAmount.toLocaleString()}</div>
+            <div style={{ color: '#10b981', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              {statistics.summary.totalOrders}건 주문
+            </div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statHeaderStyle}>
+              <div style={statTitleStyle}>총 구매액</div>
+              <Package style={{ width: '1.5rem', height: '1.5rem', color: '#8b5cf6' }} />
+            </div>
+            <div style={statValueStyle}>₩{statistics.summary.totalPurchaseAmount.toLocaleString()}</div>
+            <div style={{ color: '#64748b', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              {statistics.summary.totalPurchases}건 구매
+            </div>
+          </div>
+        </div>
+
+        {/* 상위 고객사 */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ShoppingCart style={{ width: '1.25rem', height: '1.25rem' }} />
+            상위 고객사 ({dateRange.label})
+          </h4>
+          <div style={{ background: 'white', borderRadius: '1rem', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', color: '#374151' }}>고객사</th>
+                  <th style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600', color: '#374151' }}>주문 건수</th>
+                  <th style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600', color: '#374151' }}>총 금액</th>
+                  <th style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600', color: '#374151' }}>제품 수</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statistics.topCustomers.map((customer, index) => (
+                  <tr key={customer.companyName} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Badge variant={index === 0 ? 'default' : 'secondary'}>
+                          {index + 1}
+                        </Badge>
+                        {customer.companyName}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '0.75rem' }}>{customer.orderCount}건</td>
+                    <td style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600' }}>
+                      ₩{customer.totalValue.toLocaleString()}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '0.75rem' }}>{customer.products.length}개</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 회사별 상세 타임라인 */}
+        <div>
+          <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Clock style={{ width: '1.25rem', height: '1.25rem' }} />
+            회사별 상세 타임라인
+          </h4>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {companyTimelines.slice(0, 5).map((company) => (
+              <div key={company.companyName} style={{ 
+                background: 'white', 
+                borderRadius: '1rem', 
+                padding: '1.5rem', 
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h5 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {company.companyType === 'customer' ? 
+                      <Users style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} /> :
+                      <Truck style={{ width: '1rem', height: '1rem', color: '#8b5cf6' }} />
+                    }
+                    {company.companyName}
+                  </h5>
+                  <Badge variant={company.companyType === 'customer' ? 'default' : 'secondary'}>
+                    {company.companyType === 'customer' ? '고객사' : '공급업체'}
+                  </Badge>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  {company.products.slice(0, 3).map((product) => (
+                    <div key={product.productCode} style={{ 
+                      border: '1px solid #e2e8f0', 
+                      borderRadius: '0.5rem', 
+                      padding: '1rem' 
+                    }}>
+                      <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>{product.productName}</div>
+                      <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                        {product.productCode} • {product.totalOrders}건 주문
+                      </div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#10b981' }}>
+                        ₩{product.totalAmount.toLocaleString()}
+                      </div>
+                      
+                      {/* 타임라인 이벤트 */}
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.75rem' }}>
+                        {product.timeline.slice(0, 3).map((event, idx) => (
+                          <div key={event.id} 
+                            onClick={() => {
+                              setSelectedTimelineItem({ event, product, company });
+                              setShowDetailModal(true);
+                            }}
+                            style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '0.5rem',
+                            marginBottom: '0.25rem',
+                            color: '#64748b',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                            borderRadius: '0.25rem',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <div style={{ 
+                              width: '6px', 
+                              height: '6px', 
+                              borderRadius: '50%', 
+                              background: event.type === 'order' ? '#3b82f6' : 
+                                         event.type === 'production' ? '#f59e0b' : 
+                                         event.type === 'shipment' ? '#10b981' : '#8b5cf6'
+                            }}></div>
+                            <span>{event.date.toLocaleDateString('ko-KR')} - {event.description.substring(0, 30)}...</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* 상세 정보 모달 */}
+        {showDetailModal && selectedTimelineItem && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '1rem',
+              padding: '2rem',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>상세 정보</h3>
+                <button 
+                  onClick={() => setShowDetailModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: '#64748b'
+                  }}
+                >×</button>
+              </div>
+              
+              {renderDetailModalContent()}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderDetailModalContent = () => {
+    if (!selectedTimelineItem) return null;
+    
+    const { event, product, company } = selectedTimelineItem;
+    
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* 기본 정보 */}
+        <div style={{ padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '0.75rem' }}>
+          <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>기본 정보</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>회사명</div>
+              <div style={{ fontWeight: '600' }}>{company.companyName}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>회사 유형</div>
+              <Badge variant={company.companyType === 'customer' ? 'default' : 'secondary'}>
+                {company.companyType === 'customer' ? '고객사' : '공급업체'}
+              </Badge>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>제품명</div>
+              <div style={{ fontWeight: '600' }}>{product.productName}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>제품 코드</div>
+              <div style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>{product.productCode}</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* 이벤트 상세 */}
+        <div style={{ padding: '1.5rem', backgroundColor: '#fefefe', border: '1px solid #e2e8f0', borderRadius: '0.75rem' }}>
+          <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ 
+              width: '12px', 
+              height: '12px', 
+              borderRadius: '50%', 
+              background: event.type === 'order' ? '#3b82f6' : 
+                         event.type === 'production' ? '#f59e0b' : 
+                         event.type === 'shipment' ? '#10b981' : '#8b5cf6'
+            }}></div>
+            {event.type === 'order' ? '주문 정보' : 
+             event.type === 'production' ? '생산 정보' : 
+             event.type === 'shipment' ? '배송 정보' : '기타 정보'}
+          </h4>
+          
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>이벤트 날짜</div>
+              <div style={{ fontWeight: '600', fontSize: '1.1rem' }}>
+                {event.date.toLocaleDateString('ko-KR', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric',
+                  weekday: 'short'
+                })}
+              </div>
+            </div>
+            
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>상태</div>
+              <Badge variant={event.status === 'completed' ? 'default' : 'secondary'}>
+                {event.status === 'completed' ? '완료' : 
+                 event.status === 'in_progress' ? '진행중' : 
+                 event.status === 'pending' ? '대기중' : event.status}
+              </Badge>
+            </div>
+            
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>설명</div>
+              <div style={{ lineHeight: '1.5' }}>{event.description}</div>
+            </div>
+            
+            {event.quantity && (
+              <div>
+                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>수량</div>
+                <div style={{ fontWeight: '600' }}>{event.quantity.toLocaleString()}개</div>
+              </div>
+            )}
+            
+            {event.amount && (
+              <div>
+                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>금액</div>
+                <div style={{ fontWeight: '600', color: '#10b981' }}>₩{event.amount.toLocaleString()}</div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* 제작 및 완료 예정 정보 */}
+        <div style={{ padding: '1.5rem', backgroundColor: '#f0f9ff', borderRadius: '0.75rem' }}>
+          <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>일정 정보</h4>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {event.type === 'production' && (
+              <>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>생산 시작 예정</div>
+                  <div style={{ fontWeight: '600' }}>
+                    {new Date(event.date.getTime() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR')}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>생산 완료 예정</div>
+                  <div style={{ fontWeight: '600', color: '#f59e0b' }}>
+                    {new Date(event.date.getTime() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR')}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>예상 리드타임</div>
+                  <div style={{ fontWeight: '600' }}>7일</div>
+                </div>
+              </>
+            )}
+            
+            {event.type === 'order' && (
+              <>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>주문 접수일</div>
+                  <div style={{ fontWeight: '600' }}>{event.date.toLocaleDateString('ko-KR')}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>납품 예정일</div>
+                  <div style={{ fontWeight: '600', color: '#3b82f6' }}>
+                    {new Date(event.date.getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR')}
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {event.type === 'shipment' && (
+              <>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>출하일</div>
+                  <div style={{ fontWeight: '600' }}>{event.date.toLocaleDateString('ko-KR')}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>배송 완료 예정</div>
+                  <div style={{ fontWeight: '600', color: '#10b981' }}>
+                    {new Date(event.date.getTime() + 2 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR')}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        
+        {/* 관련 정보 */}
+        <div style={{ padding: '1.5rem', backgroundColor: '#fafafa', borderRadius: '0.75rem' }}>
+          <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>제품 통계</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>총 주문 건수</div>
+              <div style={{ fontWeight: '600', fontSize: '1.25rem' }}>{product.totalOrders}건</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>총 주문 금액</div>
+              <div style={{ fontWeight: '600', fontSize: '1.25rem', color: '#10b981' }}>₩{product.totalAmount.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -679,6 +1232,12 @@ export function ERPDataManagementPage() {
         >
           BOM 세부 분석
         </button>
+        <button
+          style={activeTab === 'timeline' ? activeTabStyle : tabButtonStyle}
+          onClick={() => setActiveTab('timeline')}
+        >
+          타임라인 분석
+        </button>
       </div>
 
       {loading ? (
@@ -692,6 +1251,7 @@ export function ERPDataManagementPage() {
           {activeTab === 'bom' && renderBOMAnalysisTab()}
           {activeTab === 'inventory' && renderInventoryTab()}
           {activeTab === 'bomDetail' && renderBOMDetailTab()}
+          {activeTab === 'timeline' && renderTimelineTab()}
         </>
       )}
     </div>
