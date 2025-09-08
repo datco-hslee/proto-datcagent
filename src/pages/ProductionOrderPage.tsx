@@ -16,7 +16,8 @@ import {
   Edit,
   Package,
 } from "lucide-react";
-import erpDataJson from '../../DatcoDemoData2.json';
+import erpDataJson from "../../DatcoDemoData2.json";
+import { generateMassiveERPData } from "../data/massiveERPData";
 
 interface ProductionOrder {
   id: string;
@@ -298,9 +299,79 @@ export function ProductionOrderPage() {
     }).filter(Boolean) as ProductionOrder[];
   };
 
+  // Generate production orders from massive ERP data
+  const getMassiveERPProductionOrders = (): ProductionOrder[] => {
+    try {
+      const massiveERPData = generateMassiveERPData();
+      const productionOrders = massiveERPData.productionOrders || [];
+      
+      return productionOrders.map((po: any) => {
+        // Convert massive ERP productionOrder to ProductionOrder interface
+        const materials: Material[] = po.workOrders?.flatMap((wo: any) => 
+          wo.materialsConsumed?.map((mc: any, index: number) => ({
+            id: `${po.id}-mat-${index}`,
+            name: mc.materialCode || 'Unknown Material',
+            requiredQuantity: mc.plannedQuantity || 0,
+            availableQuantity: mc.actualQuantity || 0,
+            unit: 'EA',
+            status: mc.actualQuantity >= mc.plannedQuantity ? 'available' : 'shortage'
+          })) || []
+        ) || [];
+        
+        // Map status from massive ERP to UI status
+        const status = po.status === 'completed' ? 'completed' :
+                      po.status === 'in_progress' ? 'in-progress' :
+                      po.status === 'planned' ? 'planned' : 'planned';
+        
+        // Map priority from massive ERP to UI priority
+        const priority = po.priority === 'urgent' ? 'high' :
+                        po.priority === 'normal' ? 'medium' : 'medium';
+        
+        // Calculate progress based on actual vs planned quantity
+        const progress = po.plannedQuantity > 0 ? 
+          Math.round((po.actualQuantity / po.plannedQuantity) * 100) : 0;
+        
+        return {
+          id: po.id,
+          orderNumber: po.orderNumber,
+          productName: po.productName,
+          productCode: po.productCode,
+          quantity: po.plannedQuantity,
+          unit: 'EA',
+          status: status as ProductionOrder['status'],
+          priority: priority as ProductionOrder['priority'],
+          startDate: po.plannedStartDate ? new Date(po.plannedStartDate) : new Date(),
+          dueDate: po.plannedEndDate ? new Date(po.plannedEndDate) : new Date(),
+          completedQuantity: po.actualQuantity || 0,
+          assignedTeam: po.workOrders?.[0]?.workCenterName || 'Production Team',
+          estimatedHours: po.workOrders?.length * 8 || 40, // 8 hours per work order
+          actualHours: po.workOrders?.filter((wo: any) => wo.actualEndTime).length * 8 || 0,
+          progress: Math.min(progress, 100),
+          customer: '대량 ERP 고객사',
+          materials: materials,
+          notes: `대량 ERP 생산오더: ${po.orderNumber}`,
+          itemCategory: '완제품',
+          standardPrice: 100000, // Default price for massive ERP data
+          moq: 50,
+          safetyStock: 25,
+          leadTimeDays: 7
+        };
+      }).filter(Boolean) as ProductionOrder[];
+    } catch (error) {
+      console.error('Error converting massive ERP production orders:', error);
+      return [];
+    }
+  };
+
   // Get orders based on selected data source
   const getCurrentOrders = (): ProductionOrder[] => {
-    return selectedDataSource === "sample" ? getSampleProductionOrders() : getProductionOrdersFromERPData();
+    if (selectedDataSource === "sample") {
+      return getSampleProductionOrders();
+    } else if (selectedDataSource === "massive") {
+      return getMassiveERPProductionOrders();
+    } else {
+      return getProductionOrdersFromERPData();
+    }
   };
 
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
@@ -737,13 +808,16 @@ export function ProductionOrderPage() {
             <p style={{ color: "#6b7280" }}>생산 계획 및 진행 상황을 관리합니다</p>
             <span style={{
               padding: "0.25rem 0.75rem",
-              backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
-              color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
+              backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : 
+                              selectedDataSource === "massive" ? "#dcfce7" : "#fef3c7",
+              color: selectedDataSource === "erp" ? "#1e40af" : 
+                    selectedDataSource === "massive" ? "#166534" : "#92400e",
               borderRadius: "9999px",
               fontSize: "0.75rem",
               fontWeight: 500
             }}>
-              {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              {selectedDataSource === "erp" ? "닷코 시연 데이터" : 
+               selectedDataSource === "massive" ? "대량 ERP 데이터" : "생성된 샘플 데이터"}
             </span>
           </div>
         </div>
@@ -806,6 +880,7 @@ export function ProductionOrderPage() {
             }}
           >
             <option value="erp">닷코 시연 데이터</option>
+            <option value="massive">대량 ERP 데이터</option>
             <option value="sample">생성된 샘플 데이터</option>
           </select>
           

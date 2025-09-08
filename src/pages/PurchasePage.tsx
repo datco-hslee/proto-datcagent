@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Search, Plus, Eye, Edit3, Trash2, Package, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import styles from "./PurchasePage.module.css";
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 interface PurchaseOrder {
   id: string;
@@ -71,6 +72,50 @@ const getPurchaseOrdersFromERPData = () => {
   });
 
   return erpPurchaseOrders;
+};
+
+// 대량 ERP 데이터에서 구매 주문 추출 함수
+const getMassiveERPPurchaseOrders = (): PurchaseOrder[] => {
+  const massiveData = generateMassiveERPData();
+  const purchaseOrders = massiveData.purchaseOrders || [];
+  const suppliers = massiveData.suppliers || [];
+
+  return purchaseOrders.map((po: any) => {
+    const supplier = suppliers.find((sup: any) => sup.id === po.supplierId);
+    
+    // 날짜 안전 처리
+    const orderDate = (() => {
+      const date = new Date(po.orderDate);
+      return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+    })();
+    
+    const deliveryDate = (() => {
+      const date = new Date(po.expectedDeliveryDate || po.deliveryDate);
+      return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+    })();
+
+    return {
+      id: po.id,
+      poNumber: po.orderNumber,
+      supplier: supplier?.name || "알 수 없는 공급사",
+      supplierEmail: supplier?.email || `${po.supplierId}@supplier.com`,
+      supplierCode: po.supplierId,
+      itemCode: po.materialCode,
+      itemName: po.materialName,
+      quantity: po.quantity,
+      unitPrice: po.unitPrice,
+      unit: po.unit || "EA",
+      items: 1,
+      totalAmount: po.totalAmount,
+      status: po.status === "confirmed" ? "confirmed" :
+              po.status === "delivered" ? "received" :
+              po.status === "pending" ? "sent" : "draft",
+      orderDate,
+      deliveryDate,
+      description: `${po.materialName} ${po.quantity}${po.unit || 'EA'} 구매`,
+      priority: (po.totalAmount > 50000000 ? "high" : po.totalAmount > 20000000 ? "medium" : "low") as "high" | "medium" | "low"
+    };
+  });
 };
 
 // 생성된 샘플 데이터
@@ -153,7 +198,7 @@ const statusConfig = {
 export const PurchasePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
@@ -167,7 +212,13 @@ export const PurchasePage: React.FC = () => {
 
   // 현재 데이터 소스에 따른 구매 주문 가져오기
   const getCurrentOrders = () => {
-    return selectedDataSource === "erp" ? getPurchaseOrdersFromERPData() : getGeneratedPurchaseOrders();
+    if (selectedDataSource === "erp") {
+      return getPurchaseOrdersFromERPData();
+    } else if (selectedDataSource === "sample") {
+      return getGeneratedPurchaseOrders();
+    } else {
+      return getMassiveERPPurchaseOrders();
+    }
   };
 
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(getCurrentOrders());
@@ -266,8 +317,9 @@ export const PurchasePage: React.FC = () => {
             <h1 className={styles.pageTitle}>구매 관리</h1>
             <p className={styles.pageDescription}>구매 주문을 관리하고 추적합니다</p>
             <div className={styles.dataSourceBadge}>
-              <Badge variant={selectedDataSource === "erp" ? "default" : "secondary"}>
-                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              <Badge variant={selectedDataSource === "erp" ? "default" : selectedDataSource === "sample" ? "secondary" : "outline"}>
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : 
+                 selectedDataSource === "sample" ? "생성된 샘플 데이터" : "대량 ERP 데이터"}
               </Badge>
             </div>
           </div>
@@ -292,11 +344,12 @@ export const PurchasePage: React.FC = () => {
         <div className={styles.filterControls}>
           <select
             value={selectedDataSource}
-            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
             className={styles.filterSelect}
           >
             <option value="erp">닷코 시연 데이터</option>
             <option value="sample">생성된 샘플 데이터</option>
+            <option value="massive">대량 ERP 데이터</option>
           </select>
           <select
             value={statusFilter}

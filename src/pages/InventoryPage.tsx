@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Search, Plus, Filter, Download, Edit, Eye, Package, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 interface InventoryItem {
   id: string;
@@ -30,7 +31,7 @@ export function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("전체");
   const [selectedStatus, setSelectedStatus] = useState("전체");
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [showNewItem, setShowNewItem] = useState(false);
   const [showViewItem, setShowViewItem] = useState(false);
@@ -337,10 +338,64 @@ export function InventoryPage() {
     return erpInventoryItems;
   };
 
+  // Massive ERP 데이터에서 materialInbounds를 재고 아이템으로 변환
+  const getInventoryFromMassiveERP = (): InventoryItem[] => {
+    const massiveData = generateMassiveERPData();
+    console.log('🔍 Massive ERP Data Keys:', Object.keys(massiveData));
+    console.log('🔍 MaterialInbounds Length:', massiveData.materialInbounds?.length || 0);
+    
+    const materialInbounds = massiveData.materialInbounds || [];
+    
+    const inventoryItems: InventoryItem[] = [];
+    
+    // materialInbounds 데이터를 InventoryItem으로 변환 (직접 변환)
+    materialInbounds.forEach((inbound: any) => {
+      console.log('🔍 Processing inbound:', inbound);
+      
+      // MaterialInbound 인터페이스에 따라 직접 변환
+      const currentStock = inbound.currentStock || inbound.quantity || 0;
+      const unitPrice = inbound.unitPrice || 1000;
+      const minStock = 50; // 기본값
+      const maxStock = 1000; // 기본값
+      
+      let status: "정상" | "부족" | "과다" | "없음" = "정상";
+      if (currentStock === 0) status = "없음";
+      else if (currentStock < minStock) status = "부족";
+      else if (currentStock > maxStock * 0.9) status = "과다";
+      
+      inventoryItems.push({
+        id: `MASSIVE-${inbound.id}`,
+        code: inbound.materialCode,
+        name: inbound.materialName,
+        category: "원자재", // 기본 카테고리
+        currentStock,
+        minStock,
+        maxStock,
+        unit: inbound.unit || "EA",
+        unitPrice,
+        totalValue: currentStock * unitPrice,
+        location: inbound.warehouseLocation || "창고A-1구역",
+        supplier: inbound.supplierName || "미지정",
+        lastUpdated: inbound.inboundDate ? new Date(inbound.inboundDate).toISOString().split('T')[0] : "2025-09-01",
+        status,
+        itemCategory: "raw",
+        standardPrice: unitPrice,
+        moq: 100,
+        safetyStock: minStock,
+        leadTimeDays: 7
+      });
+    });
+    
+    console.log('🔍 Generated inventory items:', inventoryItems.length);
+    return inventoryItems;
+  };
+
   // 현재 선택된 데이터 소스에 따라 재고 데이터 반환
   const getCurrentInventoryItems = (): InventoryItem[] => {
     if (selectedDataSource === "erp") {
       return getInventoryFromERPData();
+    } else if (selectedDataSource === "massive") {
+      return getInventoryFromMassiveERP();
     } else {
       return getSampleInventoryItems();
     }
@@ -809,8 +864,10 @@ export function InventoryPage() {
             <h1 style={titleStyle}>재고 관리</h1>
             <p style={subtitleStyle}>실시간 재고 현황을 모니터링하고 효율적으로 관리하세요</p>
             <div style={{ marginTop: "0.5rem" }}>
-              <Badge variant={selectedDataSource === "erp" ? "default" : "secondary"}>
-                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              <Badge variant={selectedDataSource === "erp" ? "default" : selectedDataSource === "massive" ? "destructive" : "secondary"}>
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : 
+                 selectedDataSource === "massive" ? "대량 ERP 데이터" : 
+                 "생성된 샘플 데이터"}
               </Badge>
             </div>
           </div>
@@ -885,12 +942,13 @@ export function InventoryPage() {
               style={filterSelectStyle} 
               value={selectedDataSource} 
               onChange={(e) => {
-                const newSource = e.target.value as "erp" | "sample";
+                const newSource = e.target.value as "erp" | "sample" | "massive";
                 setSelectedDataSource(newSource);
               }}
             >
               <option value="erp">닷코 시연 데이터</option>
               <option value="sample">생성된 샘플 데이터</option>
+              <option value="massive">대량 ERP 데이터 </option>
             </select>
           </div>
           <button style={secondaryButtonStyle} onClick={() => setShowAdvancedFilter(true)}>

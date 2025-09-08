@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, Plus, Filter, Download, Edit, Eye, Phone, Mail, UserCheck, UserX, Award, Clock } from "lucide-react";
 import { useEmployees } from "../context/EmployeeContext";
 import type { Employee } from "../types/employee";
@@ -10,6 +10,7 @@ export function EmployeesPage() {
   const [selectedStatus, setSelectedStatus] = useState("전체");
   const [selectedWorkType, setSelectedWorkType] = useState("전체");
   const [selectedDataSource, setSelectedDataSource] = useState("전체");
+  const [currentEmployees, setCurrentEmployees] = useState<Employee[]>([]);
   const [salaryRange, setSalaryRange] = useState({ min: 0, max: 10000000 });
   const [performanceRange, setPerformanceRange] = useState({ min: 0, max: 100 });
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
@@ -242,104 +243,42 @@ export function EmployeesPage() {
     transition: "all 0.2s ease",
   };
 
-  // 초기 데이터
-  const INITIAL_EMPLOYEES: Employee[] = [
-    {
-      id: "EMP-001",
-      employeeId: "EMP2024001",
-      name: "이영희",
-      position: "영업팀장",
-      department: "영업부",
-      email: "yhlee@company.com",
-      phone: "010-1234-5678",
-      hireDate: "2020-03-15",
-      salary: 6000000,
-      status: "재직",
-      workType: "정규직",
-      manager: "김대표",
-      skills: ["영업전략", "고객관리", "협상"],
-      performanceScore: 92,
-    },
-    {
-      id: "EMP-002",
-      employeeId: "EMP2024002",
-      name: "박기술",
-      position: "개발팀장",
-      department: "기술부",
-      email: "ktpark@company.com",
-      phone: "010-2345-6789",
-      hireDate: "2019-01-10",
-      salary: 7000000,
-      status: "재직",
-      workType: "정규직",
-      manager: "김대표",
-      skills: ["Python", "React", "DevOps"],
-      performanceScore: 88,
-    },
-    {
-      id: "EMP-003",
-      employeeId: "EMP2024003",
-      name: "최생산",
-      position: "생산관리자",
-      department: "생산부",
-      email: "scchoi@company.com",
-      phone: "010-3456-7890",
-      hireDate: "2021-06-01",
-      salary: 5500000,
-      status: "재직",
-      workType: "정규직",
-      manager: "김대표",
-      skills: ["품질관리", "생산계획", "안전관리"],
-      performanceScore: 85,
-    },
-    {
-      id: "EMP-004",
-      employeeId: "EMP2024004",
-      name: "정회계",
-      position: "경리과장",
-      department: "경영지원부",
-      email: "hjjung@company.com",
-      phone: "010-4567-8901",
-      hireDate: "2022-09-01",
-      salary: 4500000,
-      status: "휴직",
-      workType: "정규직",
-      manager: "김대표",
-      skills: ["재무관리", "세무", "ERP"],
-      performanceScore: 78,
-    },
-    {
-      id: "EMP-005",
-      employeeId: "EMP2024005",
-      name: "김신입",
-      position: "마케팅 인턴",
-      department: "마케팅부",
-      email: "snekim@company.com",
-      phone: "010-5678-9012",
-      hireDate: "2024-01-08",
-      salary: 2500000,
-      status: "재직",
-      workType: "인턴",
-      manager: "이영희",
-      skills: ["소셜미디어", "콘텐츠 제작"],
-      performanceScore: 72,
-    },
-  ];
 
-  const filteredEmployees = employees.filter((emp) => {
+  // 데이터 소스 변경 시 직원 데이터 업데이트
+  useEffect(() => {
+    if (selectedDataSource === "전체") {
+      setCurrentEmployees(employees);
+    } else {
+      const sourceEmployees = getEmployeesByDataSource(selectedDataSource as "demo" | "erp" | "generated" | "massive");
+      setCurrentEmployees(sourceEmployees);
+    }
+  }, [selectedDataSource, employees, getEmployeesByDataSource]);
+
+  // 초기 로드 시 전체 직원 데이터 설정
+  useEffect(() => {
+    setCurrentEmployees(employees);
+  }, [employees]);
+
+  const filteredEmployees = currentEmployees.filter((emp) => {
     const matchesSearch =
       emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchTerm.toLowerCase());
+      emp.position.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesDepartment = selectedDepartment === "전체" || emp.department === selectedDepartment;
     const matchesStatus = selectedStatus === "전체" || emp.status === selectedStatus;
     const matchesWorkType = selectedWorkType === "전체" || emp.workType === selectedWorkType;
-    const matchesDataSource = selectedDataSource === "전체" || emp.dataSource === selectedDataSource;
     const matchesSalary = emp.salary >= salaryRange.min && emp.salary <= salaryRange.max;
     const matchesPerformance = emp.performanceScore >= performanceRange.min && emp.performanceScore <= performanceRange.max;
-    
-    return matchesSearch && matchesDepartment && matchesStatus && matchesWorkType && matchesDataSource && matchesSalary && matchesPerformance;
+
+    return (
+      matchesSearch &&
+      matchesDepartment &&
+      matchesStatus &&
+      matchesWorkType &&
+      matchesSalary &&
+      matchesPerformance
+    );
   });
 
   const formatCurrency = (amount: number) => {
@@ -370,19 +309,18 @@ export function EmployeesPage() {
     }
   };
 
-  // 통계 계산
+  // 통계 계산 (현재 선택된 데이터 소스 기준)
   const stats = {
-    total: employees.filter((e) => e.status !== "퇴사").length,
-    active: employees.filter((e) => e.status === "재직").length,
-    onLeave: employees.filter((e) => e.status === "휴직").length,
-    departments: new Set(employees.filter((e) => e.status !== "퇴사").map((e) => e.department)).size,
-    avgPerformance: Math.round(
-      employees.filter((e) => e.status === "재직").reduce((sum, emp) => sum + emp.performanceScore, 0) /
-        employees.filter((e) => e.status === "재직").length
-    ),
+    total: currentEmployees.filter((e) => e.status !== "퇴사").length,
+    active: currentEmployees.filter((e) => e.status === "재직").length,
+    onLeave: currentEmployees.filter((e) => e.status === "휴직").length,
+    departments: Array.from(new Set(currentEmployees.map((e) => e.department))).length,
+    avgPerformance: currentEmployees.length > 0 ? Math.round(
+      currentEmployees.reduce((sum, e) => sum + e.performanceScore, 0) / currentEmployees.length
+    ) : 0,
   };
 
-  const departments = ["전체", ...Array.from(new Set(employees.map((e) => e.department)))];
+  const departments = ["전체", ...Array.from(new Set(currentEmployees.map((e) => e.department)))];
   const workTypes = ["전체", "정규직", "계약직", "인턴"];
   const dataSourceSummary = getDataSourceSummary();
   const dataSources = ["전체", ...Object.keys(dataSourceSummary)];
@@ -832,7 +770,7 @@ export function EmployeesPage() {
           color: "#6b7280",
         }}
       >
-        총 {filteredEmployees.length}명의 직원이 표시됨 (전체 {employees.length}명 중)
+        총 {filteredEmployees.length}명의 직원이 표시됨 (현재 데이터 소스: {currentEmployees.length}명 중)
       </div>
 
       {/* Advanced Filter Modal */}

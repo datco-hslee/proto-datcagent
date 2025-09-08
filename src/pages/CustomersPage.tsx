@@ -3,12 +3,13 @@ import { Search, Plus, Filter, Download, Edit, Eye, Phone, Mail, Building } from
 import { useCustomers } from "../context/CustomerContext";
 import type { Customer } from "../context/CustomerContext";
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 export function CustomersPage() {
   const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("전체");
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -155,9 +156,59 @@ export function CustomersPage() {
     ];
   };
 
+  // 대량 ERP 데이터에서 고객 정보 추출
+  const getMassiveERPCustomers = (): Customer[] => {
+    const massiveData = generateMassiveERPData();
+    const customers = massiveData.customers || [];
+    const salesOrders = massiveData.salesOrders || [];
+
+    return customers.map((customer: any) => {
+      const customerOrders = salesOrders.filter((order: any) => order.customerId === customer.id);
+      
+      const totalOrders = customerOrders.length;
+      const totalAmount = customerOrders.reduce((sum: number, order: any) => sum + order.totalAmount, 0);
+      const lastOrderDate = customerOrders.length > 0 
+        ? new Date(customerOrders.sort((a: any, b: any) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())[0].orderDate).toISOString().split('T')[0]
+        : "2024-01-01";
+
+      return {
+        id: customer.id,
+        name: customer.contactPerson,
+        company: customer.company,
+        email: customer.email,
+        phone: customer.phone,
+        address: customer.address,
+        status: (totalOrders > 5 ? "활성" : totalOrders > 0 ? "잠재" : "비활성") as Customer["status"],
+        totalOrders,
+        totalAmount,
+        lastContact: lastOrderDate,
+        representative: "영업팀",
+        industry: customer.industry,
+        creditRating: customer.creditRating as Customer["creditRating"],
+        paymentTerms: customer.paymentTerms,
+        contactPerson: customer.contactPerson,
+        // ERP 거래처마스터 속성들
+        거래처코드: customer.id,
+        거래처명: customer.company,
+        구분: "고객사",
+        결제조건: `${customer.paymentTerms}D`,
+        신용등급: customer.creditRating,
+        통화: "KRW",
+        납기리드타임일: 7,
+        인코텀즈: "EXW"
+      };
+    });
+  };
+
   // 현재 선택된 데이터 소스에 따른 고객 목록
   const getCurrentCustomers = (): Customer[] => {
-    return selectedDataSource === "erp" ? getERPCustomers() : getSampleCustomers();
+    if (selectedDataSource === "erp") {
+      return getERPCustomers();
+    } else if (selectedDataSource === "massive") {
+      return getMassiveERPCustomers();
+    } else {
+      return getSampleCustomers();
+    }
   };
 
   // 데이터 소스 변경 시 고객 목록 업데이트
@@ -586,13 +637,13 @@ export function CustomersPage() {
               borderRadius: "9999px",
               fontSize: "0.75rem",
               fontWeight: "500",
-              backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
-              color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
-              border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : "#fcd34d"}`,
+              backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : selectedDataSource === "massive" ? "#f0f9ff" : "#fef3c7",
+              color: selectedDataSource === "erp" ? "#1e40af" : selectedDataSource === "massive" ? "#0369a1" : "#92400e",
+              border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : selectedDataSource === "massive" ? "#7dd3fc" : "#fcd34d"}`,
               marginTop: "0.75rem",
             }}
           >
-            {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+            {selectedDataSource === "erp" ? "닷코 시연 데이터" : selectedDataSource === "massive" ? "대량 ERP 데이터" : "생성된 샘플 데이터"}
           </div>
         </div>
       </div>
@@ -603,10 +654,11 @@ export function CustomersPage() {
           <select 
             style={filterSelectStyle} 
             value={selectedDataSource} 
-            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
           >
             <option value="erp">닷코 시연 데이터</option>
             <option value="sample">생성된 샘플 데이터</option>
+            <option value="massive">대량 ERP 데이터</option>
           </select>
 
           <div style={{ position: "relative" }}>

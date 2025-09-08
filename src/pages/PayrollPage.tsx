@@ -22,6 +22,7 @@ import {
 import { useEmployees } from "../context/EmployeeContext";
 import type { PayrollRecord } from "../types/employee";
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from "../data/massiveERPData";
 import styles from "./PayrollPage.module.css";
 
 
@@ -94,7 +95,7 @@ export function PayrollPage() {
   const { employees, getEmployeeById, getActiveEmployees } = useEmployees();
 
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -161,10 +162,50 @@ export function PayrollPage() {
     });
   };
 
+  // Massive ERP 데이터에서 payrollRecords를 급여 기록으로 변환
+  const getMassiveERPPayrollRecords = (): PayrollRecord[] => {
+    try {
+      const massiveData = generateMassiveERPData();
+      console.log('🔍 Massive ERP Payroll Records Length:', massiveData.payrollRecords?.length || 0);
+      
+      const payrollRecords = massiveData.payrollRecords || [];
+      
+      return payrollRecords.map((record: any) => {
+        console.log('🔍 Processing payroll record:', record);
+        
+        // 급여 상태를 랜덤하게 생성 (실제 ERP 데이터에는 status 필드가 없음)
+        const statuses: PayrollRecord["status"][] = ['draft', 'approved', 'paid'];
+        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+        
+        return {
+          id: `massive-${record.id}`,
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          department: record.department,
+          position: record.position,
+          period: record.payPeriod, // payPeriod -> period
+          baseSalary: record.baseSalary,
+          allowances: record.allowances,
+          overtime: record.overtimePay, // overtimePay -> overtime
+          deductions: record.totalDeductions, // totalDeductions -> deductions
+          tax: record.incomeTax, // incomeTax -> tax
+          netPay: record.netPay,
+          status: randomStatus,
+          payDate: record.payDate ? record.payDate.toISOString().split('T')[0] : "", // Date -> string
+        };
+      });
+    } catch (error) {
+      console.error('❌ Error processing massive ERP payroll records:', error);
+      return [];
+    }
+  };
+
   // 현재 급여 기록 가져오기
   const getCurrentPayrollRecords = (): PayrollRecord[] => {
     if (selectedDataSource === "sample") {
       return getSamplePayrollRecords();
+    } else if (selectedDataSource === "massive") {
+      return getMassiveERPPayrollRecords();
     } else {
       // ERP 인원마스터 데이터 기반 급여 기록
       return getERPPayrollRecords();
@@ -434,10 +475,11 @@ export function PayrollPage() {
             <select
               className={styles.filterSelect}
               value={selectedDataSource}
-              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
             >
               <option value="erp">닷코 시연 데이터</option>
               <option value="sample">생성된 샘플 데이터</option>
+              <option value="massive">대량 ERP 데이터 (payrollRecords 포함)</option>
             </select>
           </div>
           
@@ -449,11 +491,11 @@ export function PayrollPage() {
             borderRadius: '4px',
             fontSize: '12px',
             fontWeight: '500',
-            backgroundColor: selectedDataSource === 'erp' ? '#3b82f6' : '#f59e0b',
+            backgroundColor: selectedDataSource === 'erp' ? '#3b82f6' : selectedDataSource === 'massive' ? '#10b981' : '#f59e0b',
             color: 'white',
             marginLeft: '8px'
           }}>
-            {selectedDataSource === 'erp' ? '닷코 시연 데이터' : '생성된 샘플 데이터'}
+            {selectedDataSource === 'erp' ? '닷코 시연 데이터' : selectedDataSource === 'massive' ? '대량 ERP 데이터' : '생성된 샘플 데이터'}
           </div>
           
           <div className={styles.searchBox}>

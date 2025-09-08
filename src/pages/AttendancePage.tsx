@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { useEmployees } from "../context/EmployeeContext";
 import erpDataJson from "../../DatcoDemoData2.json";
+import { generateMassiveERPData } from "../data/massiveERPData";
 import {
   Search,
   Plus,
@@ -39,6 +40,65 @@ interface AttendanceRecord {
   breakEnd?: string;
   overtimeHours?: number;
 }
+
+// 대량 ERP 근태 데이터를 AttendanceRecord 인터페이스로 변환
+const getMassiveERPAttendanceRecords = (): AttendanceRecord[] => {
+  try {
+    const massiveData = generateMassiveERPData();
+    const attendanceRecords = massiveData.attendanceRecords || [];
+    
+    return attendanceRecords.map((record: any) => {
+      // 날짜 변환
+      const date = record.date instanceof Date ? record.date : new Date(record.date);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // 시간 포맷 변환
+      const formatTime = (dateTime: Date | null): string => {
+        if (!dateTime) return "";
+        const dt = dateTime instanceof Date ? dateTime : new Date(dateTime);
+        return dt.toTimeString().slice(0, 5); // HH:MM 형식
+      };
+      
+      const formatHours = (hours: number): string => {
+        const h = Math.floor(hours);
+        const m = Math.round((hours - h) * 60);
+        return `${h}:${m.toString().padStart(2, '0')}`;
+      };
+      
+      // 상태 매핑
+      const statusMap: { [key: string]: AttendanceRecord["status"] } = {
+        'present': 'present',
+        'absent': 'absent',
+        'late': 'late',
+        'early_leave': 'early_leave',
+        'sick': 'sick_leave',
+        'vacation': 'vacation'
+      };
+      
+      const mappedStatus = statusMap[record.status] || 'present';
+      
+      return {
+        id: record.id,
+        employeeId: record.employeeId,
+        employeeName: record.employeeName,
+        department: record.department,
+        date: dateStr,
+        checkInTime: formatTime(record.actualCheckIn),
+        checkOutTime: formatTime(record.actualCheckOut),
+        workHours: formatHours(record.regularHours || 0),
+        status: mappedStatus,
+        overtime: formatHours(record.overtimeHours || 0),
+        notes: record.notes || "",
+        breakStart: record.plannedStartTime ? formatTime(new Date(new Date(record.plannedStartTime).getTime() + 4 * 60 * 60 * 1000)) : undefined,
+        breakEnd: record.plannedStartTime ? formatTime(new Date(new Date(record.plannedStartTime).getTime() + 5 * 60 * 60 * 1000)) : undefined,
+        overtimeHours: record.overtimeHours || 0
+      };
+    }).filter(Boolean);
+  } catch (error) {
+    console.error('대량 ERP 근태 데이터 변환 중 오류:', error);
+    return [];
+  }
+};
 
 // ERP 인원마스터 데이터를 기반으로 출근 기록 생성 (오늘 날짜만)
 const getERPAttendanceRecords = (): AttendanceRecord[] => {
@@ -207,7 +267,7 @@ export const AttendancePage: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [newRecord, setNewRecord] = useState<Partial<AttendanceRecord>>({});
 
   // 직원 데이터를 기반으로 출근 기록 생성
@@ -234,6 +294,8 @@ export const AttendancePage: React.FC = () => {
   const getCurrentAttendanceRecords = (): AttendanceRecord[] => {
     if (selectedDataSource === "sample") {
       return getSampleAttendanceRecords();
+    } else if (selectedDataSource === "massive") {
+      return getMassiveERPAttendanceRecords();
     } else {
       // ERP 인원마스터 데이터 기반 출근 기록
       return getERPAttendanceRecords();
@@ -264,7 +326,24 @@ export const AttendancePage: React.FC = () => {
   };
 
   // 통계 계산
-  const totalEmployees = [...new Set(currentAttendanceRecords.map(r => r.employeeId))].length;
+  const getTotalEmployees = (): number => {
+    if (selectedDataSource === "massive") {
+      // 대량 ERP 데이터의 경우 전체 데이터에서 고유 직원 수 계산
+      try {
+        const massiveData = generateMassiveERPData();
+        const allAttendanceRecords = massiveData.attendanceRecords || [];
+        return [...new Set(allAttendanceRecords.map((r: any) => r.employeeId))].length;
+      } catch (error) {
+        console.error('대량 ERP 직원 수 계산 오류:', error);
+        return 0;
+      }
+    } else {
+      // 기존 로직: 현재 표시된 기록에서 고유 직원 수 계산
+      return [...new Set(currentAttendanceRecords.map(r => r.employeeId))].length;
+    }
+  };
+  
+  const totalEmployees = getTotalEmployees();
   const presentEmployees = currentAttendanceRecords.filter((r) => r.status === "present").length;
   const lateEmployees = currentAttendanceRecords.filter((r) => r.status === "late").length;
   const totalWorkingHours = currentAttendanceRecords.reduce((sum, r) => {
@@ -375,9 +454,10 @@ export const AttendancePage: React.FC = () => {
             <select
               className={styles.filterSelect}
               value={selectedDataSource}
-              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
             >
               <option value="erp">닷코 시연 데이터</option>
+              <option value="massive">대량 ERP 데이터</option>
               <option value="sample">생성된 샘플 데이터</option>
             </select>
           </div>
@@ -390,14 +470,14 @@ export const AttendancePage: React.FC = () => {
             borderRadius: '6px',
             fontSize: '13px',
             fontWeight: '600',
-            backgroundColor: selectedDataSource === 'erp' ? '#3b82f6' : '#f59e0b',
+            backgroundColor: selectedDataSource === 'erp' ? '#3b82f6' : selectedDataSource === 'massive' ? '#10b981' : '#f59e0b',
             color: 'white',
             marginLeft: '8px',
             marginTop: '4px',
             whiteSpace: 'nowrap',
             height: '28px'
           }}>
-            {selectedDataSource === 'erp' ? '닷코 시연 데이터' : '생성된 샘플 데이터'}
+            {selectedDataSource === 'erp' ? '닷코 시연 데이터' : selectedDataSource === 'massive' ? '대량 ERP 데이터' : '생성된 샘플 데이터'}
           </div>
           
           <div className={styles.searchBox}>

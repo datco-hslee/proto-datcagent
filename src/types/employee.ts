@@ -14,7 +14,7 @@ export interface Employee {
   skills: string[];
   performanceScore: number;
   avatar?: string;
-  dataSource?: "generated" | "erp" | "demo";
+  dataSource?: "generated" | "erp" | "demo" | "massive";
   dataSourceLabel?: string;
 }
 

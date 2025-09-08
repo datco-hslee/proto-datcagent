@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, Plus, Filter, Download, Edit, Package, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 interface Order {
   id: string;
@@ -21,7 +22,7 @@ export function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("전체");
   const [selectedPriority, setSelectedPriority] = useState("전체");
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -170,9 +171,77 @@ export function OrdersPage() {
     ];
   };
 
+  // 대량 ERP 데이터에서 주문 정보 추출
+  const getMassiveERPOrders = (): Order[] => {
+    const massiveData = generateMassiveERPData();
+    const salesOrders = massiveData.salesOrders || [];
+    const customers = massiveData.customers || [];
+
+    return salesOrders.map((order: any) => {
+      const customer = customers.find((c: any) => c.id === order.customerId);
+      
+      // 상태 계산 (주문일자와 납기일자 기반)
+      const orderDate = new Date(order.orderDate);
+      const dueDate = new Date(order.dueDate);
+      const today = new Date();
+      
+      let status: Order["status"];
+      let progress: number;
+      
+      if (order.status === "confirmed") {
+        if (dueDate < today) {
+          status = "완료";
+          progress = 100;
+        } else if (orderDate <= today && today <= dueDate) {
+          status = "진행중";
+          const totalDays = (dueDate.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24);
+          const passedDays = (today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24);
+          progress = Math.min(Math.max(Math.round((passedDays / totalDays) * 100), 0), 100);
+        } else {
+          status = "대기중";
+          progress = 0;
+        }
+      } else {
+        status = "취소";
+        progress = 0;
+      }
+      
+      // 우선순위 계산 (주문 금액 기반)
+      const priority: Order["priority"] = order.totalAmount >= 100000000 ? "높음" : 
+                                        order.totalAmount >= 50000000 ? "보통" : "낮음";
+
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customer: customer ? customer.contactPerson : "알 수 없음",
+        company: customer ? customer.company : "알 수 없음",
+        status,
+        priority,
+        orderDate: (() => {
+          const date = new Date(order.orderDate);
+          return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+        })(),
+        dueDate: (() => {
+          const date = new Date(order.requestedDeliveryDate || order.confirmedDeliveryDate);
+          return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+        })(),
+        totalAmount: order.totalAmount,
+        items: order.items?.length || 1,
+        representative: "영업팀",
+        progress
+      };
+    });
+  };
+
   // 현재 선택된 데이터 소스에 따른 주문 목록
   const getCurrentOrders = (): Order[] => {
-    return selectedDataSource === "erp" ? getERPOrders() : getSampleOrders();
+    if (selectedDataSource === "erp") {
+      return getERPOrders();
+    } else if (selectedDataSource === "massive") {
+      return getMassiveERPOrders();
+    } else {
+      return getSampleOrders();
+    }
   };
 
   // 데이터 소스 변경 시 주문 목록 업데이트
@@ -722,13 +791,17 @@ export function OrdersPage() {
             borderRadius: "9999px",
             fontSize: "0.75rem",
             fontWeight: "500",
-            backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
-            color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
-            border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : "#fcd34d"}`,
+            backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : 
+                             selectedDataSource === "sample" ? "#fef3c7" : "#f0fdf4",
+            color: selectedDataSource === "erp" ? "#1e40af" : 
+                   selectedDataSource === "sample" ? "#d97706" : "#16a34a",
+            border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : 
+                                 selectedDataSource === "sample" ? "#fcd34d" : "#bbf7d0"}`,
             marginTop: "0.75rem",
           }}
         >
-          {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+          {selectedDataSource === "erp" ? "닷코 시연 데이터" : 
+             selectedDataSource === "sample" ? "생성된 샘플 데이터" : "대량 ERP 데이터"}
         </div>
       </div>
 
@@ -758,7 +831,7 @@ export function OrdersPage() {
           {/* 데이터 소스 선택 */}
           <select
             value={selectedDataSource}
-            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
             style={{
               ...filterSelectStyle,
               minWidth: "200px",
@@ -767,6 +840,7 @@ export function OrdersPage() {
           >
             <option value="erp">닷코 시연 데이터</option>
             <option value="sample">생성된 샘플 데이터</option>
+            <option value="massive">대량 ERP 데이터</option>
           </select>
           
           <div style={{ position: "relative" }}>

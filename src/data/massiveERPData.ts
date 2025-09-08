@@ -1,5 +1,6 @@
 // 대량 ERP 데모 데이터 생성 시스템 (3-6개월치)
 // 완전한 비즈니스 플로우: 영업→구매→생산→재고→납품→인사/급여→회계
+// LOT 번호 기반 완전한 추적성 및 시계열 데이터 연결성 보장
 
 // ==================== 인터페이스 정의 ====================
 
@@ -320,6 +321,102 @@ export interface FinancialData {
 
 // ==================== 기준 데이터 ====================
 
+// 대량 고객 데이터 생성을 위한 기본 데이터
+const CUSTOMER_INDUSTRIES = [
+  '제조업', 'IT솔루션', '엔지니어링', '기술서비스', '시스템개발',
+  '자동차부품', '전자제품', '화학공업', '건설업', '물류운송',
+  '식품가공', '의료기기', '에너지', '통신장비', '반도체',
+  '항공우주', '조선업', '철강업', '섬유업', '플라스틱',
+  '기계제조', '정밀기기', '바이오', '환경기술', '로봇공학'
+];
+
+const CUSTOMER_REGIONS = [
+  { region: '서울', districts: ['강남구', '서초구', '송파구', '영등포구', '마포구', '중구', '종로구'] },
+  { region: '경기', districts: ['성남시', '수원시', '안양시', '용인시', '고양시', '부천시', '화성시'] },
+  { region: '인천', districts: ['연수구', '남동구', '부평구', '서구', '중구'] },
+  { region: '부산', districts: ['해운대구', '부산진구', '동래구', '남구', '사하구'] },
+  { region: '대구', districts: ['수성구', '달서구', '북구', '중구'] },
+  { region: '대전', districts: ['유성구', '서구', '중구', '동구'] },
+  { region: '광주', districts: ['북구', '서구', '남구', '광산구'] },
+  { region: '울산', districts: ['남구', '동구', '북구', '중구'] }
+];
+
+const COMPANY_SUFFIXES = ['㈜', '(주)', '코퍼레이션', '테크', '시스템', '솔루션', '엔지니어링', '인더스트리', '그룹', '컴퍼니'];
+const COMPANY_PREFIXES = ['한국', '동양', '대한', '글로벌', '아시아', '코리아', '퍼스트', '프리미엄', '스마트', '디지털'];
+
+// 대량 고객 데이터 생성 함수
+const generateMassiveCustomers = (count: number = 100): Customer[] => {
+  const customers: Customer[] = [];
+  
+  for (let i = 1; i <= count; i++) {
+    const industry = getRandomElement(CUSTOMER_INDUSTRIES);
+    const region = getRandomElement(CUSTOMER_REGIONS);
+    const district = getRandomElement(region.districts);
+    
+    // 회사명 생성
+    const prefix = Math.random() < 0.4 ? getRandomElement(COMPANY_PREFIXES) : '';
+    const suffix = getRandomElement(COMPANY_SUFFIXES);
+    const industryKeyword = industry.includes('업') ? industry.slice(0, -1) : industry;
+    const companyName = `${prefix}${industryKeyword}${suffix}`;
+    
+    // 신용등급 결정 (정규분포 근사)
+    const creditRatings = ['AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', 'A-', 'BBB+', 'BBB', 'BBB-'];
+    const creditWeights = [5, 8, 12, 15, 20, 18, 12, 6, 3, 1]; // AAA가 가장 적고 A가 가장 많음
+    const creditRating = getWeightedRandomElement(creditRatings, creditWeights);
+    
+    // 결제조건 (신용등급에 따라)
+    let paymentTerms: number;
+    if (creditRating.startsWith('AAA') || creditRating.startsWith('AA')) {
+      paymentTerms = getRandomElement([45, 60, 90]);
+    } else if (creditRating.startsWith('A')) {
+      paymentTerms = getRandomElement([30, 45, 60]);
+    } else {
+      paymentTerms = getRandomElement([15, 30, 45]);
+    }
+    
+    // 주소 생성
+    const streetNumbers = Math.floor(Math.random() * 999) + 1;
+    const address = `${region.region}시 ${district} ${industry}로 ${streetNumbers}`;
+    
+    // 담당자명 생성
+    const lastNames = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권'];
+    const firstNames = ['민수', '영희', '철수', '수진', '현우', '지영', '동현', '소영', '준호', '미경', '성호', '은정', '태현', '혜진'];
+    const contactPerson = getRandomElement(lastNames) + getRandomElement(firstNames);
+    
+    // 전화번호 생성
+    const phone = `010-${Math.floor(Math.random() * 9000) + 1000}-${Math.floor(Math.random() * 9000) + 1000}`;
+    
+    customers.push({
+      id: `CUST-${i.toString().padStart(3, '0')}`,
+      name: companyName,
+      industry,
+      creditRating: creditRating as Customer['creditRating'],
+      paymentTerms,
+      address,
+      contactPerson,
+      phone
+    });
+  }
+  
+  return customers;
+};
+
+// 가중치 기반 랜덤 선택 함수
+const getWeightedRandomElement = <T>(elements: T[], weights: number[]): T => {
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  let random = Math.random() * totalWeight;
+  
+  for (let i = 0; i < elements.length; i++) {
+    random -= weights[i];
+    if (random <= 0) {
+      return elements[i];
+    }
+  }
+  
+  return elements[elements.length - 1];
+};
+
+// 기존 고정 고객 데이터 (호환성 유지)
 const CUSTOMERS: Customer[] = [
   {
     id: 'CUST-001',
@@ -1623,8 +1720,8 @@ export const generateMassiveERPData = () => {
   console.log(`🎉 총 ${totalTransactions.toLocaleString()}건의 데이터 생성 완료!`);
   
   generatedData = {
-    // 기준 데이터
-    customers: CUSTOMERS,
+    // 기준 데이터 (대량 고객 데이터 사용)
+    customers: generateMassiveCustomers(200), // 200개 고객사 생성
     suppliers: SUPPLIERS,
     materials: MATERIALS,
     products: PRODUCTS,

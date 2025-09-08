@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Employee } from '../types/employee';
 import { setEmployeeContextData } from '../data/employeeDataIntegration';
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 interface EmployeeContextType {
   employees: Employee[];
@@ -11,13 +12,13 @@ interface EmployeeContextType {
   updateEmployee: (employeeId: string, updates: Partial<Employee>) => void;
   getEmployeeById: (employeeId: string) => Employee | undefined;
   getActiveEmployees: () => Employee[];
-  getEmployeesByDataSource: (dataSource: "generated" | "erp" | "demo") => Employee[];
+  getEmployeesByDataSource: (dataSource: "generated" | "erp" | "demo" | "massive") => Employee[];
   getDataSourceSummary: () => { [key: string]: { count: number; label: string } };
 }
 
 const EmployeeContext = createContext<EmployeeContextType | undefined>(undefined);
 
-// Convert ERP employee data to Employee interface
+// Convert ERP employee data to Employee interface (DatcoDemoData2.json)
 const convertERPEmployeeToEmployee = (erpEmployee: any): Employee => {
   return {
     id: `ERP-${erpEmployee.사번}`,
@@ -37,6 +38,39 @@ const convertERPEmployeeToEmployee = (erpEmployee: any): Employee => {
     dataSource: "erp" as const,
     dataSourceLabel: "닷코 시연 데이터"
   };
+};
+
+// Convert massive ERP employee data to Employee interface
+const convertMassiveERPEmployeeToEmployee = (erpEmployee: any): Employee => {
+  return {
+    id: `MASSIVE-${erpEmployee.id}`,
+    employeeId: erpEmployee.id,
+    name: erpEmployee.name,
+    position: erpEmployee.position,
+    department: erpEmployee.department,
+    email: erpEmployee.email,
+    phone: erpEmployee.phone,
+    hireDate: erpEmployee.hireDate,
+    salary: erpEmployee.salary,
+    status: erpEmployee.status === 'active' ? '재직' : '퇴직',
+    workType: erpEmployee.workType === 'full_time' ? '정규직' : '계약직',
+    manager: erpEmployee.manager || '',
+    skills: erpEmployee.skills || [],
+    performanceScore: erpEmployee.performanceScore || 85,
+    dataSource: "massive" as const,
+    dataSourceLabel: "대량 ERP 데이터"
+  };
+};
+
+// Get massive ERP employees data
+const getMassiveERPEmployees = (): Employee[] => {
+  try {
+    const massiveData = generateMassiveERPData();
+    return massiveData.employees.map(convertMassiveERPEmployeeToEmployee);
+  } catch (error) {
+    console.warn('Failed to load massive ERP data:', error);
+    return [];
+  }
 };
 
 // Original generated employee data
@@ -219,7 +253,7 @@ export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }
     return employees.filter(emp => emp.status === "재직");
   };
 
-  const getEmployeesByDataSource = (dataSource: "generated" | "erp" | "demo"): Employee[] => {
+  const getEmployeesByDataSource = (dataSource: "generated" | "erp" | "demo" | "massive"): Employee[] => {
     return employees.filter(emp => emp.dataSource === dataSource);
   };
 
