@@ -3,65 +3,106 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
+import { 
+  Search, 
+  Filter, 
+  Download, 
+  Plus, 
+  Edit, 
+  Eye, 
+  DollarSign, 
+  Calendar, 
+  Users, 
+  TrendingUp,
+  Calculator,
+  FileText,
+  CheckCircle,
+  Clock
+} from "lucide-react";
 import { useEmployees } from "../context/EmployeeContext";
 import type { PayrollRecord } from "../types/employee";
-import {
-  Search,
-  Plus,
-  Filter,
-  Eye,
-  Download,
-  Calculator,
-  DollarSign,
-  TrendingUp,
-  Users,
-  FileText,
-  Calendar,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
+import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from "../data/massiveERPData";
 import styles from "./PayrollPage.module.css";
 
 
-// 실제 직원 데이터를 기반으로 급여 기록을 생성하는 함수
-const generatePayrollRecordsFromEmployees = (employees: any[]) => {
-  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM 형식
-  
-  return employees
-    .filter(emp => emp.status === "재직")
-    .map((employee) => ({
-      id: `payroll-${employee.employeeId}`,
-      employeeId: employee.employeeId,
-      employeeName: employee.name,
-      department: employee.department,
-      position: employee.position,
-      period: currentMonth,
-      baseSalary: employee.salary,
-      allowances: Math.floor(employee.salary * 0.1), // 기본급의 10%로 설정
-      overtime: 0, // 초기값 0
-      deductions: Math.floor(employee.salary * 0.03), // 기본급의 3%로 설정
-      tax: Math.floor(employee.salary * 0.15), // 기본급의 15%로 설정
-      netPay: employee.salary + Math.floor(employee.salary * 0.1) - Math.floor(employee.salary * 0.03) - Math.floor(employee.salary * 0.15),
-      status: "draft" as const,
-      payDate: "",
-    }));
-};
 
 const statusConfig = {
   draft: { label: "작성중", color: "secondary", icon: FileText },
   approved: { label: "승인됨", color: "default", icon: CheckCircle },
   paid: { label: "지급완료", color: "success", icon: DollarSign },
-  cancelled: { label: "취소됨", color: "destructive", icon: AlertCircle },
+  cancelled: { label: "취소됨", color: "destructive", icon: Clock },
 };
 
-export const PayrollPage: React.FC = () => {
+
+// 샘플 급여 데이터 생성 함수
+const getSamplePayrollRecords = (): PayrollRecord[] => {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  
+  return [
+    {
+      id: "payroll-sample-001",
+      employeeId: "EMP001",
+      employeeName: "김철수",
+      department: "개발팀",
+      position: "시니어 개발자",
+      period: currentMonth,
+      baseSalary: 5500000,
+      allowances: 550000,
+      overtime: 200000,
+      deductions: 165000,
+      tax: 825000,
+      netPay: 5260000,
+      status: "paid",
+      payDate: "2025-09-25",
+    },
+    {
+      id: "payroll-sample-002",
+      employeeId: "EMP002",
+      employeeName: "이영희",
+      department: "마케팅팀",
+      position: "마케팅 매니저",
+      period: currentMonth,
+      baseSalary: 4800000,
+      allowances: 480000,
+      overtime: 150000,
+      deductions: 144000,
+      tax: 720000,
+      netPay: 4566000,
+      status: "approved",
+      payDate: "",
+    },
+    {
+      id: "payroll-sample-003",
+      employeeId: "EMP003",
+      employeeName: "박민수",
+      department: "영업팀",
+      position: "영업 대표",
+      period: currentMonth,
+      baseSalary: 4200000,
+      allowances: 420000,
+      overtime: 100000,
+      deductions: 126000,
+      tax: 630000,
+      netPay: 3964000,
+      status: "draft",
+      payDate: "",
+    }
+  ];
+};
+
+export function PayrollPage() {
   const { employees, getEmployeeById, getActiveEmployees } = useEmployees();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
-  const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
+  const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PayrollRecord["status"] | "all">("all");
+  const [sortBy, setSortBy] = useState<"name" | "department" | "netPay" | "status">("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [calculationData, setCalculationData] = useState({
     employeeId: "",
@@ -72,15 +113,114 @@ export const PayrollPage: React.FC = () => {
     overtimeRate: 1.5
   });
 
-  // 직원 데이터가 변경될 때마다 급여 기록을 업데이트
-  useEffect(() => {
-    if (employees.length > 0) {
-      const generatedRecords = generatePayrollRecordsFromEmployees(employees);
-      setPayrollRecords(generatedRecords);
-    }
-  }, [employees]);
+  // ERP 인원마스터 데이터를 기반으로 급여 데이터 생성
+  const getERPPayrollRecords = (): PayrollRecord[] => {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const erpData = erpDataJson.sheets.인원마스터 || [];
+    
+    return erpData.map((emp: any, index: number) => {
+      const monthlyWorkHours = 173;
+      // ERP 데이터에서 기본시급을 사용하여 월급 계산
+      const baseHourlyRate = emp.기본시급 || 12000;
+      const overtimeHourlyRate = emp.잔업시급 || 18000;
+      const specialWorkHourlyRate = emp.특근시급 || 24000;
+      
+      const baseSalary = baseHourlyRate * monthlyWorkHours;
+      const allowances = Math.floor(baseSalary * 0.1);
+      const overtime = Math.floor(baseSalary * 0.15);
+      const grossPay = baseSalary + allowances + overtime;
+      const deductions = Math.floor(grossPay * 0.09);
+      const tax = Math.floor(grossPay * 0.08);
+      const netPay = grossPay - deductions - tax;
+      const statuses: PayrollRecord["status"][] = ["paid", "approved", "draft"];
+      const status = statuses[index % statuses.length];
+      
+      return {
+        id: `payroll-erp-${emp.사번}`,
+        employeeId: emp.사번,
+        employeeName: emp.성명,
+        department: emp.직무,
+        position: emp.직무,
+        period: currentMonth,
+        baseSalary,
+        allowances,
+        overtime,
+        deductions,
+        tax,
+        netPay,
+        status,
+        payDate: status === "paid" ? "2025-09-25" : "",
+        // ERP 인원마스터 추가 속성
+        grade: emp.등급,
+        productionLine: emp.라인,
+        standardCycleTimeRail: emp["표준CT초(레일)"],
+        standardCycleTimeFrame: emp["표준CT초(프레임)"],
+        baseHourlyRate: emp.기본시급,
+        overtimeHourlyRate: emp.잔업시급,
+        specialWorkHourlyRate: emp.특근시급,
+      };
+    });
+  };
 
-  const filteredRecords = payrollRecords.filter((record) => {
+  // Massive ERP 데이터에서 payrollRecords를 급여 기록으로 변환
+  const getMassiveERPPayrollRecords = (): PayrollRecord[] => {
+    try {
+      const massiveData = generateMassiveERPData();
+      console.log('🔍 Massive ERP Payroll Records Length:', massiveData.payrollRecords?.length || 0);
+      
+      const payrollRecords = massiveData.payrollRecords || [];
+      
+      return payrollRecords.map((record: any) => {
+        console.log('🔍 Processing payroll record:', record);
+        
+        // 급여 상태를 랜덤하게 생성 (실제 ERP 데이터에는 status 필드가 없음)
+        const statuses: PayrollRecord["status"][] = ['draft', 'approved', 'paid'];
+        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+        
+        return {
+          id: `massive-${record.id}`,
+          employeeId: record.employeeId,
+          employeeName: record.employeeName,
+          department: record.department,
+          position: record.position,
+          period: record.payPeriod, // payPeriod -> period
+          baseSalary: record.baseSalary,
+          allowances: record.allowances,
+          overtime: record.overtimePay, // overtimePay -> overtime
+          deductions: record.totalDeductions, // totalDeductions -> deductions
+          tax: record.incomeTax, // incomeTax -> tax
+          netPay: record.netPay,
+          status: randomStatus,
+          payDate: record.payDate ? record.payDate.toISOString().split('T')[0] : "", // Date -> string
+        };
+      });
+    } catch (error) {
+      console.error('❌ Error processing massive ERP payroll records:', error);
+      return [];
+    }
+  };
+
+  // 현재 급여 기록 가져오기
+  const getCurrentPayrollRecords = (): PayrollRecord[] => {
+    if (selectedDataSource === "sample") {
+      return getSamplePayrollRecords();
+    } else if (selectedDataSource === "massive") {
+      return getMassiveERPPayrollRecords();
+    } else {
+      // ERP 인원마스터 데이터 기반 급여 기록
+      return getERPPayrollRecords();
+    }
+  };
+
+  // 데이터 소스 변경 시 급여 기록 업데이트
+  useEffect(() => {
+    const records = getCurrentPayrollRecords();
+    setPayrollRecords(records);
+  }, [selectedDataSource]);
+
+  const currentPayrollRecords = getCurrentPayrollRecords();
+
+  const filteredRecords = currentPayrollRecords.filter((record) => {
     const matchesSearch =
       record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -102,8 +242,8 @@ export const PayrollPage: React.FC = () => {
     return <StatusIcon className={styles.statusIcon} />;
   };
 
-  const totalPayroll = payrollRecords.reduce((sum, record) => sum + record.netPay, 0);
-  const totalTax = payrollRecords.reduce((sum, record) => sum + record.tax, 0);
+  const totalPayroll = currentPayrollRecords.reduce((sum, record) => sum + record.netPay, 0);
+  const totalTax = currentPayrollRecords.reduce((sum, record) => sum + record.tax, 0);
   const departments = [...new Set(employees.map((e) => e.department))];
 
   // Salary calculation function
@@ -191,6 +331,13 @@ export const PayrollPage: React.FC = () => {
       ['성명', record.employeeName],
       ['부서', record.department],
       ['직급', record.position],
+      ...(record.grade ? [['등급', record.grade]] : []),
+      ...(record.productionLine ? [['라인', record.productionLine]] : []),
+      ...(record.baseHourlyRate ? [['기본시급', record.baseHourlyRate.toLocaleString()]] : []),
+      ...(record.overtimeHourlyRate ? [['잔업시급', record.overtimeHourlyRate.toLocaleString()]] : []),
+      ...(record.specialWorkHourlyRate ? [['특근시급', record.specialWorkHourlyRate.toLocaleString()]] : []),
+      ...(record.standardCycleTimeRail ? [['표준CT초(레일)', record.standardCycleTimeRail.toString()]] : []),
+      ...(record.standardCycleTimeFrame ? [['표준CT초(프레임)', record.standardCycleTimeFrame.toString()]] : []),
       ['급여기간', record.period],
       ['지급일', record.payDate],
       [''],
@@ -299,7 +446,7 @@ export const PayrollPage: React.FC = () => {
             <div className={styles.statContent}>
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>처리 직원 수</span>
-                <span className={styles.statValue}>{payrollRecords.length}명</span>
+                <span className={styles.statValue}>{currentPayrollRecords.length}명</span>
               </div>
               <div className={styles.statIcon}>
                 <Users />
@@ -311,7 +458,7 @@ export const PayrollPage: React.FC = () => {
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>지급 완료율</span>
                 <span className={styles.statValue}>
-                  {Math.round((payrollRecords.filter((r) => r.status === "paid").length / payrollRecords.length) * 100)}%
+                  {currentPayrollRecords.length > 0 ? Math.round((currentPayrollRecords.filter((r) => r.status === "paid").length / currentPayrollRecords.length) * 100) : 0}%
                 </span>
               </div>
               <div className={styles.statIcon}>
@@ -322,6 +469,35 @@ export const PayrollPage: React.FC = () => {
         </div>
 
         <div className={styles.controls}>
+          {/* 데이터 소스 선택 */}
+          <div className={styles.filterGroup}>
+            {/* <label className={styles.filterLabel}>데이터 소스</label> */}
+            <select
+              className={styles.filterSelect}
+              value={selectedDataSource}
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
+            >
+              <option value="erp">닷코 시연 데이터</option>
+              <option value="sample">생성된 샘플 데이터</option>
+              <option value="massive">대량 ERP 데이터 (payrollRecords 포함)</option>
+            </select>
+          </div>
+          
+          {/* 데이터 소스 표시 배지 */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: '500',
+            backgroundColor: selectedDataSource === 'erp' ? '#3b82f6' : selectedDataSource === 'massive' ? '#10b981' : '#f59e0b',
+            color: 'white',
+            marginLeft: '8px'
+          }}>
+            {selectedDataSource === 'erp' ? '닷코 시연 데이터' : selectedDataSource === 'massive' ? '대량 ERP 데이터' : '생성된 샘플 데이터'}
+          </div>
+          
           <div className={styles.searchBox}>
             <Search className={styles.searchIcon} />
             <Input
@@ -334,7 +510,7 @@ export const PayrollPage: React.FC = () => {
 
           <div className={styles.filterSection}>
             <Filter className={styles.filterIcon} />
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={styles.filterSelect}>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PayrollRecord["status"] | "all")} className={styles.filterSelect}>
               <option value="all">모든 상태</option>
               <option value="draft">작성중</option>
               <option value="approved">승인됨</option>
@@ -365,6 +541,8 @@ export const PayrollPage: React.FC = () => {
                     <span className={styles.employeeId}>{record.employeeId}</span>
                     <span className={styles.department}>{record.department}</span>
                     <span className={styles.position}>{record.position}</span>
+                    {record.grade && <span className={styles.grade}>{record.grade}</span>}
+                    {record.productionLine && <span className={styles.productionLine}>{record.productionLine}</span>}
                   </div>
                 </div>
                 <div className={styles.cardActions}>
@@ -452,6 +630,13 @@ export const PayrollPage: React.FC = () => {
                     <div>사번: {selectedRecord.employeeId}</div>
                     <div>부서: {selectedRecord.department}</div>
                     <div>직급: {selectedRecord.position}</div>
+                    {selectedRecord.grade && <div>등급: {selectedRecord.grade}</div>}
+                    {selectedRecord.productionLine && <div>라인: {selectedRecord.productionLine}</div>}
+                    {selectedRecord.baseHourlyRate && <div>기본시급: {selectedRecord.baseHourlyRate.toLocaleString()}원</div>}
+                    {selectedRecord.overtimeHourlyRate && <div>잔업시급: {selectedRecord.overtimeHourlyRate.toLocaleString()}원</div>}
+                    {selectedRecord.specialWorkHourlyRate && <div>특근시급: {selectedRecord.specialWorkHourlyRate.toLocaleString()}원</div>}
+                    {selectedRecord.standardCycleTimeRail && <div>표준CT초(레일): {selectedRecord.standardCycleTimeRail}초</div>}
+                    {selectedRecord.standardCycleTimeFrame && <div>표준CT초(프레임): {selectedRecord.standardCycleTimeFrame}초</div>}
                   </div>
                 </div>
                 <div className={styles.periodSection}>

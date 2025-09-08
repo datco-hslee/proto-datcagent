@@ -12,14 +12,39 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  gap: 2rem;
+}
+
+.titleSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .titleSection h1 {
   font-size: 2rem;
   font-weight: 700;
   color: #1e293b;
-  margin-bottom: 0.5rem;
+  margin: 0;
+}
+
+.pageTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.pageDescription {
+  color: #64748b;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.dataSourceBadge {
+  margin-top: 0.5rem;
 }
 
 .subtitle {
@@ -111,6 +136,14 @@
   gap: 1rem;
   margin-bottom: 2rem;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.filterControls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .searchBox {
@@ -456,6 +489,17 @@
   .controls {
     flex-direction: column;
     align-items: stretch;
+    gap: 1rem;
+  }
+
+  .filterControls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .searchBox {
+    max-width: none;
   }
 
   .ordersGrid {

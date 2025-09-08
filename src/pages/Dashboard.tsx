@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+// import { ExcelDataManager } from "@/components/dashboard/ExcelDataManager";
 
 export function Dashboard() {
   return (
@@ -50,6 +51,7 @@ export function Dashboard() {
           description="월평균 기준"
         />
       </div>
+
 
       {/* Main Content Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

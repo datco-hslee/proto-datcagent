@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Eye, Edit3, Plus, Search, Filter, Calendar, TrendingUp, TrendingDown, AlertTriangle, Trash2, DollarSign, Target, AlertCircle, CheckCircle, BarChart3, PieChart } from "lucide-react";
 import styles from "./BudgetPage.module.css";
+import erpDataJson from "../../DatcoDemoData2.json";
 
 interface BudgetItem {
   id: string;
@@ -142,38 +143,89 @@ const priorityConfig = {
   high: { label: "높음", color: "destructive" },
 };
 
-export const BudgetPage: React.FC = () => {
-  const [budgets, setBudgets] = useState<BudgetItem[]>(mockBudgetItems);
-  const [selectedBudget, setSelectedBudget] = useState<BudgetItem | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [showPlanningModal, setShowPlanningModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<BudgetItem | null>(null);
-  const [newBudget, setNewBudget] = useState({
-    budgetName: "",
-    category: "",
-    plannedAmount: "",
-    description: "",
-    priority: "medium" as "high" | "medium" | "low",
-    startDate: "",
-    endDate: "",
-    department: ""
+// ERP 예산 데이터 반환 함수 (회계 데이터 기반)
+const getERPBudgetItems = (): BudgetItem[] => {
+  const arApData = erpDataJson.sheets?.["회계(AR_AP)"] || [];
+  
+  // 회계 데이터를 예산 항목으로 변환
+  const budgetMap = new Map<string, any>();
+  
+  arApData.forEach((item: any) => {
+    const category = item.계정과목 || "기타";
+    const key = `${category}-${item.거래처명 || "일반"}`;
+    
+    if (!budgetMap.has(key)) {
+      budgetMap.set(key, {
+        category: category,
+        department: item.부서 || "재무팀",
+        budgetName: `${category} 예산`,
+        plannedAmount: 0,
+        actualAmount: 0,
+        items: []
+      });
+    }
+    
+    const budget = budgetMap.get(key);
+    const amount = parseFloat(item.금액?.toString().replace(/,/g, '') || '0') || 0;
+    
+    budget.actualAmount += Math.abs(amount);
+    budget.plannedAmount = budget.actualAmount * 1.2; // 실제 금액의 120%를 계획 금액으로 설정
+    budget.items.push(item);
   });
-  const [editBudget, setEditBudget] = useState({
-    budgetName: "",
-    category: "",
-    plannedAmount: "",
-    description: "",
-    priority: "medium" as "high" | "medium" | "low",
-    startDate: "",
-    endDate: "",
-    department: "",
-    owner: ""
-  });
+  
+  return Array.from(budgetMap.entries()).map(([key, budget], index) => ({
+    id: `erp-budget-${index}`,
+    category: budget.category,
+    department: budget.department,
+    budgetName: budget.budgetName,
+    plannedAmount: Math.round(budget.plannedAmount),
+    actualAmount: Math.round(budget.actualAmount),
+    remainingAmount: Math.round(budget.plannedAmount - budget.actualAmount),
+    period: "2024",
+    startDate: "2024-01-01",
+    endDate: "2024-12-31",
+    status: budget.actualAmount > budget.plannedAmount ? "over_budget" : 
+            budget.actualAmount < budget.plannedAmount * 0.8 ? "under_budget" : "on_track",
+    priority: budget.actualAmount > 50000000 ? "high" : 
+              budget.actualAmount > 20000000 ? "medium" : "low",
+    owner: "재무담당자",
+    description: `${budget.category} 관련 예산 관리`,
+    currency: "KRW",
+  }));
+};
 
-  const filteredBudgets = budgets.filter((budget) => {
+// 샘플 예산 데이터 반환 함수
+const getSampleBudgetItems = (): BudgetItem[] => {
+  return mockBudgetItems;
+};
+
+// 현재 선택된 데이터 소스에 따른 예산 데이터 반환 함수
+const getCurrentBudgetItems = (dataSource: "erp" | "sample"): BudgetItem[] => {
+  return dataSource === "erp" ? getERPBudgetItems() : getSampleBudgetItems();
+};
+
+export const BudgetPage: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selectedBudget, setSelectedBudget] = useState<BudgetItem | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newBudget, setNewBudget] = useState<Partial<BudgetItem>>({});
+  const [editingBudget, setEditingBudget] = useState<string | null>(null);
+  const [editedBudget, setEditedBudget] = useState<Partial<BudgetItem>>({});
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editBudget, setEditBudget] = useState<Partial<BudgetItem>>({});
+  const [showPlanningModal, setShowPlanningModal] = useState(false);
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([]);
+
+  // 데이터 소스 변경 시 예산 데이터 업데이트
+  useEffect(() => {
+    const newBudgetItems = getCurrentBudgetItems(selectedDataSource);
+    setBudgetItems(newBudgetItems);
+  }, [selectedDataSource]);
+
+  const filteredBudgets = budgetItems.filter((budget) => {
     const matchesSearch =
       budget.budgetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       budget.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -213,7 +265,7 @@ export const BudgetPage: React.FC = () => {
     setNewBudget({
       budgetName: "",
       category: "",
-      plannedAmount: "",
+      plannedAmount: 0,
       description: "",
       priority: "medium",
       startDate: "",
@@ -223,11 +275,11 @@ export const BudgetPage: React.FC = () => {
   };
 
   const handleEditBudget = (budget: BudgetItem) => {
-    setEditingBudget(budget);
+    setEditingBudget(budget.id);
     setEditBudget({
       budgetName: budget.budgetName,
       category: budget.category,
-      plannedAmount: budget.plannedAmount.toString(),
+      plannedAmount: budget.plannedAmount,
       description: budget.description,
       priority: budget.priority,
       startDate: budget.startDate,
@@ -247,7 +299,7 @@ export const BudgetPage: React.FC = () => {
 
   const handleDeleteBudget = (budgetId: string) => {
     if (window.confirm('정말로 이 예산을 삭제하시겠습니까?')) {
-      setBudgets(budgets.filter(budget => budget.id !== budgetId));
+      setBudgetItems(budgetItems.filter(budget => budget.id !== budgetId));
       console.log('예산 삭제됨:', budgetId);
     }
   };
@@ -258,7 +310,7 @@ export const BudgetPage: React.FC = () => {
     setEditBudget({
       budgetName: "",
       category: "",
-      plannedAmount: "",
+      plannedAmount: 0,
       description: "",
       priority: "medium",
       startDate: "",
@@ -269,19 +321,27 @@ export const BudgetPage: React.FC = () => {
   };
 
   // 통계 계산
-  const totalPlanned = budgets.reduce((sum, item) => sum + item.plannedAmount, 0);
-  const totalActual = budgets.reduce((sum, item) => sum + item.actualAmount, 0);
-  const totalRemaining = budgets.reduce((sum, item) => sum + item.remainingAmount, 0);
-  const overBudgetCount = budgets.filter((item) => item.status === "over_budget").length;
+  const totalPlanned = budgetItems.reduce((sum, item) => sum + item.plannedAmount, 0);
+  const totalActual = budgetItems.reduce((sum, item) => sum + item.actualAmount, 0);
+  const totalRemaining = budgetItems.reduce((sum, item) => sum + item.remainingAmount, 0);
+  const overBudgetCount = budgetItems.filter((item) => item.status === "over_budget").length;
 
-  const categories = [...new Set(budgets.map((item) => item.category))];
+  const categories = [...new Set(budgetItems.map((item) => item.category))];
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.headerContent}>
           <div className={styles.titleSection}>
-            <h1 className={styles.title}>예산 관리</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h1 className={styles.title}>예산 관리</h1>
+              <Badge 
+                variant={selectedDataSource === "erp" ? "default" : "secondary"}
+                className={`${selectedDataSource === "erp" ? "bg-blue-500" : "bg-yellow-500"} text-white text-xs px-2 py-1`}
+              >
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              </Badge>
+            </div>
             <p className={styles.subtitle}>예산 계획과 실행을 체계적으로 관리하세요</p>
           </div>
           <Button className={styles.addButton} onClick={() => setShowPlanningModal(true)}>
@@ -350,6 +410,16 @@ export const BudgetPage: React.FC = () => {
 
           <div className={styles.filterSection}>
             <Filter className={styles.filterIcon} />
+            
+            <select 
+              value={selectedDataSource} 
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")} 
+              className={styles.filterSelect}
+            >
+              <option value="erp">닷코 시연 데이터</option>
+              <option value="sample">생성된 샘플 데이터</option>
+            </select>
+            
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={styles.filterSelect}>
               <option value="all">모든 상태</option>
               <option value="on_track">진행중</option>

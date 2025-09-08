@@ -11,7 +11,14 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  ChevronDown,
 } from "lucide-react";
+
+// ERP 데이터 import
+import erpDataJson from '../../DatcoDemoData2.json';
+
+// ERP 데이터 변수 정의
+const erpData = erpDataJson;
 
 interface SalesMetric {
   label: string;
@@ -228,8 +235,156 @@ const getSalesPerformance = (): SalesPersonPerformance[] => {
 
 const SALES_PERFORMANCE = getSalesPerformance();
 
+// ERP 데이터에서 영업 분석 데이터 추출
+const getERPSalesMetrics = (): SalesMetric[] => {
+  const orders = erpData.sheets.수주;
+  const totalRevenue = orders.reduce((sum: number, order: any) => sum + order.수주금액, 0);
+  const avgOrderAmount = totalRevenue / orders.length;
+  
+  return [
+    {
+      label: "월간 매출",
+      value: `₩${totalRevenue.toLocaleString()}`,
+      change: 15.2,
+      trend: "up",
+      period: "vs 지난달",
+    },
+    {
+      label: "신규 리드",
+      value: `${orders.length * 8}`,
+      change: 12.5,
+      trend: "up",
+      period: "vs 지난달",
+    },
+    {
+      label: "전환율",
+      value: "28.7%",
+      change: 3.2,
+      trend: "up",
+      period: "vs 지난달",
+    },
+    {
+      label: "평균 거래액",
+      value: `₩${Math.round(avgOrderAmount).toLocaleString()}`,
+      change: 1.8,
+      trend: "up",
+      period: "vs 지난달",
+    },
+  ];
+};
+
+const getSampleSalesMetrics = (): SalesMetric[] => {
+  return SALES_METRICS;
+};
+
+const getERPMonthlyData = (): ChartData[] => {
+  const orders = erpData.sheets.수주;
+  const baseData = [
+    { month: "2025년 7월", revenue: 180000000, target: 200000000, leads: 120, conversion: 25.0 },
+    { month: "2025년 8월", revenue: 220000000, target: 210000000, leads: 140, conversion: 27.5 },
+    { month: "2025년 9월", revenue: orders.reduce((sum: number, order: any) => sum + order.수주금액, 0), target: 320000000, leads: orders.length * 8, conversion: 28.7 },
+  ];
+  
+  // 6개월 데이터로 확장
+  const extendedData = [
+    { month: "2025년 4월", revenue: 150000000, target: 180000000, leads: 100, conversion: 22.0 },
+    { month: "2025년 5월", revenue: 165000000, target: 185000000, leads: 110, conversion: 23.5 },
+    { month: "2025년 6월", revenue: 175000000, target: 190000000, leads: 115, conversion: 24.2 },
+    ...baseData
+  ];
+  
+  return extendedData;
+};
+
+const getSampleMonthlyData = (): ChartData[] => {
+  return MONTHLY_DATA;
+};
+
+const getERPSalesPerformance = (): SalesPersonPerformance[] => {
+  
+  // ERP 데이터에서 영업팀 직원 추출
+  const salesUsers = erpData.sheets.사용자권한.filter((user: any) => user.부서 === "영업팀");
+  
+  // ERP 데이터에 영업팀 직원이 없는 경우 기본 데이터 사용
+  if (salesUsers.length === 0) {
+    const salesPeople = [
+      {
+        id: "ERP-SALES-001",
+        name: "김영업",
+        position: "영업팀장",
+        department: "영업부",
+        performanceScore: 95,
+      },
+    ];
+    
+    return salesPeople.map((person, index) => {
+      const performanceMultiplier = person.performanceScore / 100;
+      let baseTarget = 50000000;
+      if (person.position.includes("팀장")) baseTarget = 150000000;
+      else if (person.position.includes("대리")) baseTarget = 100000000;
+      
+      const target = baseTarget;
+      const revenue = Math.round(target * performanceMultiplier * 1.2);
+      const leads = Math.round(25 + (person.performanceScore / 100) * 15 + index * 5);
+      const deals = Math.round(leads * (person.performanceScore / 100) * 0.35);
+      const conversionRate = Math.round((deals / leads) * 100 * 10) / 10;
+      
+      return {
+        id: person.id,
+        name: person.name,
+        revenue,
+        target,
+        leads,
+        deals,
+        conversionRate,
+        rank: index + 1,
+      };
+    });
+  }
+  
+  // ERP 데이터 기반 영업 성과 생성
+  const salesPeople = salesUsers.map((user: any, index: number) => ({
+    id: user.사용자ID,
+    name: user.사용자명,
+    position: user.권한레벨 === "MANAGER" ? "영업관리자" : "영업사원",
+    department: "영업부",
+    performanceScore: 90 - (index * 5), // 기본 성과점수
+  }));
+  
+  // 영업 성과 계산을 위한 기본 데이터
+  
+  return salesPeople.map((person, index) => {
+    const performanceMultiplier = person.performanceScore / 100;
+    let baseTarget = 50000000;
+    if (person.position.includes("팀장")) baseTarget = 150000000;
+    else if (person.position.includes("관리자")) baseTarget = 120000000;
+    
+    const target = baseTarget;
+    const revenue = Math.round(target * performanceMultiplier);
+    const leads = Math.round(30 + (person.performanceScore / 100) * 20);
+    const deals = Math.round(leads * (person.performanceScore / 100) * 0.3);
+    const conversionRate = Math.round((deals / leads) * 100 * 10) / 10;
+    
+    return {
+      id: person.id,
+      name: person.name,
+      revenue,
+      target,
+      leads,
+      deals,
+      conversionRate,
+      rank: index + 1,
+    };
+  }).sort((a, b) => b.revenue - a.revenue).map((emp, index) => ({ ...emp, rank: index + 1 }));
+};
+
+const getSampleSalesPerformance = (): SalesPersonPerformance[] => {
+  return SALES_PERFORMANCE;
+};
+
 export function SalesAnalyticsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("6months");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterCriteria, setFilterCriteria] = useState({
     department: "전체",
@@ -240,6 +395,19 @@ export function SalesAnalyticsPage() {
   });
   const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
 
+  // 현재 데이터 소스에 따른 데이터 반환
+  const getCurrentSalesMetrics = (): SalesMetric[] => {
+    return selectedDataSource === "erp" ? getERPSalesMetrics() : getSampleSalesMetrics();
+  };
+
+  const getCurrentMonthlyData = (): ChartData[] => {
+    return selectedDataSource === "erp" ? getERPMonthlyData() : getSampleMonthlyData();
+  };
+
+  const getCurrentSalesPerformance = (): SalesPersonPerformance[] => {
+    return selectedDataSource === "erp" ? getERPSalesPerformance() : getSampleSalesPerformance();
+  };
+
   // 기간별 데이터 필터링
   const getFilteredMonthlyData = () => {
     const periodMap = {
@@ -249,22 +417,33 @@ export function SalesAnalyticsPage() {
       "1year": 12
     };
     const months = periodMap[selectedPeriod as keyof typeof periodMap] || 6;
-    return MONTHLY_DATA.slice(-months);
+    return getCurrentMonthlyData().slice(-months);
   };
 
   // 필터링된 영업 성과 데이터
   const getFilteredSalesPerformance = () => {
-    return SALES_PERFORMANCE.filter(person => {
-      const employee = EMPLOYEES.find(emp => emp.id === person.id);
-      if (!employee) return false;
-      
-      const matchesDepartment = filterCriteria.department === "전체" || employee.department === filterCriteria.department;
-      const matchesPerformance = employee.performanceScore >= filterCriteria.performanceMin &&
-        employee.performanceScore <= filterCriteria.performanceMax;
-      const matchesRevenue = person.revenue >= filterCriteria.revenueMin && person.revenue <= filterCriteria.revenueMax;
-      
-      return matchesDepartment && matchesPerformance && matchesRevenue;
-    });
+    const currentPerformance = getCurrentSalesPerformance();
+    
+    if (selectedDataSource === "erp") {
+      // ERP 데이터의 경우 간단한 필터링
+      return currentPerformance.filter(person => {
+        const matchesRevenue = person.revenue >= filterCriteria.revenueMin && person.revenue <= filterCriteria.revenueMax;
+        return matchesRevenue;
+      });
+    } else {
+      // 샘플 데이터의 경우 기존 로직 사용
+      return currentPerformance.filter(person => {
+        const employee = EMPLOYEES.find(emp => emp.id === person.id);
+        if (!employee) return false;
+        
+        const matchesDepartment = filterCriteria.department === "전체" || employee.department === filterCriteria.department;
+        const matchesPerformance = employee.performanceScore >= filterCriteria.performanceMin &&
+          employee.performanceScore <= filterCriteria.performanceMax;
+        const matchesRevenue = person.revenue >= filterCriteria.revenueMin && person.revenue <= filterCriteria.revenueMax;
+        
+        return matchesDepartment && matchesPerformance && matchesRevenue;
+      });
+    }
   };
 
   // 버튼 핸들러들
@@ -358,15 +537,28 @@ export function SalesAnalyticsPage() {
   };
 
 
-  const getMaxRevenue = () => Math.max(...MONTHLY_DATA.map((d) => Math.max(d.revenue, d.target)));
+  const getMaxRevenue = () => Math.max(...getCurrentMonthlyData().map((d) => Math.max(d.revenue, d.target)));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", padding: "1.5rem" }}>
       {/* 헤더 */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <h1 style={{ fontSize: "1.875rem", fontWeight: "bold", marginBottom: "0.5rem" }}>영업 분석</h1>
-          <p style={{ color: "#6b7280" }}>영업 성과와 트렌드를 분석하고 인사이트를 확인하세요</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <div>
+            <h1 style={{ fontSize: "1.875rem", fontWeight: "bold", marginBottom: "0.5rem" }}>영업 분석</h1>
+            <p style={{ color: "#6b7280" }}>영업 성과와 트렌드를 분석하고 인사이트를 확인하세요</p>
+          </div>
+          <div style={{
+            padding: "0.375rem 0.75rem",
+            borderRadius: "0.375rem",
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
+            color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
+            border: `1px solid ${selectedDataSource === "erp" ? "#bfdbfe" : "#fde68a"}`
+          }}>
+            {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <button style={{
@@ -414,8 +606,46 @@ export function SalesAnalyticsPage() {
         </div>
       </div>
 
-      {/* 기간 선택 */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      {/* 데이터 소스 및 기간 선택 */}
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+        {/* 데이터 소스 선택 */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "#374151" }}>데이터 소스:</span>
+          <div style={{ position: "relative" }}>
+            <select
+              value={selectedDataSource}
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+              style={{
+                appearance: "none",
+                padding: "0.375rem 2rem 0.375rem 0.75rem",
+                border: "1px solid #d1d5db",
+                borderRadius: "0.375rem",
+                backgroundColor: "white",
+                fontSize: "0.875rem",
+                cursor: "pointer",
+                minWidth: "180px"
+              }}
+            >
+              <option value="erp">닷코 시연 데이터</option>
+              <option value="sample">생성된 샘플 데이터</option>
+            </select>
+            <ChevronDown style={{
+              position: "absolute",
+              right: "0.5rem",
+              top: "50%",
+              transform: "translateY(-50%)",
+              height: "1rem",
+              width: "1rem",
+              color: "#6b7280",
+              pointerEvents: "none"
+            }} />
+          </div>
+        </div>
+        
+        </div>
+        
+        {/* 기간 선택 */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
         <span style={{ fontSize: "0.875rem", fontWeight: 500, color: "#374151" }}>기간:</span>
         {[
           { value: "1month", label: "1개월" },
@@ -443,7 +673,7 @@ export function SalesAnalyticsPage() {
 
       {/* 주요 지표 */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.5rem" }}>
-        {SALES_METRICS.map((metric, index) => (
+        {getCurrentSalesMetrics().map((metric, index) => (
           <div key={index} style={{
             backgroundColor: "white",
             border: "1px solid #e5e7eb",

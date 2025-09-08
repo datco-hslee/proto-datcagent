@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -23,6 +23,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import styles from "./WorkInstructionPage.module.css";
+import { useWorkInstructions } from "../context/WorkInstructionContext";
+import erpDataJson from '../../DatcoDemoData2.json';
 
 interface WorkInstruction {
   id: string;
@@ -50,131 +52,10 @@ interface WorkInstruction {
     unit: string;
     available: number;
   }[];
+  customerName?: string;
+  orderAmount?: number;
 }
 
-const mockWorkInstructions: WorkInstruction[] = [
-  {
-    id: "1",
-    instructionNumber: "WI-2024-001",
-    productName: "스마트 센서 모듈",
-    productCode: "SSM-001",
-    bomId: "BOM-SSM-001",
-    quantity: 100,
-    unit: "EA",
-    priority: "high",
-    status: "in_progress",
-    assignedWorker: "김기술",
-    workStation: "조립라인 A",
-    estimatedTime: 480,
-    actualTime: 320,
-    startDate: "2024-01-20",
-    dueDate: "2024-01-22",
-    instructions: "1. PCB 보드 검사\n2. 센서 부품 조립\n3. 소프트웨어 설치\n4. 최종 테스트",
-    qualityCheck: true,
-    materials: [
-      { name: "PCB 보드", quantity: 100, unit: "EA", available: 100 },
-      { name: "센서 칩", quantity: 100, unit: "EA", available: 95 },
-      { name: "케이스", quantity: 100, unit: "EA", available: 100 },
-    ],
-  },
-  {
-    id: "2",
-    instructionNumber: "WI-2024-002",
-    productName: "자동화 제어기",
-    productCode: "AC-002",
-    bomId: "BOM-AC-002",
-    quantity: 50,
-    unit: "EA",
-    priority: "normal",
-    status: "pending",
-    assignedWorker: "이제조",
-    workStation: "조립라인 B",
-    estimatedTime: 360,
-    startDate: "2024-01-22",
-    dueDate: "2024-01-24",
-    instructions: "1. 메인보드 조립\n2. 케이블 연결\n3. 펌웨어 업로드\n4. 기능 테스트",
-    qualityCheck: true,
-    materials: [
-      { name: "메인보드", quantity: 50, unit: "EA", available: 50 },
-      { name: "제어 케이블", quantity: 200, unit: "M", available: 180 },
-      { name: "제어 박스", quantity: 50, unit: "EA", available: 45 },
-    ],
-  },
-  {
-    id: "3",
-    instructionNumber: "WI-2024-003",
-    productName: "LED 조명 패널",
-    productCode: "LED-003",
-    bomId: "BOM-LED-003",
-    quantity: 200,
-    unit: "EA",
-    priority: "urgent",
-    status: "completed",
-    assignedWorker: "박전기",
-    workStation: "조립라인 C",
-    estimatedTime: 240,
-    actualTime: 220,
-    startDate: "2024-01-18",
-    dueDate: "2024-01-20",
-    completedDate: "2024-01-19",
-    instructions: "1. LED 칩 배치\n2. 회로 연결\n3. 방열판 부착\n4. 전기 안전 테스트",
-    qualityCheck: true,
-    materials: [
-      { name: "LED 칩", quantity: 800, unit: "EA", available: 800 },
-      { name: "방열판", quantity: 200, unit: "EA", available: 200 },
-      { name: "전원 드라이버", quantity: 200, unit: "EA", available: 200 },
-    ],
-  },
-  {
-    id: "4",
-    instructionNumber: "WI-2024-004",
-    productName: "모터 드라이브",
-    productCode: "MD-004",
-    bomId: "BOM-MD-004",
-    quantity: 75,
-    unit: "EA",
-    priority: "normal",
-    status: "paused",
-    assignedWorker: "최기계",
-    workStation: "조립라인 D",
-    estimatedTime: 420,
-    actualTime: 180,
-    startDate: "2024-01-21",
-    dueDate: "2024-01-25",
-    instructions: "1. 모터 마운트 조립\n2. 드라이브 회로 설치\n3. 케이블 하네스 연결\n4. 동작 테스트",
-    notes: "부품 공급 지연으로 일시 중단",
-    qualityCheck: false,
-    materials: [
-      { name: "모터 마운트", quantity: 75, unit: "EA", available: 75 },
-      { name: "드라이브 모듈", quantity: 75, unit: "EA", available: 50 },
-      { name: "연결 케이블", quantity: 300, unit: "M", available: 250 },
-    ],
-  },
-  {
-    id: "5",
-    instructionNumber: "WI-2024-005",
-    productName: "디스플레이 유닛",
-    productCode: "DU-005",
-    bomId: "BOM-DU-005",
-    quantity: 30,
-    unit: "EA",
-    priority: "low",
-    status: "cancelled",
-    assignedWorker: "정디스플레이",
-    workStation: "조립라인 E",
-    estimatedTime: 300,
-    startDate: "2024-01-19",
-    dueDate: "2024-01-23",
-    instructions: "1. 디스플레이 모듈 검사\n2. 터치패널 부착\n3. 인터페이스 연결\n4. 표시 테스트",
-    notes: "고객 주문 취소",
-    qualityCheck: false,
-    materials: [
-      { name: "디스플레이 패널", quantity: 30, unit: "EA", available: 30 },
-      { name: "터치 센서", quantity: 30, unit: "EA", available: 30 },
-      { name: "컨트롤러 보드", quantity: 30, unit: "EA", available: 30 },
-    ],
-  },
-];
 
 const priorityConfig = {
   low: { label: "낮음", color: "secondary" },
@@ -191,13 +72,191 @@ const statusConfig = {
   cancelled: { label: "취소", color: "destructive", icon: AlertCircle },
 };
 
-export const WorkInstructionPage: React.FC = () => {
+// Function to get work instructions from ERP data
+const getWorkInstructionsFromERPData = (): WorkInstruction[] => {
+  const workOrders = erpDataJson.sheets.작업지시 || [];
+  const productionPlans = erpDataJson.sheets.생산계획 || [];
+  const itemMaster = erpDataJson.sheets.품목마스터 || [];
+  const salesOrders = erpDataJson.sheets.수주 || [];
+  const customers = erpDataJson.sheets.거래처마스터 || [];
+  const bom = erpDataJson.sheets.BOM || [];
+  
+  // 작업지시와 생산계획을 모두 합쳐서 사용 (작업지시 우선, 나머지는 생산계획으로 보완)
+  const workOrderProductCodes = workOrders.map((wo: any) => wo.품목코드);
+  const additionalPlans = productionPlans.filter((plan: any) => !workOrderProductCodes.includes(plan.품목코드));
+  const baseData = [...workOrders, ...additionalPlans];
+  
+  return baseData.map((order: any, index: number) => {
+    const isWorkOrder = !!order.작업지시번호;
+    const productCode = order.품목코드;
+    const item = itemMaster.find((item: any) => item.품목코드 === productCode);
+    const salesOrder = salesOrders.find((so: any) => so.품목코드 === productCode);
+    const customer = salesOrder ? customers.find((c: any) => c.거래처코드 === salesOrder.거래처코드) : null;
+    const bomItems = bom.filter((b: any) => b.상위품목코드 === productCode);
+    
+    const statusMap: { [key: string]: WorkInstruction['status'] } = {
+      'RELEASED': 'in_progress',
+      'PLANNED': 'pending',
+      'COMPLETED': 'completed',
+      'CANCELLED': 'cancelled',
+      '확정': 'pending',
+      '계획': 'pending'
+    };
+    
+    const materials = bomItems.map((bomItem: any) => {
+      const materialItem = itemMaster.find((item: any) => item.품목코드 === bomItem.하위품목코드);
+      const quantity = isWorkOrder ? order.지시수량 : order.계획수량;
+      const requiredQty = (bomItem.소요수량 || 1) * quantity;
+      return {
+        name: materialItem?.품목명 || bomItem.하위품목코드,
+        quantity: requiredQty,
+        unit: materialItem?.단위 || "EA",
+        available: Math.floor(requiredQty * 0.9) // 90% 가용성 시뮬레이션
+      };
+    });
+    
+    // 작업자 배정 로직
+    const workers = ["김생산", "이제조", "박품질", "최기계", "정센서"];
+    const assignedWorker = workers[index % workers.length];
+    
+    // 날짜 계산
+    const startDate = isWorkOrder ? order.시작일자 : `2025-09-${10 + index * 5}`;
+    const dueDate = isWorkOrder ? order.완료일자 : `2025-09-${15 + index * 5}`;
+    
+    return {
+      id: `erp-${isWorkOrder ? order.작업지시번호 : order.계획번호}`,
+      instructionNumber: isWorkOrder ? order.작업지시번호 : `WI-${order.계획번호}`,
+      productName: item?.품목명 || productCode,
+      productCode: productCode,
+      bomId: `BOM-${productCode}`,
+      quantity: isWorkOrder ? order.지시수량 : order.계획수량,
+      unit: item?.단위 || "EA",
+      priority: salesOrder ? "high" : "normal" as const,
+      status: statusMap[order.상태] || 'pending',
+      assignedWorker: assignedWorker,
+      workStation: order.라인 || "LINE-1",
+      estimatedTime: 480, // 8시간 기본값
+      startDate: startDate,
+      dueDate: dueDate,
+      instructions: `1. ${item?.품목명 || productCode} 생산 준비\n2. 자재 투입 및 가공\n3. 품질 검사 실시\n4. 완제품 포장 및 출고`,
+      qualityCheck: true,
+      materials,
+      customerName: customer?.거래처명,
+      orderAmount: salesOrder?.수주금액
+    };
+  });
+};
+
+// Function to get sample work instructions
+const getSampleWorkInstructions = (): WorkInstruction[] => {
+  return [
+    {
+      id: "sample-wi-001",
+      instructionNumber: "WI-2024-001",
+      productName: "스마트 센서 모듈",
+      productCode: "SSM-001",
+      bomId: "BOM-SSM-001",
+      quantity: 500,
+      unit: "EA",
+      priority: "high",
+      status: "in_progress",
+      assignedWorker: "김기술",
+      workStation: "조립라인 A",
+      estimatedTime: 360,
+      actualTime: 280,
+      startDate: "2024-09-01",
+      dueDate: "2024-09-05",
+      instructions: "1. 센서 모듈 부품 준비\n2. PCB 조립 작업\n3. 센서 캘리브레이션\n4. 품질 테스트 완료",
+      qualityCheck: true,
+      materials: [
+        { name: "MCU 칩셋", quantity: 500, unit: "EA", available: 480 },
+        { name: "센서 보드", quantity: 500, unit: "EA", available: 500 },
+        { name: "케이스", quantity: 500, unit: "EA", available: 450 }
+      ],
+      customerName: "A전자",
+      orderAmount: 25000000
+    },
+    {
+      id: "sample-wi-002",
+      instructionNumber: "WI-2024-002",
+      productName: "IoT 컨트롤러",
+      productCode: "IOT-002",
+      bomId: "BOM-IOT-002",
+      quantity: 300,
+      unit: "EA",
+      priority: "normal",
+      status: "pending",
+      assignedWorker: "이제조",
+      workStation: "조립라인 B",
+      estimatedTime: 420,
+      startDate: "2024-09-10",
+      dueDate: "2024-09-15",
+      instructions: "1. 컨트롤러 부품 검수\n2. 메인보드 조립\n3. 펌웨어 설치\n4. 기능 테스트 수행",
+      qualityCheck: true,
+      materials: [
+        { name: "제어 보드", quantity: 300, unit: "EA", available: 300 },
+        { name: "통신 모듈", quantity: 300, unit: "EA", available: 280 },
+        { name: "외부 케이스", quantity: 300, unit: "EA", available: 300 }
+      ],
+      customerName: "B기술",
+      orderAmount: 18000000
+    },
+    {
+      id: "sample-wi-003",
+      instructionNumber: "WI-2024-003",
+      productName: "산업용 디스플레이",
+      productCode: "IND-003",
+      bomId: "BOM-IND-003",
+      quantity: 200,
+      unit: "EA",
+      priority: "urgent",
+      status: "completed",
+      assignedWorker: "박전기",
+      workStation: "테스트 라인",
+      estimatedTime: 600,
+      actualTime: 580,
+      startDate: "2024-08-20",
+      dueDate: "2024-08-25",
+      completedDate: "2024-08-24",
+      instructions: "1. 디스플레이 패널 검사\n2. 백라이트 조립\n3. 터치 센서 부착\n4. 최종 품질 검증",
+      notes: "고객 요청으로 긴급 생산 완료",
+      qualityCheck: true,
+      materials: [
+        { name: "LCD 패널", quantity: 200, unit: "EA", available: 200 },
+        { name: "백라이트 유닛", quantity: 200, unit: "EA", available: 200 },
+        { name: "터치 센서", quantity: 200, unit: "EA", available: 200 }
+      ],
+      customerName: "C산업",
+      orderAmount: 40000000
+    }
+  ];
+};
+
+export function WorkInstructionPage() {
+  const { workInstructions, addWorkInstruction, deleteWorkInstruction } = useWorkInstructions();
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [selectedInstruction, setSelectedInstruction] = useState<WorkInstruction | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingInstruction, setEditingInstruction] = useState<WorkInstruction | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [currentInstructions, setCurrentInstructions] = useState<WorkInstruction[]>([]);
+  
+  // Get current instructions based on selected data source
+  const getCurrentInstructions = (): WorkInstruction[] => {
+    if (selectedDataSource === "erp") {
+      return getWorkInstructionsFromERPData();
+    } else {
+      return getSampleWorkInstructions();
+    }
+  };
+  
+  // Update instructions when data source changes
+  useEffect(() => {
+    setCurrentInstructions(getCurrentInstructions());
+  }, [selectedDataSource]);
   const [newInstructionData, setNewInstructionData] = useState({
     productName: "",
     productCode: "",
@@ -212,14 +271,16 @@ export const WorkInstructionPage: React.FC = () => {
     instructions: ""
   });
 
-  const filteredInstructions = mockWorkInstructions.filter((instruction) => {
-    const matchesSearch =
+  const filteredInstructions = currentInstructions.filter((instruction: WorkInstruction) => {
+    const matchesSearch = 
       instruction.instructionNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instruction.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instruction.assignedWorker.toLowerCase().includes(searchTerm.toLowerCase()) ||
       instruction.workStation.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesStatus = statusFilter === "all" || instruction.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || instruction.priority === priorityFilter;
+    
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
@@ -252,7 +313,7 @@ export const WorkInstructionPage: React.FC = () => {
 
     const newInstruction: WorkInstruction = {
       id: `wi-${Date.now()}`,
-      instructionNumber: `WI-2024-${String(mockWorkInstructions.length + 1).padStart(3, '0')}`,
+      instructionNumber: `WI-2024-${String(workInstructions.length + 1).padStart(3, '0')}`,
       productName: newInstructionData.productName,
       productCode: newInstructionData.productCode,
       bomId: `BOM-${newInstructionData.productCode}`,
@@ -270,8 +331,8 @@ export const WorkInstructionPage: React.FC = () => {
       materials: []
     };
 
-    // 실제 구현에서는 상태 관리를 통해 추가해야 합니다
-    mockWorkInstructions.push(newInstruction);
+    // Use context to add instruction
+    addWorkInstruction(newInstruction);
     setShowCreateModal(false);
     setNewInstructionData({
       productName: "",
@@ -314,9 +375,9 @@ export const WorkInstructionPage: React.FC = () => {
     }
 
     // 실제 구현에서는 상태 관리를 통해 업데이트해야 합니다
-    const index = mockWorkInstructions.findIndex(i => i.id === editingInstruction.id);
+    const index = workInstructions.findIndex(i => i.id === editingInstruction.id);
     if (index !== -1) {
-      mockWorkInstructions[index] = {
+      workInstructions[index] = {
         ...editingInstruction,
         productName: newInstructionData.productName,
         productCode: newInstructionData.productCode,
@@ -352,20 +413,17 @@ export const WorkInstructionPage: React.FC = () => {
 
   const handleDeleteInstruction = (instruction: WorkInstruction) => {
     if (window.confirm(`"${instruction.instructionNumber} - ${instruction.productName}" 작업지시서를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
-      // 실제 구현에서는 상태 관리를 통해 삭제해야 합니다
-      const index = mockWorkInstructions.findIndex(i => i.id === instruction.id);
-      if (index !== -1) {
-        mockWorkInstructions.splice(index, 1);
-      }
+      deleteWorkInstruction(instruction.id);
       alert(`작업지시서 "${instruction.instructionNumber}"이 삭제되었습니다.`);
     }
   };
 
   // 통계 계산
-  const totalInstructions = mockWorkInstructions.length;
-  const inProgressCount = mockWorkInstructions.filter((i) => i.status === "in_progress").length;
-  const completedCount = mockWorkInstructions.filter((i) => i.status === "completed").length;
-  const urgentCount = mockWorkInstructions.filter((i) => i.priority === "urgent").length;
+  const totalInstructions = currentInstructions.length;
+  const inProgressCount = currentInstructions.filter(i => i.status === "in_progress").length;
+  const completedCount = currentInstructions.filter(i => i.status === "completed").length;
+  const pendingCount = currentInstructions.filter(i => i.status === "pending").length;
+  const urgentCount = currentInstructions.filter(i => i.priority === "urgent").length;
 
   return (
     <div className={styles.container}>
@@ -374,6 +432,14 @@ export const WorkInstructionPage: React.FC = () => {
           <div className={styles.titleSection}>
             <h1 className={styles.title}>작업 지시서</h1>
             <p className={styles.subtitle}>생산 작업 지시를 관리하고 진행 상황을 추적하세요</p>
+            <div style={{ marginTop: '0.5rem' }}>
+              <Badge 
+                variant={selectedDataSource === "erp" ? "default" : "secondary"}
+                className={selectedDataSource === "erp" ? "bg-blue-500 text-white" : "bg-yellow-500 text-white"}
+              >
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              </Badge>
+            </div>
           </div>
           <Button className={styles.addButton} onClick={() => setShowCreateModal(true)}>
             <Plus className={styles.icon} />
@@ -440,6 +506,16 @@ export const WorkInstructionPage: React.FC = () => {
           </div>
 
           <div className={styles.filterSection}>
+            <select 
+              value={selectedDataSource} 
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")} 
+              className={styles.filterSelect}
+              style={{ marginRight: '0.5rem' }}
+            >
+              <option value="erp">닷코 시연 데이터</option>
+              <option value="sample">생성된 샘플 데이터</option>
+            </select>
+            
             <Filter className={styles.filterIcon} />
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={styles.filterSelect}>
               <option value="all">모든 상태</option>

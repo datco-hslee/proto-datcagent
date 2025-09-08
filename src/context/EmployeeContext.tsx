@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Employee } from '../types/employee';
 import { setEmployeeContextData } from '../data/employeeDataIntegration';
+import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 interface EmployeeContextType {
   employees: Employee[];
@@ -10,12 +12,69 @@ interface EmployeeContextType {
   updateEmployee: (employeeId: string, updates: Partial<Employee>) => void;
   getEmployeeById: (employeeId: string) => Employee | undefined;
   getActiveEmployees: () => Employee[];
+  getEmployeesByDataSource: (dataSource: "generated" | "erp" | "demo" | "massive") => Employee[];
+  getDataSourceSummary: () => { [key: string]: { count: number; label: string } };
 }
 
 const EmployeeContext = createContext<EmployeeContextType | undefined>(undefined);
 
-// 통합된 직원 데이터 (massiveERPData와 동기화)
-const INITIAL_EMPLOYEES: Employee[] = [
+// Convert ERP employee data to Employee interface (DatcoDemoData2.json)
+const convertERPEmployeeToEmployee = (erpEmployee: any): Employee => {
+  return {
+    id: `ERP-${erpEmployee.사번}`,
+    employeeId: erpEmployee.사번,
+    name: erpEmployee.성명,
+    position: erpEmployee.직무,
+    department: erpEmployee.라인 || "생산부",
+    email: `${erpEmployee.사번.toLowerCase()}@company.com`,
+    phone: "010-0000-0000", // Default phone number
+    hireDate: "2023-01-01", // Default hire date
+    salary: erpEmployee.기본시급 * 8 * 22 || 3000000, // Estimate monthly salary
+    status: "재직" as const,
+    workType: "정규직" as const,
+    manager: "김대표", // Default manager
+    skills: [erpEmployee.직무 || "일반작업"],
+    performanceScore: 85, // Default performance score
+    dataSource: "erp" as const,
+    dataSourceLabel: "닷코 시연 데이터"
+  };
+};
+
+// Convert massive ERP employee data to Employee interface
+const convertMassiveERPEmployeeToEmployee = (erpEmployee: any): Employee => {
+  return {
+    id: `MASSIVE-${erpEmployee.id}`,
+    employeeId: erpEmployee.id,
+    name: erpEmployee.name,
+    position: erpEmployee.position,
+    department: erpEmployee.department,
+    email: erpEmployee.email,
+    phone: erpEmployee.phone,
+    hireDate: erpEmployee.hireDate,
+    salary: erpEmployee.salary,
+    status: erpEmployee.status === 'active' ? '재직' : '퇴직',
+    workType: erpEmployee.workType === 'full_time' ? '정규직' : '계약직',
+    manager: erpEmployee.manager || '',
+    skills: erpEmployee.skills || [],
+    performanceScore: erpEmployee.performanceScore || 85,
+    dataSource: "massive" as const,
+    dataSourceLabel: "대량 ERP 데이터"
+  };
+};
+
+// Get massive ERP employees data
+const getMassiveERPEmployees = (): Employee[] => {
+  try {
+    const massiveData = generateMassiveERPData();
+    return massiveData.employees.map(convertMassiveERPEmployeeToEmployee);
+  } catch (error) {
+    console.warn('Failed to load massive ERP data:', error);
+    return [];
+  }
+};
+
+// Original generated employee data
+const GENERATED_EMPLOYEES: Employee[] = [
   {
     id: "EMP-001",
     employeeId: "E2021001",
@@ -31,6 +90,8 @@ const INITIAL_EMPLOYEES: Employee[] = [
     manager: "김대표",
     skills: ["생산관리", "품질관리", "팀리더십"],
     performanceScore: 92,
+    dataSource: "generated",
+    dataSourceLabel: "생성된 샘플 데이터"
   },
   {
     id: "EMP-002",
@@ -47,6 +108,8 @@ const INITIAL_EMPLOYEES: Employee[] = [
     manager: "김철수",
     skills: ["기계조작", "품질검사", "안전관리"],
     performanceScore: 88,
+    dataSource: "generated",
+    dataSourceLabel: "생성된 샘플 데이터"
   },
   {
     id: "EMP-003",
@@ -63,6 +126,8 @@ const INITIAL_EMPLOYEES: Employee[] = [
     manager: "김대표",
     skills: ["품질검사", "데이터분석", "ISO관리"],
     performanceScore: 85,
+    dataSource: "generated",
+    dataSourceLabel: "생성된 샘플 데이터"
   },
   {
     id: "EMP-004",
@@ -79,6 +144,8 @@ const INITIAL_EMPLOYEES: Employee[] = [
     manager: "김철수",
     skills: ["조립작업", "품질관리", "효율개선"],
     performanceScore: 78,
+    dataSource: "generated",
+    dataSourceLabel: "생성된 샘플 데이터"
   },
   {
     id: "EMP-005",
@@ -95,6 +162,8 @@ const INITIAL_EMPLOYEES: Employee[] = [
     manager: "김철수",
     skills: ["현장관리", "작업지도", "안전관리"],
     performanceScore: 90,
+    dataSource: "generated",
+    dataSourceLabel: "생성된 샘플 데이터"
   },
   {
     id: "EMP-006",
@@ -111,6 +180,8 @@ const INITIAL_EMPLOYEES: Employee[] = [
     manager: "김대표",
     skills: ["구매협상", "공급업체관리", "원가분석"],
     performanceScore: 82,
+    dataSource: "generated",
+    dataSourceLabel: "생성된 샘플 데이터"
   },
   {
     id: "EMP-007",
@@ -127,6 +198,8 @@ const INITIAL_EMPLOYEES: Employee[] = [
     manager: "김대표",
     skills: ["영업전략", "고객관리", "계약협상"],
     performanceScore: 95,
+    dataSource: "generated",
+    dataSourceLabel: "생성된 샘플 데이터"
   },
   {
     id: "EMP-008",
@@ -143,8 +216,14 @@ const INITIAL_EMPLOYEES: Employee[] = [
     manager: "김대표",
     skills: ["품질시스템", "프로세스개선", "데이터분석"],
     performanceScore: 87,
-  },
+    dataSource: "generated",
+    dataSourceLabel: "생성된 샘플 데이터"
+  }
 ];
+
+// Load employees from comprehensive ERP data and combine with generated data
+const ERP_EMPLOYEES: Employee[] = (erpDataJson.sheets.인원마스터 || []).map(convertERPEmployeeToEmployee);
+const INITIAL_EMPLOYEES: Employee[] = [...GENERATED_EMPLOYEES, ...ERP_EMPLOYEES];
 
 export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
@@ -174,6 +253,27 @@ export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }
     return employees.filter(emp => emp.status === "재직");
   };
 
+  const getEmployeesByDataSource = (dataSource: "generated" | "erp" | "demo" | "massive"): Employee[] => {
+    return employees.filter(emp => emp.dataSource === dataSource);
+  };
+
+  const getDataSourceSummary = () => {
+    const summary: { [key: string]: { count: number; label: string } } = {};
+    
+    employees.forEach(emp => {
+      const source = emp.dataSource || "unknown";
+      if (!summary[source]) {
+        summary[source] = {
+          count: 0,
+          label: emp.dataSourceLabel || source
+        };
+      }
+      summary[source].count++;
+    });
+    
+    return summary;
+  };
+
   const value: EmployeeContextType = {
     employees,
     setEmployees,
@@ -181,6 +281,8 @@ export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }
     updateEmployee,
     getEmployeeById,
     getActiveEmployees,
+    getEmployeesByDataSource,
+    getDataSourceSummary,
   };
 
   return (
