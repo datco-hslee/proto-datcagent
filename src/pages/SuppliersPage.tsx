@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
-import { Search, Plus, Filter, Eye, Edit3, Trash2, Building2, Phone, Mail, MapPin, Star, TrendingUp, Package, Clock } from "lucide-react";
+import { Search, Plus, Filter, Eye, Edit3, Trash2, Building2, Phone, Mail, MapPin, Star, TrendingUp, Package } from "lucide-react";
 import styles from "./SuppliersPage.module.css";
+// Import the ERP data from the JSON file
+import erpDataJson from '../../DatcoDemoData2.json';
 
 interface Supplier {
   id: string;
@@ -21,9 +23,77 @@ interface Supplier {
   lastOrderDate: string;
   paymentTerms: string;
   leadTime: number;
+  // ERP 데이터 추가 필드
+  supplierCode?: string;
+  creditRating?: string;
+  incoterms?: string;
 }
 
-const mockSuppliers: Supplier[] = [
+// ERP 데이터에서 거래처 정보 추출 (공급사 + 고객사)
+const getSuppliersFromERPData = (companyTypeFilter: string = "all"): Supplier[] => {
+  try {
+    if (!erpDataJson || !erpDataJson.sheets) {
+      console.warn("ERP 데이터가 없습니다. 빈 배열을 반환합니다.");
+      return [];
+    }
+
+    const suppliers = erpDataJson.sheets?.거래처마스터?.filter((item: any) => item.구분 === '공급사') || [];
+    const purchaseOrders = erpDataJson.sheets?.구매발주 || [];
+    const itemMaster = erpDataJson.sheets?.품목마스터 || [];
+    const arData = erpDataJson.sheets['회계(AR_AP)']?.filter((item: any) => item.구분 === '매입채무') || [];
+
+    if (!Array.isArray(suppliers)) {
+      console.warn("거래처마스터 데이터가 배열이 아닙니다.");
+      return [];
+    }
+
+    // 회사 유형에 따른 필터링
+    const filteredSuppliers = suppliers.filter((supplier: any) => {
+      if (companyTypeFilter === "all") return true;
+      if (companyTypeFilter === "supplier") return supplier.구분 === "공급사";
+      if (companyTypeFilter === "customer") return supplier.구분 === "고객사";
+      return true;
+    });
+    
+    return filteredSuppliers.map((supplier: any) => {
+      // 해당 공급업체의 구매 주문 정보 집계
+      const supplierOrders = Array.isArray(purchaseOrders) 
+        ? purchaseOrders.filter((po: any) => po.공급업체코드 === supplier.거래처코드)
+        : [];
+      const totalOrders = supplierOrders.length;
+      const totalAmount = supplierOrders.reduce((sum: number, po: any) => sum + (po.총금액 || 0), 0);
+      const lastOrder = supplierOrders.length > 0 
+        ? supplierOrders.sort((a: any, b: any) => new Date(b.발주일자).getTime() - new Date(a.발주일자).getTime())[0]
+        : null;
+      
+      return {
+        id: `ERP-${supplier.거래처코드}`,
+        supplierCode: supplier.거래처코드,
+        name: supplier.거래처명 || "공급업체명 없음",
+        contact: "담당자",
+        email: `${(supplier.거래처코드 || 'supplier').toLowerCase()}@company.com`,
+        phone: "02-1234-5678",
+        address: "서울시 강남구",
+        category: "제조업",
+        rating: Math.min(5, Math.max(1, Math.floor(Math.random() * 5) + 1)),
+        status: "active",
+        totalOrders: totalOrders,
+        totalAmount: totalAmount,
+        lastOrderDate: lastOrder ? lastOrder.발주일자 : "2024-01-01",
+        leadTime: supplier.납기리드타임일 || 7,
+        paymentTerms: supplier.결제조건 || "30D",
+        creditRating: supplier.신용등급 || "A",
+        incoterms: supplier.인코텀즈 || "DDP"
+      };
+    });
+  } catch (error) {
+    console.error("ERP 데이터 로딩 오류:", error);
+    return [];
+  }
+};
+
+// 샘플 데이터 (기존 하드코딩 데이터)
+const getSampleSuppliers = (): Supplier[] => [
   {
     id: "1",
     name: "㈜테크부품",
@@ -116,10 +186,23 @@ export const SuppliersPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [companyTypeFilter, setCompanyTypeFilter] = useState<string>("all");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  
+  // 데이터 소스에 따른 공급업체 목록 가져오기
+  const getCurrentSuppliers = (): Supplier[] => {
+    return selectedDataSource === "erp" ? getSuppliersFromERPData(companyTypeFilter) : getSampleSuppliers();
+  };
+  
+  const [suppliers, setSuppliers] = useState<Supplier[]>(getCurrentSuppliers());
+  
+  // 데이터 소스 또는 회사 유형 변경 시 공급업체 목록 업데이트
+  useEffect(() => {
+    setSuppliers(getCurrentSuppliers());
+  }, [selectedDataSource, companyTypeFilter]);
   const [newSupplier, setNewSupplier] = useState<Partial<Supplier>>({
     name: "",
     contact: "",
@@ -227,7 +310,7 @@ export const SuppliersPage: React.FC = () => {
     return Array.from({ length: 5 }, (_, i) => <Star key={i} className={`${styles.star} ${i < Math.floor(rating) ? styles.starFilled : ""}`} />);
   };
 
-  const categories = [...new Set(mockSuppliers.map((s) => s.category))];
+  const categories = [...new Set(suppliers.map((s) => s.category))];
 
   return (
     <div className={styles.container}>
@@ -236,6 +319,11 @@ export const SuppliersPage: React.FC = () => {
           <div className={styles.titleSection}>
             <h1 className={styles.title}>공급업체 관리</h1>
             <p className={styles.subtitle}>공급업체 정보를 관리하고 성과를 모니터링하세요</p>
+            <div className={styles.dataSourceBadge}>
+              <Badge variant={selectedDataSource === "erp" ? "default" : "secondary"}>
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              </Badge>
+            </div>
           </div>
           <Button className={styles.addButton} onClick={handleCreateSupplier}>
             <Plus className={styles.addIcon} />
@@ -248,7 +336,7 @@ export const SuppliersPage: React.FC = () => {
             <div className={styles.statContent}>
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>총 공급업체</span>
-                <span className={styles.statValue}>{mockSuppliers.length}개</span>
+                <span className={styles.statValue}>{suppliers.length}개</span>
               </div>
               <div className={styles.statIcon}>
                 <Building2 />
@@ -259,7 +347,7 @@ export const SuppliersPage: React.FC = () => {
             <div className={styles.statContent}>
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>활성 공급업체</span>
-                <span className={styles.statValue}>{mockSuppliers.filter((s) => s.status === "active").length}개</span>
+                <span className={styles.statValue}>{suppliers.filter((s) => s.status === "active").length}개</span>
               </div>
               <div className={styles.statIcon}>
                 <TrendingUp />
@@ -270,7 +358,7 @@ export const SuppliersPage: React.FC = () => {
             <div className={styles.statContent}>
               <div className={styles.statInfo}>
                 <span className={styles.statLabel}>평균 평점</span>
-                <span className={styles.statValue}>{(mockSuppliers.reduce((sum, s) => sum + s.rating, 0) / mockSuppliers.length).toFixed(1)}</span>
+                <span className={styles.statValue}>{suppliers.length > 0 ? (suppliers.reduce((sum, s) => sum + s.rating, 0) / suppliers.length).toFixed(1) : '0.0'}</span>
               </div>
               <div className={styles.statIcon}>
                 <Star />
@@ -291,6 +379,31 @@ export const SuppliersPage: React.FC = () => {
           </div>
 
           <div className={styles.filterSection}>
+            {/* 데이터 소스 선택 */}
+            <select 
+              value={selectedDataSource} 
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+              className={styles.filterSelect}
+              style={{ marginRight: '10px' }}
+            >
+              <option value="erp">닷코 시연 데이터</option>
+              <option value="sample">생성된 샘플 데이터</option>
+            </select>
+
+            {/* 회사 유형 필터 (ERP 데이터일 때만 표시) */}
+            {selectedDataSource === "erp" && (
+              <select 
+                value={companyTypeFilter} 
+                onChange={(e) => setCompanyTypeFilter(e.target.value)}
+                className={styles.filterSelect}
+                style={{ marginRight: '10px' }}
+              >
+                <option value="all">모든 거래처</option>
+                <option value="supplier">공급사</option>
+                <option value="customer">고객사</option>
+              </select>
+            )}
+            
             <Filter className={styles.filterIcon} />
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={styles.filterSelect}>
               <option value="all">모든 상태</option>

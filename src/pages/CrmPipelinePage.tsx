@@ -1,17 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DndContext,
-  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
+  DragOverlay,
   useDroppable,
 } from '@dnd-kit/core';
 import type {
   DragEndEvent,
   DragStartEvent,
-  DragOverEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -20,22 +18,19 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  Users,
   Plus,
-  Filter,
   Search,
+  Filter,
   Phone,
-  Mail,
+  Edit,
   Building2,
-  Calendar,
-  MessageSquare,
   X,
-  Edit
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+  TrendingUp,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import styles from "./CrmPipelinePage.module.css";
+import erpDataJson from '../../DatcoDemoData2.json';
 
 interface Lead {
   id: string;
@@ -322,32 +317,60 @@ function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit }: {
   );
 }
 
-function getActivityTypeIcon(type: Activity['type']) {
-  const iconProps = { className: styles.activityIcon };
+// ERP 데이터를 Lead 형식으로 변환하는 함수
+const convertERPToLeads = (): Lead[] => {
+  const customers = erpDataJson.sheets?.거래처마스터 || [];
+  const salesOrders = erpDataJson.sheets?.수주 || [];
+  
+  return customers.map((customer: any, index: number) => {
+    const relatedOrder = salesOrders.find((order: any) => order.고객명 === customer.거래처명);
+    const estimatedValue = relatedOrder ? relatedOrder.수주금액 : Math.floor(Math.random() * 100000000) + 10000000;
+    
+    // 단계를 랜덤하게 할당 (실제로는 ERP 데이터에서 가져와야 함)
+    const stages: Lead['stage'][] = ['prospect', 'qualified', 'proposal', 'negotiation'];
+    const randomStage = stages[index % stages.length];
+    
+    return {
+      id: `erp-lead-${index + 1}`,
+      companyName: customer.거래처명,
+      contactPerson: customer.담당자 || '담당자',
+      email: customer.이메일 || `contact@${customer.거래처명.toLowerCase().replace(/\s+/g, '')}.co.kr`,
+      phone: customer.전화번호 || '02-0000-0000',
+      estimatedValue: estimatedValue,
+      stage: randomStage,
+      probability: Math.floor(Math.random() * 40) + 50, // 50-90%
+      activities: [
+        {
+          id: `act-erp-${index + 1}`,
+          type: 'call' as const,
+          title: '초기 상담',
+          description: 'ERP 고객 데이터 기반 영업 기회',
+          timestamp: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000),
+          completed: true
+        }
+      ],
+      createdAt: new Date(Date.now() - Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000),
+      updatedAt: new Date(Date.now() - Math.floor(Math.random() * 7) * 24 * 60 * 60 * 1000),
+      tags: [customer.구분 || '일반', 'ERP고객'],
+      source: 'ERP 시스템'
+    };
+  });
+};
 
-  switch (type) {
-    case 'call':
-      return <Phone {...iconProps} />;
-    case 'email':
-      return <Mail {...iconProps} />;
-    case 'meeting':
-      return <Calendar {...iconProps} />;
-    case 'note':
-      return <MessageSquare {...iconProps} />;
-    default:
-      return <MessageSquare {...iconProps} />;
-  }
-}
+// 샘플 데이터 반환 함수
+const getSampleLeads = (): Lead[] => {
+  return MOCK_LEADS;
+};
 
 export function CrmPipelinePage() {
-  const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showNewLeadModal, setShowNewLeadModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showActivityModal, setShowActivityModal] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   
   // 리드 편집 폼 데이터
@@ -386,12 +409,21 @@ export function CrmPipelinePage() {
     assignedTo: "",
   });
 
+  // 현재 데이터 소스에 따른 리드 데이터 가져오기
+  const getCurrentLeads = (): Lead[] => {
+    return selectedDataSource === "erp" ? convertERPToLeads() : getSampleLeads();
+  };
+
+  // 데이터 소스 변경 시 리드 업데이트
+  useEffect(() => {
+    setLeads(getCurrentLeads());
+  }, [selectedDataSource]);
+
   // 모달 닫기 함수들
   const closeModals = () => {
     setShowNewLeadModal(false);
     setShowFilterModal(false);
     setShowEditModal(false);
-    setShowActivityModal(false);
     setEditingLead(null);
   };
 
@@ -536,7 +568,7 @@ export function CrmPipelinePage() {
   // 활동 추가
   const handleAddActivity = (lead: Lead) => {
     setEditingLead(lead);
-    setShowActivityModal(true);
+    // setShowActivityModal(true);
   };
 
   // 통화 걸기
@@ -582,33 +614,71 @@ export function CrmPipelinePage() {
     <div className={styles.container}>
       {/* 헤더 */}
       <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <h1 className={styles.title}>CRM 파이프라인</h1>
-          <p className={styles.subtitle}>영업 기회를 관리하고 추적하세요</p>
-        </div>
-        <div className={styles.headerRight}>
-          <Button variant="outline" onClick={handleFilterClick}>
-            <Filter className="h-4 w-4 mr-2" />
-            필터
-          </Button>
-          <Button onClick={handleAddNewLead}>
-            <Plus className="h-4 w-4 mr-2" />
-            새 영업 기회
-          </Button>
+        <div className={styles.headerContent}>
+          <div className={styles.titleSection}>
+            <div className={styles.headerTitleSection}>
+              <div className={styles.headerIcon}>
+                <TrendingUp />
+              </div>
+              <div>
+                <h1 className={styles.headerTitle}>CRM 파이프라인</h1>
+                <p className={styles.headerSubtitle}>영업 기회를 관리하고 추적하세요</p>
+              </div>
+            </div>
+            {/* 데이터 소스 표시 배지 */}
+            <div
+              style={{
+                alignItems: "center",
+                display: "inline-flex",
+                padding: "0.25rem 0.75rem",
+                borderRadius: "9999px",
+                fontSize: "0.75rem",
+                fontWeight: "500",
+                backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
+                color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
+                border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : "#fcd34d"}`,
+                marginTop: "0.75rem",
+                maxWidth: selectedDataSource === "erp" ? "110px" : "122px",
+              }}
+            >
+              {selectedDataSource === 'erp' ? '닷코 시연 데이터' : '생성된 샘플 데이터'}
+            </div>
+          </div>
+          <div className={styles.controlsRow}>
+            <Button variant="outline" onClick={handleFilterClick}>
+              <Filter className="h-4 w-4 mr-2" />
+              필터
+            </Button>
+            <Button onClick={handleAddNewLead}>
+              <Plus className="h-4 w-4 mr-2" />
+              새 영업 기회
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* 검색 */}
-      <div className={styles.searchContainer}>
-        <div className={styles.searchBox}>
-          <Search className={styles.searchIcon} />
-          <Input
-            type="text"
-            placeholder="고객명, 회사명으로 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className={styles.searchInput}
-          />
+      {/* 검색 및 데이터 소스 선택 */}
+      <div className={styles.toolbar}>
+        <div className={styles.controlsRow}>
+          <select 
+            value={selectedDataSource} 
+            onChange={(e) => setSelectedDataSource(e.target.value as 'erp' | 'sample')}
+            className={styles.filterSelect}
+          >
+            <option value="erp">닷코 시연 데이터</option>
+            <option value="sample">생성된 샘플 데이터</option>
+          </select>
+          
+          <div className={styles.searchContainer}>
+            <Search className={styles.searchIcon} />
+            <Input
+              type="text"
+              placeholder="고객명, 회사명으로 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
         </div>
       </div>
 

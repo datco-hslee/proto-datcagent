@@ -13,10 +13,10 @@ import {
   Factory,
   RotateCcw,
   Eye,
-  Edit
+  Edit,
+  Package,
 } from "lucide-react";
-import { useCustomers } from "../context/CustomerContext";
-import { generateDynamicERPData } from "../data/dynamicERPData";
+import erpDataJson from '../../DatcoDemoData2.json';
 
 interface ProductionOrder {
   id: string;
@@ -37,6 +37,12 @@ interface ProductionOrder {
   progress: number;
   customer: string;
   notes?: string;
+  // Item master details
+  itemCategory?: string;
+  standardPrice?: number;
+  moq?: number;
+  safetyStock?: number;
+  leadTimeDays?: number;
 }
 
 interface Material {
@@ -57,90 +63,272 @@ interface ProductionMetric {
 }
 
 
-const PRODUCTION_METRICS: ProductionMetric[] = [
-  {
-    label: "진행 중인 오더",
-    value: "3건",
-    change: 1,
-    icon: Factory,
-    color: "blue",
-  },
-  {
-    label: "오늘 완료 예정",
-    value: "2건",
-    change: 0,
-    icon: CheckCircle,
-    color: "green",
-  },
-  {
-    label: "지연 위험",
-    value: "1건",
-    change: -1,
-    icon: AlertTriangle,
-    color: "orange",
-  },
-  {
-    label: "평균 효율성",
-    value: "87%",
-    change: 5,
-    icon: TrendingUp,
-    color: "purple",
-  },
-];
+// Calculate dynamic metrics based on actual order data
+const calculateProductionMetrics = (orders: ProductionOrder[]): ProductionMetric[] => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Count in-progress orders
+  const inProgressCount = orders.filter(order => order.status === "in-progress").length;
+  
+  // Count orders due today
+  const todayDueCount = orders.filter(order => {
+    const dueDate = new Date(order.dueDate);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate.getTime() === today.getTime() && order.status !== "completed";
+  }).length;
+  
+  // Count delayed orders (past due date and not completed)
+  const delayedCount = orders.filter(order => {
+    const dueDate = new Date(order.dueDate);
+    dueDate.setHours(23, 59, 59, 999);
+    return dueDate.getTime() < today.getTime() && order.status !== "completed";
+  }).length;
+  
+  // Calculate average efficiency (actual hours vs estimated hours)
+  const ordersWithHours = orders.filter(order => order.estimatedHours > 0 && order.actualHours > 0);
+  const avgEfficiency = ordersWithHours.length > 0 
+    ? Math.round((ordersWithHours.reduce((sum, order) => sum + (order.estimatedHours / order.actualHours), 0) / ordersWithHours.length) * 100)
+    : 0;
+  
+  return [
+    {
+      label: "총 오더",
+      value: `${orders.length}건`,
+      change: 0,
+      icon: Package,
+      color: "gray",
+    },
+    {
+      label: "진행 중인 오더",
+      value: `${inProgressCount}건`,
+      change: 0, // Could be calculated by comparing with previous day if needed
+      icon: Factory,
+      color: "blue",
+    },
+    {
+      label: "오늘 완료 예정",
+      value: `${todayDueCount}건`,
+      change: 0,
+      icon: CheckCircle,
+      color: "green",
+    },
+    {
+      label: "지연 위험",
+      value: `${delayedCount}건`,
+      change: 0,
+      icon: AlertTriangle,
+      color: "orange",
+    },
+    {
+      label: "평균 효율성",
+      value: `${avgEfficiency}%`,
+      change: 0,
+      icon: TrendingUp,
+      color: "purple",
+    },
+  ];
+};
 
 export function ProductionOrderPage() {
-  const { customers } = useCustomers();
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [selectedDataSource, setSelectedDataSource] = useState<string>("erp");
   const [showDetailedFilters, setShowDetailedFilters] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(null);
   
-  // Generate dynamic production orders from customer data
-  const dynamicERPData = useMemo(() => generateDynamicERPData(customers), [customers]);
-  const [orders, setOrders] = useState<ProductionOrder[]>(() => {
-    // Convert dynamic production orders to ProductionOrder format
-    return dynamicERPData.productionOrders.map((order: any, index: number) => ({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      productName: order.productName,
-      productCode: order.productCode,
-      quantity: order.quantity,
-      unit: "EA",
-      status: order.status === "계획" ? "planned" : 
-             order.status === "진행중" ? "in-progress" :
-             order.status === "완료" ? "completed" : "on-hold",
-      priority: order.priority === "높음" ? "high" :
-               order.priority === "보통" ? "medium" : "low",
-      startDate: new Date(order.plannedStartDate),
-      dueDate: new Date(order.plannedEndDate),
-      completedQuantity: Math.floor(order.quantity * Math.random()),
-      assignedTeam: `생산팀 ${String.fromCharCode(65 + (index % 3))}`,
-      estimatedHours: Math.floor(order.quantity * 0.2),
-      actualHours: Math.floor(order.quantity * 0.15),
-      progress: Math.floor(Math.random() * 100),
-      customer: order.customerName || "고객정보없음",
-      materials: [
-        { 
-          id: `m${index}-1`, 
-          name: "주요 부품", 
-          requiredQuantity: order.quantity, 
-          availableQuantity: Math.floor(order.quantity * (0.8 + Math.random() * 0.4)), 
-          unit: "EA", 
-          status: Math.random() > 0.3 ? "available" : "shortage" 
-        }
-      ]
-    }));
-  });
+  // Generate sample production orders (original generated data)
+  const getSampleProductionOrders = (): ProductionOrder[] => {
+    return [
+      {
+        id: "PO-001",
+        orderNumber: "PO-2024-001",
+        productName: "스마트 센서 모듈",
+        productCode: "SSM-001",
+        quantity: 500,
+        unit: "EA",
+        status: "in-progress",
+        priority: "high",
+        startDate: new Date("2024-09-01"),
+        dueDate: new Date("2024-09-15"),
+        completedQuantity: 250,
+        assignedTeam: "생산팀 A",
+        estimatedHours: 120,
+        actualHours: 65,
+        progress: 50,
+        customer: "테크놀로지 주식회사",
+        materials: [
+          { id: "MAT-001", name: "MCU 칩셋", requiredQuantity: 500, availableQuantity: 450, unit: "EA", status: "shortage" },
+          { id: "MAT-002", name: "센서 보드", requiredQuantity: 500, availableQuantity: 500, unit: "EA", status: "available" }
+        ],
+        notes: "고객 요청으로 품질 검사 강화 필요",
+        itemCategory: "완제품",
+        standardPrice: 85000,
+        moq: 100,
+        safetyStock: 50,
+        leadTimeDays: 7
+      },
+      {
+        id: "PO-002", 
+        orderNumber: "PO-2024-002",
+        productName: "IoT 컨트롤러",
+        productCode: "IOT-002",
+        quantity: 300,
+        unit: "EA",
+        status: "planned",
+        priority: "medium",
+        startDate: new Date("2024-09-10"),
+        dueDate: new Date("2024-09-25"),
+        completedQuantity: 0,
+        assignedTeam: "생산팀 B",
+        estimatedHours: 90,
+        actualHours: 0,
+        progress: 0,
+        customer: "스마트솔루션",
+        materials: [
+          { id: "MAT-003", name: "제어 보드", requiredQuantity: 300, availableQuantity: 280, unit: "EA", status: "shortage" },
+          { id: "MAT-004", name: "케이스", requiredQuantity: 300, availableQuantity: 350, unit: "EA", status: "available" }
+        ],
+        itemCategory: "완제품",
+        standardPrice: 125000,
+        moq: 50,
+        safetyStock: 30,
+        leadTimeDays: 10
+      },
+      {
+        id: "PO-003",
+        orderNumber: "PO-2024-003", 
+        productName: "산업용 디스플레이",
+        productCode: "IND-003",
+        quantity: 150,
+        unit: "EA",
+        status: "completed",
+        priority: "low",
+        startDate: new Date("2024-08-15"),
+        dueDate: new Date("2024-08-30"),
+        completedQuantity: 150,
+        assignedTeam: "생산팀 A",
+        estimatedHours: 60,
+        actualHours: 58,
+        progress: 100,
+        customer: "글로벌인더스트리",
+        materials: [
+          { id: "MAT-005", name: "LCD 패널", requiredQuantity: 150, availableQuantity: 0, unit: "EA", status: "ordered" },
+          { id: "MAT-006", name: "백라이트", requiredQuantity: 150, availableQuantity: 0, unit: "EA", status: "ordered" }
+        ],
+        itemCategory: "완제품",
+        standardPrice: 450000,
+        moq: 20,
+        safetyStock: 10,
+        leadTimeDays: 14
+      }
+    ];
+  };
+
+  // Generate production orders from ERP JSON data - only work orders, no production plans
+  const getProductionOrdersFromERPData = (): ProductionOrder[] => {
+    // Get data from ERP JSON - only work orders
+    const workOrders = erpDataJson.sheets.작업지시 || [];
+    const itemMaster = erpDataJson.sheets.품목마스터 || [];
+    const bomData = erpDataJson.sheets.BOM || [];
+    
+    // Create a map of items for quick lookup
+    const itemMap = new Map<string, any>();
+    itemMaster.forEach((item: any) => {
+      itemMap.set(item.품목코드, item);
+    });
+    
+    // Process ONLY the 2 work orders from ERP data
+    return workOrders.map((workOrder: any) => {
+      const item = itemMap.get(workOrder.품목코드);
+      if (!item) return null;
+      
+      const status = workOrder.상태 === "RELEASED" ? "in-progress" : 
+                    workOrder.상태 === "PLANNED" ? "planned" : 
+                    workOrder.상태 === "COMPLETED" ? "completed" : "planned";
+      
+      // Get materials from BOM data
+      const materials: Material[] = bomData
+        .filter((bom: any) => bom.상위품목코드 === workOrder.품목코드)
+        .map((bom: any, bomIndex: number) => {
+          const childItem = itemMap.get(bom.하위품목코드);
+          return {
+            id: `${workOrder.작업지시번호}-mat-${bomIndex}`,
+            name: childItem?.품목명 || bom.하위품목코드,
+            requiredQuantity: bom.소요량 * workOrder.지시수량,
+            availableQuantity: Math.floor((bom.소요량 * workOrder.지시수량) * 0.9),
+            unit: bom.단위 || "EA",
+            status: Math.random() > 0.3 ? "available" : "shortage"
+          };
+        });
+      
+      return {
+        id: workOrder.작업지시번호,
+        orderNumber: workOrder.작업지시번호,
+        productName: item.품목명,
+        productCode: workOrder.품목코드,
+        quantity: workOrder.지시수량,
+        unit: "EA",
+        status: status as ProductionOrder['status'],
+        priority: "medium" as ProductionOrder['priority'],
+        startDate: new Date(workOrder.시작일자 || new Date()),
+        dueDate: new Date(workOrder.완료일자 || new Date()),
+        completedQuantity: status === "completed" ? workOrder.지시수량 : 
+                          status === "in-progress" ? Math.floor(workOrder.지시수량 * 0.5) : 0,
+        assignedTeam: workOrder.라인 || "LINE-1",
+        estimatedHours: Math.floor(workOrder.지시수량 * 0.2),
+        actualHours: status === "completed" ? Math.floor(workOrder.지시수량 * 0.18) : 
+                     status === "in-progress" ? Math.floor(workOrder.지시수량 * 0.1) : 0,
+        progress: status === "completed" ? 100 : 
+                 status === "in-progress" ? 50 : 0,
+        customer: "현대자동차",
+        materials: materials,
+        notes: `ERP 작업지시: ${workOrder.작업지시번호}`,
+        // Item master details
+        itemCategory: item.품목구분,
+        standardPrice: item.표준단가,
+        moq: item.MOQ,
+        safetyStock: item.안전재고,
+        leadTimeDays: item.리드타임일
+      };
+    }).filter(Boolean) as ProductionOrder[];
+  };
+
+  // Get orders based on selected data source
+  const getCurrentOrders = (): ProductionOrder[] => {
+    return selectedDataSource === "sample" ? getSampleProductionOrders() : getProductionOrdersFromERPData();
+  };
+
+  const [orders, setOrders] = useState<ProductionOrder[]>([]);
+
+  // Update orders when data source changes
+  React.useEffect(() => {
+    console.log("Data source changed to:", selectedDataSource);
+    const newOrders = getCurrentOrders();
+    console.log("Setting orders:", newOrders);
+    setOrders(newOrders);
+  }, [selectedDataSource]);
+
+  // Initialize orders on component mount
+  React.useEffect(() => {
+    console.log("Component mounted, initializing orders");
+    const initialOrders = getCurrentOrders();
+    console.log("Initial orders:", initialOrders);
+    setOrders(initialOrders);
+  }, []);
   
   // Additional filter states
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [dateRangeFilter, setDateRangeFilter] = useState({ start: "", end: "" });
   const [progressFilter, setProgressFilter] = useState({ min: 0, max: 100 });
+
+  // Calculate production metrics dynamically
+  const productionMetrics = useMemo(() => calculateProductionMetrics(orders), [orders]);
 
   // Create order form state
   const [newOrder, setNewOrder] = useState({
@@ -542,10 +730,22 @@ export function ProductionOrderPage() {
   return (
     <div style={{ padding: "1.5rem", backgroundColor: "#f9fafb", minHeight: "100vh" }}>
       {/* 헤더 */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
         <div>
-          <h1 style={{ fontSize: "1.875rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>생산 오더 현황</h1>
-          <p style={{ color: "#6b7280" }}>생산 일정과 진행 상황을 실시간으로 관리하세요</p>
+          <h1 style={{ fontSize: "2rem", fontWeight: "bold", color: "#111827", marginBottom: "0.5rem" }}>생산 오더 관리</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <p style={{ color: "#6b7280" }}>생산 계획 및 진행 상황을 관리합니다</p>
+            <span style={{
+              padding: "0.25rem 0.75rem",
+              backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
+              color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
+              borderRadius: "9999px",
+              fontSize: "0.75rem",
+              fontWeight: 500
+            }}>
+              {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+            </span>
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <button style={{...secondaryButtonStyle}}>
@@ -562,8 +762,8 @@ export function ProductionOrderPage() {
       </div>
 
       {/* 주요 지표 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>
-        {PRODUCTION_METRICS.map((metric, index) => (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+        {productionMetrics.map((metric: ProductionMetric, index: number) => (
           <div key={index} style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
               <h3 style={{ fontSize: "0.875rem", fontWeight: 500, color: "#6b7280" }}>{metric.label}</h3>
@@ -592,6 +792,23 @@ export function ProductionOrderPage() {
           />
         </div>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          {/* 데이터 소스 선택 */}
+          <select
+            value={selectedDataSource}
+            onChange={(e) => setSelectedDataSource(e.target.value)}
+            style={{
+              padding: "0.5rem 0.75rem",
+              border: "1px solid #d1d5db",
+              borderRadius: "0.375rem",
+              fontSize: "0.875rem",
+              backgroundColor: "white",
+              minWidth: "160px"
+            }}
+          >
+            <option value="erp">닷코 시연 데이터</option>
+            <option value="sample">생성된 샘플 데이터</option>
+          </select>
+          
           {/* 상태 필터 */}
           <select
             value={statusFilter}
@@ -981,6 +1198,41 @@ export function ProductionOrderPage() {
                         <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>담당팀</p>
                         <p style={{ fontWeight: 500 }}>{selectedOrder.assignedTeam}</p>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 품목 마스터 정보 */}
+                <div style={cardStyle}>
+                  <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e5e7eb", marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.125rem", fontWeight: 600 }}>품목 마스터 정보</h3>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem" }}>
+                    <div>
+                      <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>품목구분</p>
+                      <p style={{ fontWeight: 500 }}>{selectedOrder.itemCategory || "미정"}</p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>표준단가</p>
+                      <p style={{ fontWeight: 500, color: "#10b981" }}>
+                        {selectedOrder.standardPrice ? `₩${selectedOrder.standardPrice.toLocaleString()}` : "미정"}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>MOQ</p>
+                      <p style={{ fontWeight: 500 }}>
+                        {selectedOrder.moq ? `${selectedOrder.moq.toLocaleString()} ${selectedOrder.unit}` : "미정"}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>안전재고</p>
+                      <p style={{ fontWeight: 500 }}>
+                        {selectedOrder.safetyStock ? `${selectedOrder.safetyStock.toLocaleString()} ${selectedOrder.unit}` : "미정"}
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>리드타임</p>
+                      <p style={{ fontWeight: 500 }}>{selectedOrder.leadTimeDays ? `${selectedOrder.leadTimeDays}일` : "미정"}</p>
                     </div>
                   </div>
                 </div>

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Plus, Filter, Download, Edit, Package, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import erpDataJson from '../../DatcoDemoData2.json';
 
 interface Order {
   id: string;
@@ -20,6 +21,7 @@ export function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("전체");
   const [selectedPriority, setSelectedPriority] = useState("전체");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -62,6 +64,121 @@ export function OrdersPage() {
     minProgress: "",
     maxProgress: "",
   });
+
+  // ERP 데이터에서 주문 정보 추출
+  const getERPOrders = (): Order[] => {
+    const salesOrders = erpDataJson.sheets.수주 || [];
+    const customers = erpDataJson.sheets.거래처마스터?.filter((item: any) => item.구분 === '고객사') || [];
+    const itemMaster = erpDataJson.sheets.품목마스터 || [];
+
+    return salesOrders.map((order, index) => {
+      const customer = customers.find(c => c.거래처코드 === order.거래처코드);
+      const item = itemMaster.find(i => i.품목코드 === order.품목코드);
+      
+      // 상태 계산 (수주일자와 납기일자 기반)
+      const orderDate = new Date(order.수주일자);
+      const dueDate = new Date(order.납기일자);
+      const today = new Date();
+      
+      let status: Order["status"];
+      let progress: number;
+      
+      if (order.상태 === "확정") {
+        if (dueDate < today) {
+          status = "완료";
+          progress = 100;
+        } else if (orderDate <= today && today <= dueDate) {
+          status = "진행중";
+          const totalDays = (dueDate.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24);
+          const passedDays = (today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24);
+          progress = Math.min(Math.max(Math.round((passedDays / totalDays) * 100), 0), 100);
+        } else {
+          status = "대기중";
+          progress = 0;
+        }
+      } else {
+        status = "취소";
+        progress = 0;
+      }
+      
+      // 우선순위 계산 (주문 금액 기반)
+      const priority: Order["priority"] = order.수주금액 >= 100000000 ? "높음" : 
+                                        order.수주금액 >= 50000000 ? "보통" : "낮음";
+
+      return {
+        id: order.수주번호,
+        orderNumber: order.수주번호,
+        customer: customer ? customer.거래처명 : "알 수 없음",
+        company: customer ? customer.거래처명 : "알 수 없음",
+        status,
+        priority,
+        orderDate: order.수주일자,
+        dueDate: order.납기일자,
+        totalAmount: order.수주금액,
+        items: order.수주수량,
+        representative: "영업팀",
+        progress
+      };
+    });
+  };
+
+  // 샘플 주문 데이터
+  const getSampleOrders = (): Order[] => {
+    return [
+      {
+        id: "SAMPLE-001",
+        orderNumber: "PO-SAMPLE-001",
+        customer: "김철수",
+        company: "ABC 제조업체",
+        status: "진행중",
+        priority: "높음",
+        orderDate: "2024-01-15",
+        dueDate: "2024-02-15",
+        totalAmount: 45000000,
+        items: 5,
+        representative: "이영희",
+        progress: 75,
+      },
+      {
+        id: "SAMPLE-002",
+        orderNumber: "PO-SAMPLE-002",
+        customer: "박영희",
+        company: "XYZ 솔루션",
+        status: "대기중",
+        priority: "보통",
+        orderDate: "2024-01-18",
+        dueDate: "2024-02-28",
+        totalAmount: 32000000,
+        items: 3,
+        representative: "김대표",
+        progress: 25,
+      },
+      {
+        id: "SAMPLE-003",
+        orderNumber: "PO-SAMPLE-003",
+        customer: "정민수",
+        company: "DEF 엔지니어링",
+        status: "완료",
+        priority: "낮음",
+        orderDate: "2024-01-10",
+        dueDate: "2024-01-25",
+        totalAmount: 18000000,
+        items: 2,
+        representative: "이영희",
+        progress: 100,
+      }
+    ];
+  };
+
+  // 현재 선택된 데이터 소스에 따른 주문 목록
+  const getCurrentOrders = (): Order[] => {
+    return selectedDataSource === "erp" ? getERPOrders() : getSampleOrders();
+  };
+
+  // 데이터 소스 변경 시 주문 목록 업데이트
+  useEffect(() => {
+    // 데이터 소스가 변경되면 현재 주문 목록을 업데이트
+  }, [selectedDataSource]);
 
   // 버튼 핸들러들
   const handleAdvancedFilter = () => {
@@ -160,8 +277,8 @@ export function OrdersPage() {
     }
 
     const newOrder: Order = {
-      id: `ORD-${String(orders.length + 1).padStart(3, '0')}`,
-      orderNumber: `PO-2024-${String(orders.length + 1).padStart(3, '0')}`,
+      id: `ORD-${String(allOrders.length + 1).padStart(3, '0')}`,
+      orderNumber: `PO-2024-${String(allOrders.length + 1).padStart(3, '0')}`,
       customer: newOrderForm.customer,
       company: newOrderForm.company,
       status: newOrderForm.status,
@@ -502,81 +619,14 @@ export function OrdersPage() {
     transition: "all 0.2s ease",
   };
 
-  // 샘플 데이터를 state로 변환
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: "ORD-001",
-      orderNumber: "PO-2024-001",
-      customer: "김철수",
-      company: "ABC 제조업체",
-      status: "진행중",
-      priority: "높음",
-      orderDate: "2024-01-15",
-      dueDate: "2024-02-15",
-      totalAmount: 45000000,
-      items: 5,
-      representative: "이영희",
-      progress: 75,
-    },
-    {
-      id: "ORD-002",
-      orderNumber: "PO-2024-002",
-      customer: "박영희",
-      company: "XYZ 솔루션",
-      status: "대기중",
-      priority: "보통",
-      orderDate: "2024-01-18",
-      dueDate: "2024-02-28",
-      totalAmount: 32000000,
-      items: 3,
-      representative: "김대표",
-      progress: 25,
-    },
-    {
-      id: "ORD-003",
-      orderNumber: "PO-2024-003",
-      customer: "정민수",
-      company: "DEF 엔지니어링",
-      status: "완료",
-      priority: "낮음",
-      orderDate: "2024-01-10",
-      dueDate: "2024-01-25",
-      totalAmount: 18000000,
-      items: 2,
-      representative: "이영희",
-      progress: 100,
-    },
-    {
-      id: "ORD-004",
-      orderNumber: "PO-2024-004",
-      customer: "최수진",
-      company: "GHI 테크놀로지",
-      status: "진행중",
-      priority: "높음",
-      orderDate: "2024-01-20",
-      dueDate: "2024-03-01",
-      totalAmount: 67000000,
-      items: 8,
-      representative: "김대표",
-      progress: 50,
-    },
-    {
-      id: "ORD-005",
-      orderNumber: "PO-2024-005",
-      customer: "윤정호",
-      company: "JKL 시스템즈",
-      status: "취소",
-      priority: "보통",
-      orderDate: "2024-01-12",
-      dueDate: "2024-02-20",
-      totalAmount: 23000000,
-      items: 4,
-      representative: "이영희",
-      progress: 0,
-    },
-  ]);
+  // 샘플 데이터를 state로 변환 (새 주문 추가용)
+  const [orders, setOrders] = useState<Order[]>([]);
 
-  const filteredOrders = orders.filter((order) => {
+  // 현재 주문 목록 가져오기
+  const currentOrders = getCurrentOrders();
+  const allOrders = [...currentOrders, ...orders]; // ERP/샘플 데이터 + 사용자 추가 데이터
+  
+  const filteredOrders = allOrders.filter((order) => {
     const matchesSearch =
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -619,17 +669,67 @@ export function OrdersPage() {
 
   // 통계 계산
   const stats = {
-    total: orders.length,
-    pending: orders.filter((o) => o.status === "대기중").length,
-    inProgress: orders.filter((o) => o.status === "진행중").length,
-    completed: orders.filter((o) => o.status === "완료").length,
+    total: allOrders.length,
+    pending: allOrders.filter((o) => o.status === "대기중").length,
+    inProgress: allOrders.filter((o) => o.status === "진행중").length,
+    completed: allOrders.filter((o) => o.status === "완료").length,
+  };
+
+  const exportToCSV = () => {
+    const csvData = filteredOrders.map(order => ({
+      '주문번호': order.orderNumber,
+      '고객명': order.customer,
+      '회사명': order.company,
+      '상태': order.status,
+      '우선순위': order.priority,
+      '주문일자': order.orderDate,
+      '납기일자': order.dueDate,
+      '주문금액': order.totalAmount.toLocaleString(),
+      '품목수': order.items,
+      '담당자': order.representative,
+      '진행률': `${order.progress}%`
+    }));
+
+    const csvContent = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `orders_${selectedDataSource}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
     <div style={containerStyle}>
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>주문 관리</h1>
-        <p style={subtitleStyle}>주문 현황을 실시간으로 모니터링하고 관리하세요</p>
+      <div style={{ ...headerStyle }}>
+        <div>
+          <h1 style={titleStyle}>주문 관리</h1>
+          <p style={subtitleStyle}>주문 현황을 실시간으로 모니터링하고 관리하세요</p>
+        </div>
+        {/* 데이터 소스 표시 배지 */}
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "0.25rem 0.75rem",
+            borderRadius: "9999px",
+            fontSize: "0.75rem",
+            fontWeight: "500",
+            backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
+            color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
+            border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : "#fcd34d"}`,
+            marginTop: "0.75rem",
+          }}
+        >
+          {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -655,6 +755,20 @@ export function OrdersPage() {
       {/* Actions Bar */}
       <div style={actionsBarStyle}>
         <div style={searchContainerStyle}>
+          {/* 데이터 소스 선택 */}
+          <select
+            value={selectedDataSource}
+            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+            style={{
+              ...filterSelectStyle,
+              minWidth: "200px",
+              marginRight: "0.5rem"
+            }}
+          >
+            <option value="erp">닷코 시연 데이터</option>
+            <option value="sample">생성된 샘플 데이터</option>
+          </select>
+          
           <div style={{ position: "relative" }}>
             <Search
               style={{

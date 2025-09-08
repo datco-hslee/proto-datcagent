@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Badge } from "@/components/ui/Badge";
 import { Search, Plus, Filter, Download, Edit, Eye, Package, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
+import erpDataJson from '../../DatcoDemoData2.json';
 
 interface InventoryItem {
   id: string;
@@ -16,18 +18,26 @@ interface InventoryItem {
   supplier: string;
   lastUpdated: string;
   status: "정상" | "부족" | "과다" | "없음";
+  // 품목마스터 정보
+  itemCategory?: string; // 품목구분
+  standardPrice?: number; // 표준단가
+  moq?: number; // MOQ
+  safetyStock?: number; // 안전재고
+  leadTimeDays?: number; // 리드타임일
 }
 
 export function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("전체");
   const [selectedStatus, setSelectedStatus] = useState("전체");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [showNewItem, setShowNewItem] = useState(false);
   const [showViewItem, setShowViewItem] = useState(false);
   const [showEditItem, setShowEditItem] = useState(false);
   const [showAdjustStock, setShowAdjustStock] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   
   // 고급 필터 상태
   const [advancedFilters, setAdvancedFilters] = useState({
@@ -69,6 +79,12 @@ export function InventoryPage() {
     location: "",
     supplier: "",
     status: "",
+    // 품목마스터 정보
+    itemCategory: "",
+    standardPrice: "",
+    moq: "",
+    safetyStock: "",
+    leadTimeDays: "",
   });
   
   // 재고 조정 폼 상태
@@ -273,10 +289,72 @@ export function InventoryPage() {
     transition: "all 0.2s ease",
   };
 
-  // 샘플 데이터를 state로 변경
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([
+  // ERP 데이터에서 재고 정보 가져오기
+  const getInventoryFromERPData = (): InventoryItem[] => {
+    const inventory = erpDataJson.sheets?.['재고배치'] || [];
+    const itemMaster = erpDataJson.sheets?.품목마스터 || [];
+    const suppliers = erpDataJson.sheets?.거래처마스터 || [];
+    
+    const erpInventoryItems = inventory.map((batch: any) => {
+      const item = itemMaster.find((item: any) => item.품목코드 === batch.품목코드);
+      const supplier = suppliers.find((sup: any) => sup.구분 === "공급사");
+      
+      const currentStock = batch.현재고 || 0;
+      const minStock = item?.안전재고 || 100;
+      const maxStock = (item?.MOQ || 1000) * 2;
+      const unitPrice = item?.표준단가 || 1000;
+      
+      let status: "정상" | "부족" | "과다" | "없음" = "정상";
+      if (currentStock === 0) status = "없음";
+      else if (currentStock < minStock) status = "부족";
+      else if (currentStock > maxStock * 0.9) status = "과다";
+      
+      return {
+        id: `ERP-${batch.배치번호}`,
+        code: batch.품목코드,
+        name: item?.품목명 || `품목-${batch.품목코드}`,
+        category: item?.품목구분 === "완제품" ? "완제품" : 
+                 item?.품목구분 === "원자재" ? "원자재" : "부자재",
+        currentStock,
+        minStock,
+        maxStock,
+        unit: batch.단위 || "EA",
+        unitPrice,
+        totalValue: currentStock * unitPrice,
+        location: `${batch.창고코드}-${batch.로케이션}`,
+        supplier: supplier?.거래처명 || "미지정",
+        lastUpdated: batch.입고일자 || "2025-09-01",
+        status,
+        // 품목마스터 정보 추가
+        itemCategory: item?.품목구분 || "미정",
+        standardPrice: item?.표준단가 || 0,
+        moq: item?.MOQ || 0,
+        safetyStock: item?.안전재고 || 0,
+        leadTimeDays: item?.리드타임일 || 0
+      };
+    });
+    
+    return erpInventoryItems;
+  };
+
+  // 현재 선택된 데이터 소스에 따라 재고 데이터 반환
+  const getCurrentInventoryItems = (): InventoryItem[] => {
+    if (selectedDataSource === "erp") {
+      return getInventoryFromERPData();
+    } else {
+      return getSampleInventoryItems();
+    }
+  };
+
+  // 데이터 소스 변경 시 재고 데이터 업데이트
+  useEffect(() => {
+    setInventoryItems(getCurrentInventoryItems());
+  }, [selectedDataSource]);
+
+  // 생성된 샘플 데이터
+  const getSampleInventoryItems = (): InventoryItem[] => [
     {
-      id: "INV-001",
+      id: "GEN-001",
       code: "RAW-001",
       name: "스테인리스 스틸 파이프",
       category: "원자재",
@@ -287,12 +365,12 @@ export function InventoryPage() {
       unitPrice: 45000,
       totalValue: 20250000,
       location: "창고A-1구역",
-      supplier: "한국철강",
-      lastUpdated: "2024-01-18",
+      supplier: "대한철강",
+      lastUpdated: "2025-09-07",
       status: "정상",
     },
     {
-      id: "INV-002",
+      id: "GEN-002",
       code: "COMP-001",
       name: "제어 모듈",
       category: "부품",
@@ -308,7 +386,7 @@ export function InventoryPage() {
       status: "부족",
     },
     {
-      id: "INV-003",
+      id: "GEN-003",
       code: "FIN-001",
       name: "완제품 A형",
       category: "완제품",
@@ -324,7 +402,7 @@ export function InventoryPage() {
       status: "정상",
     },
     {
-      id: "INV-004",
+      id: "GEN-004",
       code: "RAW-002",
       name: "알루미늄 시트",
       category: "원자재",
@@ -340,7 +418,7 @@ export function InventoryPage() {
       status: "없음",
     },
     {
-      id: "INV-005",
+      id: "GEN-005",
       code: "TOOL-001",
       name: "정밀 드릴 비트",
       category: "공구",
@@ -355,7 +433,12 @@ export function InventoryPage() {
       lastUpdated: "2024-01-16",
       status: "과다",
     },
-  ]);
+  ];
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    setInventoryItems(getCurrentInventoryItems());
+  }, []);
 
   const filteredItems = inventoryItems.filter((item) => {
     const matchesSearch =
@@ -496,6 +579,12 @@ export function InventoryPage() {
       location: item.location,
       supplier: item.supplier,
       status: item.status,
+      // 품목마스터 정보
+      itemCategory: item.itemCategory || "",
+      standardPrice: (item.standardPrice || 0).toString(),
+      moq: (item.moq || 0).toString(),
+      safetyStock: (item.safetyStock || 0).toString(),
+      leadTimeDays: (item.leadTimeDays || 0).toString(),
     });
     setShowEditItem(true);
   };
@@ -715,8 +804,17 @@ export function InventoryPage() {
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>재고 관리</h1>
-        <p style={subtitleStyle}>실시간 재고 현황을 모니터링하고 효율적으로 관리하세요</p>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", width: "100%" }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <h1 style={titleStyle}>재고 관리</h1>
+            <p style={subtitleStyle}>실시간 재고 현황을 모니터링하고 효율적으로 관리하세요</p>
+            <div style={{ marginTop: "0.5rem" }}>
+              <Badge variant={selectedDataSource === "erp" ? "default" : "secondary"}>
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              </Badge>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -781,6 +879,20 @@ export function InventoryPage() {
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            {/* <label style={{ fontSize: "0.875rem", fontWeight: 500, color: "#374151" }}>데이터 소스:</label> */}
+            <select 
+              style={filterSelectStyle} 
+              value={selectedDataSource} 
+              onChange={(e) => {
+                const newSource = e.target.value as "erp" | "sample";
+                setSelectedDataSource(newSource);
+              }}
+            >
+              <option value="erp">닷코 시연 데이터</option>
+              <option value="sample">생성된 샘플 데이터</option>
+            </select>
+          </div>
           <button style={secondaryButtonStyle} onClick={() => setShowAdvancedFilter(true)}>
             <Filter style={{ height: "1rem", width: "1rem" }} />
             고급 필터
@@ -1203,17 +1315,93 @@ export function InventoryPage() {
               <button style={closeButtonStyle} onClick={closeModals}>×</button>
             </div>
             <div style={modalContentStyle}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>품목코드</label>
-                  <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
-                    {selectedItem.code}
+              {/* 기본 정보 */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#374151", marginBottom: "1rem", borderBottom: "2px solid #e5e7eb", paddingBottom: "0.5rem" }}>기본 정보</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>품목코드</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                      {selectedItem.code}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>품목명</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                      {selectedItem.name}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>품목명</label>
-                  <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
-                    {selectedItem.name}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>품목구분</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                      {selectedItem.itemCategory || "미정"}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>단위</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                      {selectedItem.unit}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 품목마스터 정보 */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#374151", marginBottom: "1rem", borderBottom: "2px solid #e5e7eb", paddingBottom: "0.5rem" }}>품목마스터 정보</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>표준단가</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f0f9ff", borderRadius: "0.5rem", fontSize: "0.875rem", color: "#1e40af" }}>
+                      ₩{(selectedItem.standardPrice || 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>MOQ</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f0fdf4", borderRadius: "0.5rem", fontSize: "0.875rem", color: "#16a34a" }}>
+                      {(selectedItem.moq || 0).toLocaleString()} {selectedItem.unit}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>안전재고</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#fffbeb", borderRadius: "0.5rem", fontSize: "0.875rem", color: "#d97706" }}>
+                      {(selectedItem.safetyStock || 0).toLocaleString()} {selectedItem.unit}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>리드타임일</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#fef2f2", borderRadius: "0.5rem", fontSize: "0.875rem", color: "#dc2626" }}>
+                      {selectedItem.leadTimeDays || 0}일
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 재고 정보 */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#374151", marginBottom: "1rem", borderBottom: "2px solid #e5e7eb", paddingBottom: "0.5rem" }}>재고 정보</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>현재고</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                      {selectedItem.currentStock.toLocaleString()} {selectedItem.unit}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>최소재고</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                      {selectedItem.minStock.toLocaleString()} {selectedItem.unit}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600 }}>최대재고</label>
+                    <div style={{ padding: "0.75rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem", fontSize: "0.875rem" }}>
+                      {selectedItem.maxStock.toLocaleString()} {selectedItem.unit}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1446,6 +1634,99 @@ export function InventoryPage() {
                     <option value="과다">과다</option>
                     <option value="없음">없음</option>
                   </select>
+                </div>
+              </div>
+
+              {/* 품목마스터 정보 */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <h3 style={{ fontSize: "1.125rem", fontWeight: 600, color: "#374151", marginBottom: "1rem", borderBottom: "2px solid #e5e7eb", paddingBottom: "0.5rem" }}>품목마스터 정보</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>품목구분</label>
+                    <select
+                      value={editItemForm.itemCategory}
+                      onChange={(e) => setEditItemForm({...editItemForm, itemCategory: e.target.value})}
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        fontSize: "0.875rem",
+                        backgroundColor: "white",
+                      }}
+                    >
+                      <option value="">품목구분 선택</option>
+                      <option value="완제품">완제품</option>
+                      <option value="원자재">원자재</option>
+                      <option value="부자재">부자재</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>표준단가</label>
+                    <input
+                      type="number"
+                      value={editItemForm.standardPrice}
+                      onChange={(e) => setEditItemForm({...editItemForm, standardPrice: e.target.value})}
+                      placeholder="표준단가를 입력하세요"
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        fontSize: "0.875rem",
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>MOQ</label>
+                    <input
+                      type="number"
+                      value={editItemForm.moq}
+                      onChange={(e) => setEditItemForm({...editItemForm, moq: e.target.value})}
+                      placeholder="최소주문량"
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        fontSize: "0.875rem",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>안전재고</label>
+                    <input
+                      type="number"
+                      value={editItemForm.safetyStock}
+                      onChange={(e) => setEditItemForm({...editItemForm, safetyStock: e.target.value})}
+                      placeholder="안전재고량"
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        fontSize: "0.875rem",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>리드타임일</label>
+                    <input
+                      type="number"
+                      value={editItemForm.leadTimeDays}
+                      onChange={(e) => setEditItemForm({...editItemForm, leadTimeDays: e.target.value})}
+                      placeholder="리드타임(일)"
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        fontSize: "0.875rem",
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 

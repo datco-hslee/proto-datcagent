@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Search, Plus, Filter, Download, Edit, Send, Clock, CheckCircle, XCircle, FileText } from "lucide-react";
+import erpDataJson from '../../DatcoDemoData2.json';
 
 interface Quote {
   id: string;
@@ -20,6 +21,7 @@ interface Quote {
 export function QuotesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("전체");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
   const [dateRange, setDateRange] = useState("전체");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [showCreateQuote, setShowCreateQuote] = useState(false);
@@ -187,7 +189,7 @@ export function QuotesPage() {
 
     const newQuote: Quote = {
       id: `QUO-${Date.now()}`,
-      quoteNumber: newQuoteForm.quoteNumber || `QT-2024-${String(quotes.length + 1).padStart(3, '0')}`,
+      quoteNumber: newQuoteForm.quoteNumber || `QT-2024-${String(allQuotes.length + 1).padStart(3, '0')}`,
       customer: newQuoteForm.customer,
       company: newQuoteForm.company,
       status: newQuoteForm.status as Quote['status'],
@@ -201,7 +203,7 @@ export function QuotesPage() {
       notes: newQuoteForm.notes,
     };
 
-    setQuotes([...quotes, newQuote]);
+    setUserAddedQuotes([...userAddedQuotes, newQuote]);
     setNewQuoteForm({
       quoteNumber: "",
       customer: "",
@@ -242,7 +244,7 @@ export function QuotesPage() {
       notes: editQuoteForm.notes,
     };
 
-    setQuotes(quotes.map(quote => quote.id === editingQuote!.id ? updatedQuote : quote));
+    setUserAddedQuotes(userAddedQuotes.map((quote: Quote) => quote.id === editingQuote!.id ? updatedQuote : quote));
     setEditingQuote(null);
     alert('견적이 성공적으로 수정되었습니다.');
   };
@@ -483,86 +485,113 @@ export function QuotesPage() {
     transition: "all 0.2s ease",
   };
 
-  // 샘플 데이터를 state로 변경
-  const [quotes, setQuotes] = useState<Quote[]>([
-    {
-      id: "QUO-001",
-      quoteNumber: "QT-2024-001",
-      customer: "김철수",
-      company: "ABC 제조업체",
-      status: "발송완료",
-      quoteDate: "2024-01-15",
-      validUntil: "2024-02-15",
-      totalAmount: 50000000,
-      discount: 2500000,
-      finalAmount: 47500000,
-      items: 5,
-      representative: "이영희",
-      notes: "긴급 프로젝트 건",
-    },
-    {
-      id: "QUO-002",
-      quoteNumber: "QT-2024-002",
-      customer: "박영희",
-      company: "XYZ 솔루션",
-      status: "승인",
-      quoteDate: "2024-01-18",
-      validUntil: "2024-02-28",
-      totalAmount: 35000000,
-      discount: 1000000,
-      finalAmount: 34000000,
-      items: 3,
-      representative: "김대표",
-      notes: "장기 계약 할인 적용",
-    },
-    {
-      id: "QUO-003",
-      quoteNumber: "QT-2024-003",
-      customer: "정민수",
-      company: "DEF 엔지니어링",
-      status: "발송대기",
-      quoteDate: "2024-01-20",
-      validUntil: "2024-02-20",
-      totalAmount: 28000000,
-      discount: 0,
-      finalAmount: 28000000,
-      items: 4,
-      representative: "이영희",
-      notes: "",
-    },
-    {
-      id: "QUO-004",
-      quoteNumber: "QT-2024-004",
-      customer: "최수진",
-      company: "GHI 테크놀로지",
-      status: "임시저장",
-      quoteDate: "2024-01-22",
-      validUntil: "2024-03-01",
-      totalAmount: 67000000,
-      discount: 3000000,
-      finalAmount: 64000000,
-      items: 8,
-      representative: "김대표",
-      notes: "검토 중인 사양서 반영 필요",
-    },
-    {
-      id: "QUO-005",
-      quoteNumber: "QT-2024-005",
-      customer: "윤정호",
-      company: "JKL 시스템즈",
-      status: "거절",
-      quoteDate: "2024-01-12",
-      validUntil: "2024-01-30",
-      totalAmount: 23000000,
-      discount: 500000,
-      finalAmount: 22500000,
-      items: 2,
-      representative: "이영희",
-      notes: "예산 초과로 거절",
-    },
-  ]);
+  // ERP 데이터에서 견적 추출 (수주 데이터 활용)
+  const getERPQuotes = (): Quote[] => {
+    const orders = erpDataJson.sheets.수주 || [];
+    const customers = erpDataJson.sheets.거래처마스터 || [];
+    const items = erpDataJson.sheets.품목마스터 || [];
 
-  const filteredQuotes = quotes.filter((quote) => {
+    return orders.map((order: any) => {
+      const customer = customers.find((c: any) => c.거래처코드 === order.거래처코드);
+      const item = items.find((i: any) => i.품목코드 === order.품목코드);
+      
+      // 견적 상태 계산 (수주 상태 기반)
+      let quoteStatus: Quote['status'] = "발송완료";
+      if (order.상태 === "완료") quoteStatus = "승인";
+      else if (order.상태 === "취소") quoteStatus = "거절";
+      else if (new Date(order.납기일자) < new Date()) quoteStatus = "만료";
+      
+      // 할인 계산 (5-15% 랜덤)
+      const discountRate = 0.05 + Math.random() * 0.1;
+      const discount = Math.floor(order.수주금액 * discountRate);
+      
+      // 견적 유효기한 (견적일로부터 30일)
+      const quoteDate = new Date(order.수주일자);
+      const validUntil = new Date(quoteDate);
+      validUntil.setDate(validUntil.getDate() + 30);
+
+      return {
+        id: `ERP-QUO-${order.수주번호}`,
+        quoteNumber: `QT-ERP-${order.수주번호}`,
+        customer: customer?.거래처명 || "담당자",
+        company: customer?.거래처명 || "회사명",
+        status: quoteStatus,
+        quoteDate: order.수주일자,
+        validUntil: validUntil.toISOString().split('T')[0],
+        totalAmount: order.수주금액 + discount,
+        discount: discount,
+        finalAmount: order.수주금액,
+        items: 1,
+        representative: "영업팀",
+        notes: item?.품목명 ? `품목: ${item.품목명}` : "",
+      };
+    });
+  };
+
+  // 샘플 견적 데이터
+  const getSampleQuotes = (): Quote[] => {
+    return [
+      {
+        id: "SAMPLE-QUO-001",
+        quoteNumber: "QT-2024-001",
+        customer: "김철수",
+        company: "ABC 제조업체",
+        status: "발송완료",
+        quoteDate: "2024-01-15",
+        validUntil: "2024-02-15",
+        totalAmount: 50000000,
+        discount: 2500000,
+        finalAmount: 47500000,
+        items: 5,
+        representative: "이영희",
+        notes: "긴급 프로젝트 건",
+      },
+      {
+        id: "SAMPLE-QUO-002",
+        quoteNumber: "QT-2024-002",
+        customer: "박영희",
+        company: "XYZ 솔루션",
+        status: "승인",
+        quoteDate: "2024-01-18",
+        validUntil: "2024-02-28",
+        totalAmount: 35000000,
+        discount: 1000000,
+        finalAmount: 34000000,
+        items: 3,
+        representative: "김대표",
+        notes: "장기 계약 할인 적용",
+      },
+      {
+        id: "SAMPLE-QUO-003",
+        quoteNumber: "QT-2024-003",
+        customer: "정민수",
+        company: "DEF 엔지니어링",
+        status: "발송대기",
+        quoteDate: "2024-01-20",
+        validUntil: "2024-02-20",
+        totalAmount: 28000000,
+        discount: 0,
+        finalAmount: 28000000,
+        items: 4,
+        representative: "이영희",
+        notes: "",
+      },
+    ];
+  };
+
+  // 현재 선택된 데이터 소스에 따른 견적 반환
+  const getCurrentQuotes = (): Quote[] => {
+    return selectedDataSource === "erp" ? getERPQuotes() : getSampleQuotes();
+  };
+
+  // 사용자가 추가한 견적 데이터 (빈 배열로 시작)
+  const [userAddedQuotes, setUserAddedQuotes] = useState<Quote[]>([]);
+
+  // 현재 견적 목록 가져오기
+  const currentQuotes = getCurrentQuotes();
+  const allQuotes = [...currentQuotes, ...userAddedQuotes]; // ERP/샘플 데이터 + 사용자 추가 데이터
+  
+  const filteredQuotes = allQuotes.filter((quote) => {
     const matchesSearch =
       quote.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       quote.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -626,18 +655,36 @@ export function QuotesPage() {
 
   // 통계 계산
   const stats = {
-    total: quotes.length,
-    draft: quotes.filter((q) => q.status === "임시저장").length,
-    sent: quotes.filter((q) => q.status === "발송완료").length,
-    approved: quotes.filter((q) => q.status === "승인").length,
-    totalValue: quotes.filter((q) => q.status === "승인").reduce((sum, quote) => sum + quote.finalAmount, 0),
+    total: allQuotes.length,
+    draft: allQuotes.filter((q: Quote) => q.status === "임시저장").length,
+    sent: allQuotes.filter((q: Quote) => q.status === "발송완료").length,
+    approved: allQuotes.filter((q: Quote) => q.status === "승인").length,
+    totalValue: allQuotes.filter((q: Quote) => q.status === "승인").reduce((sum, quote) => sum + quote.finalAmount, 0),
   };
 
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>견적 관리</h1>
-        <p style={subtitleStyle}>견적서 작성부터 승인까지 전 과정을 효율적으로 관리하세요</p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h1 style={titleStyle}>견적 관리</h1>
+            <p style={subtitleStyle}>견적서 작성부터 승인까지 전 과정을 효율적으로 관리하세요</p>
+          </div>
+          {/* 데이터 소스 표시 배지 */}
+          <div
+            style={{
+              padding: "0.5rem 1rem",
+              borderRadius: "0.5rem",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
+              color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
+              border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : "#fcd34d"}`,
+            }}
+          >
+            현재 데이터: {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+          </div>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -667,6 +714,16 @@ export function QuotesPage() {
       {/* Actions Bar */}
       <div style={actionsBarStyle}>
         <div style={searchContainerStyle}>
+          {/* 데이터 소스 선택 */}
+          <select 
+            style={filterSelectStyle} 
+            value={selectedDataSource} 
+            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+          >
+            <option value="erp">닷코 시연 데이터</option>
+            <option value="sample">생성된 샘플 데이터</option>
+          </select>
+
           <div style={{ position: "relative" }}>
             <Search
               style={{
@@ -822,7 +879,7 @@ export function QuotesPage() {
             color: "#6b7280",
           }}
         >
-          총 {filteredQuotes.length}개의 견적이 표시됨 (전체 {quotes.length}개 중)
+          총 {filteredQuotes.length}개의 견적이 표시됨 (전체 {allQuotes.length}개 중)
         </div>
         <div
           style={{
@@ -833,13 +890,13 @@ export function QuotesPage() {
           }}
         >
           <div style={{ color: "#dc2626", fontWeight: 600, marginBottom: "0.5rem" }}>
-            ⚠️ 곧 만료되는 견적: {quotes.filter((q) => isExpiringSoon(q.validUntil)).length}개
+            ⚠️ 곧 만료되는 견적: {allQuotes.filter((q: Quote) => isExpiringSoon(q.validUntil)).length}개
           </div>
-          <div style={{ color: "#6b7280" }}>만료된 견적: {quotes.filter((q) => isExpired(q.validUntil)).length}개</div>
+          <div style={{ color: "#6b7280" }}>만료된 견적: {allQuotes.filter((q: Quote) => isExpired(q.validUntil)).length}개</div>
         </div>
       </div>
 
-      {/* 모달들 */}
+      {/* Advanced Filter Modal */}
       {showAdvancedFilter && (
         <div style={modalOverlayStyle} onClick={closeModals}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>

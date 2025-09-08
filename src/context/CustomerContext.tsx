@@ -18,6 +18,15 @@ export interface Customer {
   creditRating?: 'AAA' | 'AA' | 'A' | 'BBB' | 'BB';
   paymentTerms?: number;
   contactPerson?: string;
+  // DatcoDemoData2.json 거래처마스터 필드
+  거래처코드?: string;
+  거래처명?: string;
+  구분?: string;
+  결제조건?: string;
+  신용등급?: string;
+  통화?: string;
+  납기리드타임일?: number;
+  인코텀즈?: string;
 }
 
 interface CustomerContextType {

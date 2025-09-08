@@ -14,6 +14,8 @@ export interface Employee {
   skills: string[];
   performanceScore: number;
   avatar?: string;
+  dataSource?: "generated" | "erp" | "demo";
+  dataSourceLabel?: string;
 }
 
 export interface PayrollRecord {
@@ -31,4 +33,12 @@ export interface PayrollRecord {
   netPay: number;
   status: "draft" | "approved" | "paid" | "cancelled";
   payDate: string;
+  // ERP 인원마스터 추가 속성
+  grade?: string; // 등급
+  productionLine?: string; // 라인
+  standardCycleTimeRail?: number; // 표준CT초(레일)
+  standardCycleTimeFrame?: number; // 표준CT초(프레임)
+  baseHourlyRate?: number; // 기본시급
+  overtimeHourlyRate?: number; // 잔업시급
+  specialWorkHourlyRate?: number; // 특근시급
 }

@@ -3,8 +3,24 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
-import { Search, Plus, Filter, Eye, Clock, Calendar, User, CheckCircle, AlertCircle, Coffee, Home, Briefcase, BarChart3 } from "lucide-react";
-import { useEmployees } from "@/context/EmployeeContext";
+import { useEmployees } from "../context/EmployeeContext";
+import erpDataJson from "../../DatcoDemoData2.json";
+import {
+  Search,
+  Plus,
+  Filter,
+  Eye,
+  Download,
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  User,
+  Briefcase,
+  Home,
+  Coffee,
+} from "lucide-react";
 import styles from "./AttendancePage.module.css";
 
 interface AttendanceRecord {
@@ -13,104 +29,174 @@ interface AttendanceRecord {
   employeeName: string;
   department: string;
   date: string;
-  checkIn?: string;
-  checkOut?: string;
+  checkInTime: string;
+  checkOutTime: string;
+  workHours: string;
+  status: "present" | "absent" | "late" | "early_leave" | "vacation" | "sick_leave";
+  overtime: string;
+  notes?: string;
   breakStart?: string;
   breakEnd?: string;
-  workingHours: number;
-  overtimeHours: number;
-  status: "present" | "absent" | "late" | "early_leave" | "vacation" | "sick_leave";
-  notes?: string;
+  overtimeHours?: number;
 }
 
-const mockAttendanceRecords: AttendanceRecord[] = [
-  {
-    id: "1",
-    employeeId: "EMP001",
-    employeeName: "김철수",
-    department: "개발팀",
-    date: "2024-01-21",
-    checkIn: "09:00",
-    checkOut: "18:30",
-    breakStart: "12:00",
-    breakEnd: "13:00",
-    workingHours: 8.5,
-    overtimeHours: 0.5,
-    status: "present",
-  },
-  {
-    id: "2",
-    employeeId: "EMP002",
-    employeeName: "이영희",
-    department: "마케팅팀",
-    date: "2024-01-21",
-    checkIn: "09:15",
-    checkOut: "18:00",
-    breakStart: "12:00",
-    breakEnd: "13:00",
-    workingHours: 7.75,
-    overtimeHours: 0,
-    status: "late",
-  },
-  {
-    id: "3",
-    employeeId: "EMP003",
-    employeeName: "박지민",
-    department: "영업팀",
-    date: "2024-01-21",
-    checkIn: "08:45",
-    checkOut: "17:30",
-    breakStart: "12:00",
-    breakEnd: "13:00",
-    workingHours: 7.75,
-    overtimeHours: 0,
-    status: "early_leave",
-  },
-  {
-    id: "4",
-    employeeId: "EMP004",
-    employeeName: "최민수",
-    department: "인사팀",
-    date: "2024-01-21",
-    workingHours: 0,
-    overtimeHours: 0,
-    status: "vacation",
-    notes: "연차휴가",
-  },
-  {
-    id: "5",
-    employeeId: "EMP005",
-    employeeName: "정수현",
-    department: "회계팀",
-    date: "2024-01-21",
-    workingHours: 0,
-    overtimeHours: 0,
-    status: "sick_leave",
-    notes: "병가",
-  },
-  {
-    id: "6",
-    employeeId: "EMP006",
-    employeeName: "강민준",
-    department: "개발팀",
-    date: "2024-01-21",
-    checkIn: "09:00",
-    checkOut: "20:00",
-    breakStart: "12:00",
-    breakEnd: "13:00",
-    workingHours: 10,
-    overtimeHours: 2,
-    status: "present",
-  },
-];
+// ERP 인원마스터 데이터를 기반으로 출근 기록 생성 (오늘 날짜만)
+const getERPAttendanceRecords = (): AttendanceRecord[] => {
+  const today = new Date();
+  const records: AttendanceRecord[] = [];
+  const employees = erpDataJson.sheets.인원마스터 || [];
+  const dateStr = today.toISOString().split('T')[0];
+
+  employees.forEach((emp: any, empIndex: number) => {
+    // 95% 확률로 출근 (ERP 직원들은 더 성실함)
+    if (Math.random() > 0.05) {
+      const checkInHour = 8 + Math.floor(Math.random() * 2); // 8-9시 사이
+      const checkInMinute = Math.floor(Math.random() * 60);
+      const checkOutHour = 17 + Math.floor(Math.random() * 3); // 17-19시 사이
+      const checkOutMinute = Math.floor(Math.random() * 60);
+
+      const checkInTime = `${checkInHour.toString().padStart(2, '0')}:${checkInMinute.toString().padStart(2, '0')}`;
+      const checkOutTime = `${checkOutHour.toString().padStart(2, '0')}:${checkOutMinute.toString().padStart(2, '0')}`;
+
+      // 근무 시간 계산
+      const workMinutes = (checkOutHour * 60 + checkOutMinute) - (checkInHour * 60 + checkInMinute);
+      const workHours = Math.floor(workMinutes / 60);
+      const remainingMinutes = workMinutes % 60;
+
+      // 상태 결정
+      let status: AttendanceRecord["status"] = "present";
+      if (checkInHour > 9 || (checkInHour === 9 && checkInMinute > 0)) {
+        status = "late";
+      }
+      if (workHours < 8) {
+        status = "early_leave";
+      }
+
+      records.push({
+        id: `attendance-erp-${emp.사번}-${dateStr}`,
+        employeeId: emp.사번,
+        employeeName: emp.성명,
+        department: emp.직무,
+        date: dateStr,
+        checkInTime,
+        checkOutTime,
+        workHours: `${workHours}:${remainingMinutes.toString().padStart(2, '0')}`,
+        status,
+        overtime: workHours > 8 ? `${workHours - 8}:${remainingMinutes.toString().padStart(2, '0')}` : "0:00",
+        notes: status === "late" ? "지각" : status === "early_leave" ? "조퇴" : ""
+      });
+    } else {
+      // 결근
+      records.push({
+        id: `attendance-erp-${emp.사번}-${dateStr}`,
+        employeeId: emp.사번,
+        employeeName: emp.성명,
+        department: emp.직무,
+        date: dateStr,
+        checkInTime: "",
+        checkOutTime: "",
+        workHours: "0:00",
+        status: "absent",
+        overtime: "0:00",
+        notes: "결근"
+      });
+    }
+  });
+
+  return records;
+};
+
+// 샘플 출근 기록 데이터 생성 함수
+const getSampleAttendanceRecords = (): AttendanceRecord[] => {
+  const today = new Date();
+  const records: AttendanceRecord[] = [];
+
+  // 최근 30일간의 출근 기록 생성
+  for (let i = 0; i < 30; i++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+
+    // 주말 제외
+    if (date.getDay() === 0 || date.getDay() === 6) continue;
+
+    const dateStr = date.toISOString().split('T')[0];
+
+    // 5명의 직원에 대한 출근 기록
+    const employees = [
+      { id: "EMP001", name: "김철수", department: "개발팀" },
+      { id: "EMP002", name: "이영희", department: "마케팅팀" },
+      { id: "EMP003", name: "박민수", department: "영업팀" },
+      { id: "EMP004", name: "최지훈", department: "인사팀" },
+      { id: "EMP005", name: "정다인", department: "재무팀" }
+    ];
+
+    employees.forEach((emp, empIndex) => {
+      // 90% 확률로 출근
+      if (Math.random() > 0.1) {
+        const checkInHour = 8 + Math.floor(Math.random() * 2); // 8-9시 사이
+        const checkInMinute = Math.floor(Math.random() * 60);
+        const checkOutHour = 17 + Math.floor(Math.random() * 3); // 17-19시 사이
+        const checkOutMinute = Math.floor(Math.random() * 60);
+
+        const checkInTime = `${checkInHour.toString().padStart(2, '0')}:${checkInMinute.toString().padStart(2, '0')}`;
+        const checkOutTime = `${checkOutHour.toString().padStart(2, '0')}:${checkOutMinute.toString().padStart(2, '0')}`;
+
+        // 근무 시간 계산
+        const workMinutes = (checkOutHour * 60 + checkOutMinute) - (checkInHour * 60 + checkInMinute);
+        const workHours = Math.floor(workMinutes / 60);
+        const remainingMinutes = workMinutes % 60;
+
+        // 상태 결정
+        let status: AttendanceRecord["status"] = "present";
+        if (checkInHour > 9 || (checkInHour === 9 && checkInMinute > 0)) {
+          status = "late";
+        }
+        if (workHours < 8) {
+          status = "early_leave";
+        }
+
+        records.push({
+          id: `attendance-${emp.id}-${dateStr}`,
+          employeeId: emp.id,
+          employeeName: emp.name,
+          department: emp.department,
+          date: dateStr,
+          checkInTime,
+          checkOutTime,
+          workHours: `${workHours}:${remainingMinutes.toString().padStart(2, '0')}`,
+          status,
+          overtime: workHours > 8 ? `${workHours - 8}:${remainingMinutes.toString().padStart(2, '0')}` : "0:00",
+          notes: status === "late" ? "지각" : status === "early_leave" ? "조퇴" : ""
+        });
+      } else {
+        // 결근
+        records.push({
+          id: `attendance-${emp.id}-${dateStr}`,
+          employeeId: emp.id,
+          employeeName: emp.name,
+          department: emp.department,
+          date: dateStr,
+          checkInTime: "",
+          checkOutTime: "",
+          workHours: "0:00",
+          status: "absent",
+          overtime: "0:00",
+          notes: "결근"
+        });
+      }
+    });
+  }
+
+  return records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+};
 
 const statusConfig = {
   present: { label: "정상출근", color: "success", icon: CheckCircle },
-  absent: { label: "결근", color: "destructive", icon: AlertCircle },
+  absent: { label: "결근", color: "destructive", icon: AlertTriangle },
   late: { label: "지각", color: "destructive", icon: Clock },
   early_leave: { label: "조퇴", color: "secondary", icon: Home },
   vacation: { label: "휴가", color: "default", icon: Coffee },
-  sick_leave: { label: "병가", color: "secondary", icon: AlertCircle },
+  sick_leave: { label: "병가", color: "secondary", icon: AlertTriangle },
 };
 
 export const AttendancePage: React.FC = () => {
@@ -121,36 +207,48 @@ export const AttendancePage: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
   const [newRecord, setNewRecord] = useState<Partial<AttendanceRecord>>({});
 
-  // 직원 데이터를 기반으로 근태 기록 생성
-  const generateAttendanceRecordsFromEmployees = () => {
+  // 직원 데이터를 기반으로 출근 기록 생성
+  const generateAttendanceRecordsFromEmployees = (): AttendanceRecord[] => {
     const activeEmployees = employees.filter(emp => emp.status === "재직");
     const today = new Date().toISOString().split('T')[0];
-    
+
     return activeEmployees.map(emp => ({
       id: `att_${emp.id}_${today}`,
       employeeId: emp.employeeId,
       employeeName: emp.name,
       department: emp.department,
       date: today,
-      checkIn: "09:00",
-      checkOut: "18:00",
-      breakStart: "12:00",
-      breakEnd: "13:00",
-      workingHours: 8,
-      overtimeHours: 0,
+      checkInTime: "09:00",
+      checkOutTime: "18:00",
+      workHours: "8:00",
       status: "present" as const,
+      overtime: "0:00",
+      notes: ""
     }));
   };
 
-  useEffect(() => {
-    if (employees.length > 0) {
-      setAttendanceRecords(generateAttendanceRecordsFromEmployees());
+  // 현재 출근 기록 가져오기
+  const getCurrentAttendanceRecords = (): AttendanceRecord[] => {
+    if (selectedDataSource === "sample") {
+      return getSampleAttendanceRecords();
+    } else {
+      // ERP 인원마스터 데이터 기반 출근 기록
+      return getERPAttendanceRecords();
     }
-  }, [employees]);
+  };
 
-  const filteredRecords = attendanceRecords.filter((record) => {
+  // 데이터 소스 변경 시 출근 기록 업데이트
+  useEffect(() => {
+    const records = getCurrentAttendanceRecords();
+    setAttendanceRecords(records);
+  }, [selectedDataSource]);
+
+  const currentAttendanceRecords = getCurrentAttendanceRecords();
+
+  const filteredRecords = currentAttendanceRecords.filter((record) => {
     const matchesSearch =
       record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -166,13 +264,19 @@ export const AttendancePage: React.FC = () => {
   };
 
   // 통계 계산
-  const totalEmployees = attendanceRecords.length;
-  const presentEmployees = attendanceRecords.filter((r) => r.status === "present").length;
-  const lateEmployees = attendanceRecords.filter((r) => r.status === "late").length;
-  const totalWorkingHours = attendanceRecords.reduce((sum, r) => sum + r.workingHours, 0);
-  const totalOvertimeHours = attendanceRecords.reduce((sum, r) => sum + r.overtimeHours, 0);
+  const totalEmployees = [...new Set(currentAttendanceRecords.map(r => r.employeeId))].length;
+  const presentEmployees = currentAttendanceRecords.filter((r) => r.status === "present").length;
+  const lateEmployees = currentAttendanceRecords.filter((r) => r.status === "late").length;
+  const totalWorkingHours = currentAttendanceRecords.reduce((sum, r) => {
+    const [hours, minutes] = r.workHours.split(':').map(Number);
+    return sum + hours + (minutes / 60);
+  }, 0);
+  const totalOvertimeHours = currentAttendanceRecords.reduce((sum, r) => {
+    const [hours, minutes] = r.overtime.split(':').map(Number);
+    return sum + hours + (minutes / 60);
+  }, 0);
 
-  const departments = [...new Set(attendanceRecords.map((r) => r.department))];
+  const departments = [...new Set(currentAttendanceRecords.map((r) => r.department))];
 
   // 근태 기록 추가 핸들러
   const handleAddRecord = () => {
@@ -187,11 +291,12 @@ export const AttendancePage: React.FC = () => {
       employeeName: employee.name,
       department: employee.department,
       date: newRecord.date || new Date().toISOString().split('T')[0],
-      checkIn: newRecord.checkIn,
-      checkOut: newRecord.checkOut,
+      checkInTime: newRecord.checkInTime || "",
+      checkOutTime: newRecord.checkOutTime || "",
+      workHours: newRecord.workHours || "0:00",
+      overtime: newRecord.overtime || "0:00",
       breakStart: newRecord.breakStart,
       breakEnd: newRecord.breakEnd,
-      workingHours: newRecord.workingHours || 0,
       overtimeHours: newRecord.overtimeHours || 0,
       status: newRecord.status || "present",
       notes: newRecord.notes,
@@ -264,6 +369,37 @@ export const AttendancePage: React.FC = () => {
         </div>
 
         <div className={styles.controls}>
+          {/* 데이터 소스 선택 */}
+          <div className={styles.filterGroup}>
+            {/* <label className={styles.filterLabel}>데이터 소스</label> */}
+            <select
+              className={styles.filterSelect}
+              value={selectedDataSource}
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+            >
+              <option value="erp">닷코 시연 데이터</option>
+              <option value="sample">생성된 샘플 데이터</option>
+            </select>
+          </div>
+          
+          {/* 데이터 소스 표시 배지 */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: '600',
+            backgroundColor: selectedDataSource === 'erp' ? '#3b82f6' : '#f59e0b',
+            color: 'white',
+            marginLeft: '8px',
+            marginTop: '4px',
+            whiteSpace: 'nowrap',
+            height: '28px'
+          }}>
+            {selectedDataSource === 'erp' ? '닷코 시연 데이터' : '생성된 샘플 데이터'}
+          </div>
+          
           <div className={styles.searchBox}>
             <Search className={styles.searchIcon} />
             <Input
@@ -330,16 +466,16 @@ export const AttendancePage: React.FC = () => {
                   </Badge>
                 </div>
 
-                {record.checkIn && record.checkOut ? (
+                {record.checkInTime && record.checkOutTime ? (
                   <div className={styles.timeSection}>
                     <div className={styles.timeGrid}>
                       <div className={styles.timeItem}>
                         <span className={styles.timeLabel}>출근</span>
-                        <span className={styles.timeValue}>{record.checkIn}</span>
+                        <span className={styles.timeValue}>{record.checkInTime}</span>
                       </div>
                       <div className={styles.timeItem}>
                         <span className={styles.timeLabel}>퇴근</span>
-                        <span className={styles.timeValue}>{record.checkOut}</span>
+                        <span className={styles.timeValue}>{record.checkOutTime || "미체크"}</span>
                       </div>
                       {record.breakStart && record.breakEnd && (
                         <>
@@ -369,15 +505,15 @@ export const AttendancePage: React.FC = () => {
                       <Briefcase className={styles.hoursIcon} />
                       <div className={styles.hoursData}>
                         <span className={styles.hoursLabel}>근무시간</span>
-                        <span className={styles.hoursValue}>{record.workingHours}h</span>
+                        <span className={styles.hoursValue}>{record.workHours || "0시간"}</span>
                       </div>
                     </div>
-                    {record.overtimeHours > 0 && (
+                    {record.overtimeHours && record.overtimeHours > 0 && (
                       <div className={styles.hoursItem}>
                         <Clock className={styles.hoursIcon} />
                         <div className={styles.hoursData}>
                           <span className={styles.hoursLabel}>연장근무</span>
-                          <span className={styles.overtimeValue}>{record.overtimeHours}h</span>
+                          <span className={styles.overtimeValue}>{record.overtimeHours}시간</span>
                         </div>
                       </div>
                     )}
@@ -415,30 +551,31 @@ export const AttendancePage: React.FC = () => {
                 <div className={styles.modalDetailSection}>
                   <h4>출퇴근 기록</h4>
                   <div className={styles.modalDetailGrid}>
-                    {selectedRecord.checkIn ? (
+                    <div className={styles.modalDetailRow}>
+                      <span>체크인:</span>
+                      <span>{selectedRecord.checkInTime || "미체크인"}</span>
+                    </div>
+                    <div className={styles.modalDetailRow}>
+                      <span>체크아웃:</span>
+                      <span>{selectedRecord.checkOutTime || "미체크아웃"}</span>
+                    </div>
+                    <div className={styles.modalDetailRow}>
+                      <span>근무시간:</span>
+                      <span>{selectedRecord.workHours || "0시간"}</span>
+                    </div>
+                    {selectedRecord.breakStart && selectedRecord.breakEnd && (
                       <>
                         <div className={styles.modalDetailRow}>
-                          <span>출근시간:</span>
-                          <span>{selectedRecord.checkIn}</span>
+                          <span>휴게시작:</span>
+                          <span>{selectedRecord.breakStart}</span>
                         </div>
                         <div className={styles.modalDetailRow}>
-                          <span>퇴근시간:</span>
-                          <span>{selectedRecord.checkOut || "미체크"}</span>
+                          <span>휴게종료:</span>
+                          <span>{selectedRecord.breakEnd}</span>
                         </div>
-                        {selectedRecord.breakStart && (
-                          <>
-                            <div className={styles.modalDetailRow}>
-                              <span>휴게시작:</span>
-                              <span>{selectedRecord.breakStart}</span>
-                            </div>
-                            <div className={styles.modalDetailRow}>
-                              <span>휴게종료:</span>
-                              <span>{selectedRecord.breakEnd}</span>
-                            </div>
-                          </>
-                        )}
                       </>
-                    ) : (
+                    )}
+                    {(!selectedRecord.checkInTime || !selectedRecord.checkOutTime) && (
                       <div className={styles.modalDetailRow}>
                         <span>사유:</span>
                         <span>{selectedRecord.notes || "기록 없음"}</span>
@@ -452,11 +589,11 @@ export const AttendancePage: React.FC = () => {
                   <div className={styles.modalDetailGrid}>
                     <div className={styles.modalDetailRow}>
                       <span>총 근무시간:</span>
-                      <span className={styles.workingHours}>{selectedRecord.workingHours}시간</span>
+                      <span className={styles.workingHours}>{selectedRecord.workHours}시간</span>
                     </div>
                     <div className={styles.modalDetailRow}>
                       <span>연장근무:</span>
-                      <span className={styles.overtimeHours}>{selectedRecord.overtimeHours}시간</span>
+                      <span className={styles.overtimeHours}>{selectedRecord.overtime}시간</span>
                     </div>
                     <div className={styles.modalDetailRow}>
                       <span>기준근무시간:</span>
@@ -520,16 +657,16 @@ export const AttendancePage: React.FC = () => {
                     <label className={styles.formLabel}>출근시간</label>
                     <Input
                       type="time"
-                      value={newRecord.checkIn || ""}
-                      onChange={(e) => setNewRecord({...newRecord, checkIn: e.target.value})}
+                      value={newRecord.checkInTime || ""}
+                      onChange={(e) => setNewRecord({...newRecord, checkInTime: e.target.value})}
                     />
                   </div>
                   <div className={styles.formGroup}>
                     <label className={styles.formLabel}>퇴근시간</label>
                     <Input
                       type="time"
-                      value={newRecord.checkOut || ""}
-                      onChange={(e) => setNewRecord({...newRecord, checkOut: e.target.value})}
+                      value={newRecord.checkOutTime || ""}
+                      onChange={(e) => setNewRecord({...newRecord, checkOutTime: e.target.value})}
                     />
                   </div>
                 </div>
@@ -559,8 +696,8 @@ export const AttendancePage: React.FC = () => {
                     <Input
                       type="number"
                       step="0.5"
-                      value={newRecord.workingHours || ""}
-                      onChange={(e) => setNewRecord({...newRecord, workingHours: Number(e.target.value)})}
+                      value={newRecord.workHours || ""}
+                      onChange={(e) => setNewRecord({...newRecord, workHours: e.target.value})}
                       placeholder="근무시간 (시간)"
                     />
                   </div>
@@ -569,8 +706,8 @@ export const AttendancePage: React.FC = () => {
                     <Input
                       type="number"
                       step="0.5"
-                      value={newRecord.overtimeHours || ""}
-                      onChange={(e) => setNewRecord({...newRecord, overtimeHours: Number(e.target.value)})}
+                      value={newRecord.overtime || ""}
+                      onChange={(e) => setNewRecord({...newRecord, overtime: e.target.value})}
                       placeholder="연장근무 (시간)"
                     />
                   </div>

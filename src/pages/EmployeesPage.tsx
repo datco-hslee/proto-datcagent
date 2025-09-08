@@ -4,11 +4,12 @@ import { useEmployees } from "../context/EmployeeContext";
 import type { Employee } from "../types/employee";
 
 export function EmployeesPage() {
-  const { employees, setEmployees, addEmployee, updateEmployee } = useEmployees();
+  const { employees, setEmployees, addEmployee, updateEmployee, getDataSourceSummary, getEmployeesByDataSource } = useEmployees();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("전체");
   const [selectedStatus, setSelectedStatus] = useState("전체");
   const [selectedWorkType, setSelectedWorkType] = useState("전체");
+  const [selectedDataSource, setSelectedDataSource] = useState("전체");
   const [salaryRange, setSalaryRange] = useState({ min: 0, max: 10000000 });
   const [performanceRange, setPerformanceRange] = useState({ min: 0, max: 100 });
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
@@ -334,10 +335,11 @@ export function EmployeesPage() {
     const matchesDepartment = selectedDepartment === "전체" || emp.department === selectedDepartment;
     const matchesStatus = selectedStatus === "전체" || emp.status === selectedStatus;
     const matchesWorkType = selectedWorkType === "전체" || emp.workType === selectedWorkType;
+    const matchesDataSource = selectedDataSource === "전체" || emp.dataSource === selectedDataSource;
     const matchesSalary = emp.salary >= salaryRange.min && emp.salary <= salaryRange.max;
     const matchesPerformance = emp.performanceScore >= performanceRange.min && emp.performanceScore <= performanceRange.max;
     
-    return matchesSearch && matchesDepartment && matchesStatus && matchesWorkType && matchesSalary && matchesPerformance;
+    return matchesSearch && matchesDepartment && matchesStatus && matchesWorkType && matchesDataSource && matchesSalary && matchesPerformance;
   });
 
   const formatCurrency = (amount: number) => {
@@ -382,6 +384,8 @@ export function EmployeesPage() {
 
   const departments = ["전체", ...Array.from(new Set(employees.map((e) => e.department)))];
   const workTypes = ["전체", "정규직", "계약직", "인턴"];
+  const dataSourceSummary = getDataSourceSummary();
+  const dataSources = ["전체", ...Object.keys(dataSourceSummary)];
 
   // 모달 스타일
   const modalOverlayStyle: React.CSSProperties = {
@@ -640,6 +644,14 @@ export function EmployeesPage() {
             <option value="휴직">휴직</option>
             <option value="퇴사">퇴사</option>
           </select>
+
+          <select style={filterSelectStyle} value={selectedDataSource} onChange={(e) => setSelectedDataSource(e.target.value)}>
+            {dataSources.map((source) => (
+              <option key={source} value={source}>
+                {source === "전체" ? "전체 데이터" : dataSourceSummary[source]?.label || source}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -667,6 +679,7 @@ export function EmployeesPage() {
               <th style={thStyle}>부서/직책</th>
               <th style={thStyle}>고용형태</th>
               <th style={thStyle}>상태</th>
+              <th style={thStyle}>데이터 출처</th>
               <th style={thStyle}>연락처</th>
               <th style={thStyle}>입사일</th>
               <th style={thStyle}>급여</th>
@@ -714,6 +727,17 @@ export function EmployeesPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span style={{ color: statusBadgeStyle(employee.status).color }}>{getStatusIcon(employee.status)}</span>
                     <span style={statusBadgeStyle(employee.status)}>{employee.status}</span>
+                  </div>
+                </td>
+                <td style={tdStyle}>
+                  <div style={{ fontSize: "0.75rem" }}>
+                    <div style={{ fontWeight: 500, color: "#374151" }}>
+                      {employee.dataSourceLabel || employee.dataSource || "알 수 없음"}
+                    </div>
+                    <div style={{ color: "#6b7280", fontSize: "0.7rem" }}>
+                      {employee.dataSource === "erp" ? "ERP 시스템" : 
+                       employee.dataSource === "generated" ? "샘플 데이터" : "기타"}
+                    </div>
                   </div>
                 </td>
                 <td style={tdStyle}>

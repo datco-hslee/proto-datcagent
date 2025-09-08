@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Search, Plus, Filter, Eye, Edit3, Truck, Package, MapPin, Clock, CheckCircle, AlertCircle, BarChart3, Calendar, Users } from "lucide-react";
 import styles from "./ShippingPage.module.css";
+// Import the ERP data from the JSON file
+import erpDataJson from '../../DatcoDemoData2.json';
 
 interface Shipment {
   id: string;
@@ -15,17 +17,95 @@ interface Shipment {
   status: "preparing" | "shipped" | "transit" | "delivered" | "returned" | "cancelled";
   priority: "standard" | "express" | "urgent";
   carrier: string;
-  shippingMethod: string;
+  shippingMethod?: string;
+  shippingDate?: string;
   estimatedDelivery: string;
   actualDelivery?: string;
-  weight: number;
+  weight: string | number;
   dimensions: string;
-  cost: number;
-  destination: string;
-  createdDate: string;
+  shippingCost?: number;
+  cost?: number;
+  destination?: string;
+  createdDate?: string;
+  items?: Array<{
+    name: string;
+    quantity: number;
+    weight: string;
+  }>;
+  notes?: string;
+  // ERP specific fields
+  customerCode?: string;
+  itemCode?: string;
+  itemName?: string;
+  shipmentQuantity?: number;
 }
 
-const mockShipments: Shipment[] = [
+// Function to get shipping data from ERP
+const getShipmentsFromERPData = (): Shipment[] => {
+  try {
+    const shippingData = erpDataJson.sheets?.출하 || [];
+    const customers = erpDataJson.sheets?.거래처마스터 || [];
+    const itemMaster = erpDataJson.sheets?.품목마스터 || [];
+
+    const erpShipments = shippingData.map((shipment: any) => {
+      const customer = customers.find((cust: any) => cust.거래처코드 === shipment.거래처코드);
+      const item = itemMaster.find((item: any) => item.품목코드 === shipment.품목코드);
+
+      // Map ERP status to internal status
+      let status: "preparing" | "shipped" | "transit" | "delivered" | "returned" | "cancelled" = "preparing";
+      if (shipment.상태 === "SHIPPED" || shipment.상태 === "출하완료") status = "shipped";
+      else if (shipment.상태 === "PLANNED" || shipment.상태 === "계획") status = "preparing";
+      else if (shipment.상태 === "TRANSIT" || shipment.상태 === "운송중") status = "transit";
+      else if (shipment.상태 === "DELIVERED" || shipment.상태 === "배송완료") status = "delivered";
+      else if (shipment.상태 === "CANCELLED" || shipment.상태 === "취소") status = "cancelled";
+
+      // Determine priority based on quantity
+      const quantity = shipment.출하수량 || shipment.출하지시수량 || 0;
+      let priority: "standard" | "express" | "urgent" = "standard";
+      if (quantity > 2000) priority = "urgent";
+      else if (quantity > 1000) priority = "express";
+
+      return {
+        id: `ERP-${shipment.출하번호}`,
+        trackingNumber: `TRK-${shipment.출하번호}`,
+        orderId: shipment.수주번호 || shipment.출하번호,
+        customer: customer?.거래처명 || "미지정 고객",
+        customerAddress: `${customer?.거래처명 || "미지정 고객"} - ${customer?.구분 || "일반"} 거래처`,
+        status,
+        priority,
+        carrier: "한진택배", // Default carrier for ERP data
+        shippingMethod: "택배",
+        shippingDate: shipment.출하일자 || shipment.출하일 || "2025-09-01",
+        estimatedDelivery: shipment.예상도착일 || "2025-09-05",
+        actualDelivery: status === "delivered" ? (shipment.출하일자 || shipment.출하일) : undefined,
+        weight: `${(quantity * 0.5).toFixed(1)}`, // Estimated weight as string
+        dimensions: "40x30x20cm", // Default dimensions
+        shippingCost: Math.floor(quantity * 1500), // Estimated shipping cost
+        destination: customer?.거래처명?.includes("현대") ? "울산" : customer?.거래처명?.includes("기아") ? "광주" : customer?.거래처명?.includes("제네시스") ? "서울" : "기타 지역",
+        createdDate: shipment.출하일자 || shipment.출하일 || "2025-09-01",
+        items: [{
+          name: item?.품목명 || shipment.품목코드 || shipment.품목,
+          quantity: quantity,
+          weight: `${(quantity * 0.5).toFixed(1)}kg`
+        }],
+        notes: `ERP 출하: ${item?.품목명 || shipment.품목코드 || shipment.품목} ${quantity}개`,
+        // ERP specific fields
+        customerCode: shipment.거래처코드,
+        itemCode: shipment.품목코드 || shipment.품목,
+        itemName: item?.품목명 || shipment.품목코드 || shipment.품목,
+        shipmentQuantity: quantity
+      };
+    });
+
+    return erpShipments;
+  } catch (error) {
+    console.error("Error processing ERP shipping data:", error);
+    return [];
+  }
+};
+
+// Sample shipment data for comparison
+const getSampleShipments = (): Shipment[] => [
   {
     id: "1",
     trackingNumber: "TRK-2024-001",
@@ -134,9 +214,16 @@ export const ShippingPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
-  const [shipments, setShipments] = useState<Shipment[]>(mockShipments);
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
   const [showNewShipmentModal, setShowNewShipmentModal] = useState(false);
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
+  
+  // Get current shipments based on selected data source
+  const getCurrentShipments = (): Shipment[] => {
+    return selectedDataSource === "erp" ? getShipmentsFromERPData() : getSampleShipments();
+  };
+
+  const [shipments, setShipments] = useState<Shipment[]>(getCurrentShipments());
   const [newShipment, setNewShipment] = useState<Partial<Shipment>>({
     trackingNumber: "",
     orderId: "",
@@ -154,18 +241,24 @@ export const ShippingPage: React.FC = () => {
     createdDate: new Date().toISOString().split('T')[0],
   });
 
-  const filteredShipments = shipments.filter((shipment) => {
+  // Update shipments when data source changes
+  useEffect(() => {
+    setShipments(getCurrentShipments());
+  }, [selectedDataSource]);
+
+  const filteredShipments = shipments.filter((shipment: Shipment) => {
     const matchesSearch =
       shipment.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       shipment.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
       shipment.orderId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.destination.toLowerCase().includes(searchTerm.toLowerCase());
+      (shipment.destination || "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || shipment.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || shipment.priority === priorityFilter;
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined) => {
+    if (!amount) return "₩0";
     return new Intl.NumberFormat("ko-KR", {
       style: "currency",
       currency: "KRW",
@@ -216,8 +309,8 @@ export const ShippingPage: React.FC = () => {
 
     if (editingShipment) {
       // 편집 모드
-      setShipments(prev => 
-        prev.map(shipment => 
+      setShipments((prev: Shipment[]) => 
+        prev.map((shipment: Shipment) => 
           shipment.id === editingShipment.id 
             ? { ...newShipment, id: editingShipment.id } as Shipment
             : shipment
@@ -227,7 +320,7 @@ export const ShippingPage: React.FC = () => {
     } else {
       // 신규 생성 모드
       const newId = String(shipments.length + 1);
-      setShipments(prev => [...prev, { ...newShipment, id: newId } as Shipment]);
+      setShipments((prev: Shipment[]) => [...prev, { ...newShipment, id: newId } as Shipment]);
       alert("새로운 배송이 등록되었습니다.");
     }
 
@@ -243,9 +336,12 @@ export const ShippingPage: React.FC = () => {
 
   // 통계 계산
   const totalShipments = shipments.length;
-  const activeShipments = shipments.filter((s) => ["shipped", "transit"].includes(s.status)).length;
-  const deliveredToday = shipments.filter((s) => s.actualDelivery === "2024-01-21").length;
-  const totalShippingCost = shipments.reduce((sum, s) => sum + s.cost, 0);
+  
+  // 추가 통계 계산
+  const activeShipments = shipments.filter((s: Shipment) => s.status === "shipped" || s.status === "transit").length;
+  const today = new Date().toISOString().split('T')[0];
+  const deliveredToday = shipments.filter((s: Shipment) => s.status === "delivered" && s.actualDelivery === today).length;
+  const totalShippingCost = shipments.reduce((sum: number, s: Shipment) => sum + (s.shippingCost || s.cost || 0), 0);
 
   return (
     <div className={styles.container}>
@@ -254,6 +350,11 @@ export const ShippingPage: React.FC = () => {
           <div className={styles.titleSection}>
             <h1 className={styles.title}>배송 관리</h1>
             <p className={styles.subtitle}>주문 배송 상태를 추적하고 물류를 관리하세요</p>
+            <div className={styles.dataSourceBadge}>
+              <Badge variant={selectedDataSource === "erp" ? "default" : "secondary"}>
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              </Badge>
+            </div>
           </div>
           <Button className={styles.addButton} onClick={handleCreateShipment}>
             <Plus className={styles.icon} />
@@ -320,6 +421,15 @@ export const ShippingPage: React.FC = () => {
           </div>
 
           <div className={styles.filterSection}>
+            <select 
+              value={selectedDataSource} 
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+              className={styles.filterSelect}
+            >
+              <option value="erp">닷코 시연 데이터</option>
+              <option value="sample">생성된 샘플 데이터</option>
+            </select>
+            
             <Filter className={styles.filterIcon} />
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={styles.filterSelect}>
               <option value="all">모든 상태</option>
@@ -347,7 +457,7 @@ export const ShippingPage: React.FC = () => {
             <Card key={shipment.id} className={styles.shipmentCard}>
               <div className={styles.cardHeader}>
                 <div className={styles.shipmentInfo}>
-                  <h3 className={styles.trackingNumber}>{shipment.trackingNumber}</h3>
+                  <h3 className={styles.trackingNumber}>출하번호: {shipment.id.replace('ERP-', '')}</h3>
                   <div className={styles.shipmentMeta}>
                     <Badge variant={statusConfig[shipment.status]?.color as any} className={styles.statusBadge}>
                       {getStatusIcon(shipment.status)}
@@ -373,8 +483,8 @@ export const ShippingPage: React.FC = () => {
                   <div className={styles.customerDetail}>
                     <Users className={styles.customerIcon} />
                     <div className={styles.customerData}>
-                      <span className={styles.customerName}>{shipment.customer}</span>
-                      <span className={styles.orderId}>주문: {shipment.orderId}</span>
+                      <span className={styles.customerName}>품목: {shipment.itemName || shipment.itemCode}</span>
+                      <span className={styles.orderId}>수주번호: {shipment.orderId}</span>
                     </div>
                   </div>
                 </div>
@@ -382,30 +492,30 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.addressInfo}>
                   <MapPin className={styles.addressIcon} />
                   <div className={styles.addressData}>
-                    <span className={styles.addressLabel}>배송지</span>
-                    <span className={styles.addressValue}>{shipment.customerAddress}</span>
+                    <span className={styles.addressLabel}>출하지시수량</span>
+                    <span className={styles.addressValue}>{shipment.shipmentQuantity?.toLocaleString() || 0}개</span>
                   </div>
                 </div>
 
                 <div className={styles.shipmentDetails}>
                   <div className={styles.detailRow}>
                     <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>택배사</span>
-                      <span className={styles.detailValue}>{shipment.carrier}</span>
+                      <span className={styles.detailLabel}>운송사</span>
+                      <span className={styles.detailValue}>{selectedDataSource === 'erp' ? '로지스' : shipment.carrier}</span>
                     </div>
                     <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>배송방법</span>
-                      <span className={styles.detailValue}>{shipment.shippingMethod}</span>
+                      <span className={styles.detailLabel}>출하일</span>
+                      <span className={styles.detailValue}>{shipment.shippingDate}</span>
                     </div>
                   </div>
                   <div className={styles.detailRow}>
                     <div className={styles.detailItem}>
-                      <span className={styles.detailLabel}>중량</span>
-                      <span className={styles.detailValue}>{shipment.weight}kg</span>
+                      <span className={styles.detailLabel}>고객</span>
+                      <span className={styles.detailValue}>{shipment.customer}</span>
                     </div>
                     <div className={styles.detailItem}>
                       <span className={styles.detailLabel}>배송비</span>
-                      <span className={styles.detailValue}>{formatCurrency(shipment.cost)}</span>
+                      <span className={styles.detailValue}>{formatCurrency(shipment.cost || shipment.shippingCost)}</span>
                     </div>
                   </div>
                 </div>
@@ -485,7 +595,7 @@ export const ShippingPage: React.FC = () => {
                     </div>
                     <div className={styles.modalDetailRow}>
                       <span>배송비:</span>
-                      <span>{formatCurrency(selectedShipment.cost)}</span>
+                      <span>{formatCurrency(selectedShipment.cost || selectedShipment.shippingCost)}</span>
                     </div>
                   </div>
                 </div>

@@ -12,7 +12,17 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+}
+
+.titleSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dataSourceBadge {
+  margin-top: 0.75rem;
 }
 
 .titleSection h1 {
@@ -108,9 +118,17 @@
 
 .controls {
   display: flex;
+  flex-direction: column;
   gap: 1rem;
   margin-bottom: 2rem;
+  align-items: stretch;
+}
+
+.controlsRow {
+  display: flex;
+  gap: 1rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .searchBox {
@@ -502,6 +520,11 @@
   .headerContent {
     flex-direction: column;
     gap: 1rem;
+    align-items: stretch;
+  }
+
+  .controlsRow {
+    flex-direction: column;
     align-items: stretch;
   }
 

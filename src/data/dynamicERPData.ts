@@ -38,6 +38,24 @@ const getProductsByIndustry = (industry: string) => {
   return productMap[industry] || productMap['제조업']; // 기본값으로 제조업 제품 사용
 };
 
+// Simple hash function for consistent pseudo-random values
+function simpleHash(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
+// Seeded random function for consistent values
+function seededRandom(seed: string, min: number = 0, max: number = 1): number {
+  const hash = simpleHash(seed);
+  const normalized = (hash % 10000) / 10000; // Normalize to 0-1
+  return min + normalized * (max - min);
+}
+
 // Dynamic ERP data generator that uses customer context data
 export function generateDynamicERPData(customers: Customer[]) {
   // Create sales orders based on actual customers
@@ -47,7 +65,8 @@ export function generateDynamicERPData(customers: Customer[]) {
     
     return Array.from({ length: orderCount }, (_, orderIndex) => {
       const product = availableProducts[orderIndex % availableProducts.length];
-      const quantity = Math.floor(Math.random() * 100) + 10;
+      const seed = `${customer.id}-${orderIndex}`;
+      const quantity = Math.floor(seededRandom(seed + '-qty', 10, 110));
       
       return {
         id: `SO-${customer.id}-${orderIndex + 1}`,
@@ -58,16 +77,16 @@ export function generateDynamicERPData(customers: Customer[]) {
         customerEmail: customer.email,
         customerPhone: customer.phone,
         salesPerson: customer.representative || '영업팀',
-        orderDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        requestedDeliveryDate: new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        status: ['진행중', '완료', '대기'][Math.floor(Math.random() * 3)],
-        totalAmount: product.basePrice * quantity + Math.floor(Math.random() * 1000000), // 기본가격 * 수량 + 변동분
+        orderDate: new Date(Date.now() - seededRandom(seed + '-orderdate', 0, 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        requestedDeliveryDate: new Date(Date.now() + seededRandom(seed + '-deliverydate', 7, 30) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: ['진행중', '완료', '대기'][Math.floor(seededRandom(seed + '-status', 0, 3))],
+        totalAmount: product.basePrice * quantity + Math.floor(seededRandom(seed + '-amount', 0, 1000000)), // 기본가격 * 수량 + 변동분
         items: [
           {
             productCode: product.code,
             productName: product.name,
             quantity: quantity,
-            unitPrice: product.basePrice + Math.floor(Math.random() * 200000), // 기본가격 + 변동분
+            unitPrice: product.basePrice + Math.floor(seededRandom(seed + '-unitprice', 0, 200000)), // 기본가격 + 변동분
           }
         ]
       };
@@ -84,10 +103,10 @@ export function generateDynamicERPData(customers: Customer[]) {
     quantity: salesOrder.items[0].quantity,
     plannedStartDate: salesOrder.orderDate,
     plannedEndDate: salesOrder.requestedDeliveryDate,
-    actualStartDate: Math.random() > 0.5 ? salesOrder.orderDate : null,
-    actualEndDate: Math.random() > 0.7 ? salesOrder.requestedDeliveryDate : null,
-    status: ['계획', '진행중', '완료', '지연'][Math.floor(Math.random() * 4)],
-    priority: ['높음', '보통', '낮음'][Math.floor(Math.random() * 3)],
+    actualStartDate: seededRandom(salesOrder.id + '-actualstart', 0, 1) > 0.5 ? salesOrder.orderDate : null,
+    actualEndDate: seededRandom(salesOrder.id + '-actualend', 0, 1) > 0.7 ? salesOrder.requestedDeliveryDate : null,
+    status: ['계획', '진행중', '완료', '지연'][Math.floor(seededRandom(salesOrder.id + '-status', 0, 4))],
+    priority: ['높음', '보통', '낮음'][Math.floor(seededRandom(salesOrder.id + '-priority', 0, 3))],
     workOrders: [
       {
         id: `WO-${index + 1}-1`,
@@ -96,8 +115,8 @@ export function generateDynamicERPData(customers: Customer[]) {
         workCenter: 'WC-A01',
         plannedStartDate: salesOrder.orderDate,
         plannedEndDate: salesOrder.requestedDeliveryDate,
-        status: ['대기', '진행중', '완료'][Math.floor(Math.random() * 3)],
-        assignedWorker: '작업자-' + (Math.floor(Math.random() * 10) + 1),
+        status: ['대기', '진행중', '완료'][Math.floor(seededRandom(salesOrder.id + '-workstatus', 0, 3))],
+        assignedWorker: '작업자-' + (Math.floor(seededRandom(salesOrder.id + '-worker', 1, 11))),
         materialsConsumed: [],
         instructions: '표준 작업 지시서에 따라 진행'
       }

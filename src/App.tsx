@@ -3,7 +3,9 @@ import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { EmployeeProvider } from "./context/EmployeeContext";
 import { CustomerProvider } from "./context/CustomerContext";
-import { Dashboard } from "./components/dashboard/Dashboard";
+import { WorkInstructionProvider } from './context/WorkInstructionContext';
+import { GlobalDataProvider } from './context/GlobalDataContext';
+import { SimpleDashboard } from "./pages/SimpleDashboard";
 import { CustomersPage } from "./pages/CustomersPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { InventoryPage } from "./pages/InventoryPage";
@@ -24,15 +26,20 @@ import { TaxPage } from "./pages/TaxPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { AccountingPage } from "./pages/AccountingPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
-import { ERPDataManagementPage } from "./pages/ERPDataManagementPage";
+import ERPDataManagementPage from "./pages/ERPDataManagementPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { UserPermissionsPage } from "./pages/UserPermissionsPage";
+import { IntegrationsPage } from "./pages/IntegrationsPage";
 
 function App() {
   return (
     <EmployeeProvider>
       <CustomerProvider>
-        <AppLayout>
+        <GlobalDataProvider>
+          <WorkInstructionProvider>
+            <AppLayout>
         <Routes>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<SimpleDashboard />} />
         {/* 고객 비즈니스 모듈 */}
         <Route path="/crm-pipeline" element={<CrmPipelinePage />} />
         <Route path="/customers" element={<CustomersPage />} />
@@ -58,9 +65,14 @@ function App() {
         <Route path="/taxes" element={<TaxPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/erp-data" element={<ERPDataManagementPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/permissions" element={<UserPermissionsPage />} />
+        <Route path="/integrations" element={<IntegrationsPage />} />
         <Route path="/documents" element={<div style={{ padding: "2rem" }}>문서 관리 페이지</div>} />
         </Routes>
-        </AppLayout>
+            </AppLayout>
+          </WorkInstructionProvider>
+        </GlobalDataProvider>
       </CustomerProvider>
     </EmployeeProvider>
   );
