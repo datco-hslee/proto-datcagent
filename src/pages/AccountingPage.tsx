@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import styles from "./AccountingPage.module.css";
 import erpDataJson from "../../DatcoDemoData2.json";
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 interface Transaction {
   id: string;
@@ -170,14 +171,76 @@ const getERPTransactions = (): Transaction[] => {
   });
 };
 
+// 대량 ERP 회계 데이터 추출 함수
+const getMassiveERPTransactions = (): Transaction[] => {
+  try {
+    const massiveData = generateMassiveERPData();
+    const accountingEntries = massiveData.accountingEntries || [];
+    const customers = massiveData.customers || [];
+    const salesOrders = massiveData.salesOrders || [];
+    const purchaseOrders = massiveData.purchaseOrders || [];
+
+    return accountingEntries.map((entry: any) => {
+      const customer = customers.find((c: any) => c.id === entry.customerId);
+      const salesOrder = salesOrders.find((so: any) => so.id === entry.referenceId && entry.referenceType === 'sales');
+      const purchaseOrder = purchaseOrders.find((po: any) => po.id === entry.referenceId && entry.referenceType === 'purchase');
+      
+      // 계정 유형에 따른 분류
+      const isIncome = entry.accountCode?.startsWith('4') || entry.creditAmount > 0; // 매출 계정
+      const isExpense = entry.accountCode?.startsWith('5') || entry.accountCode?.startsWith('6') || entry.debitAmount > 0; // 비용 계정
+      
+      const amount = entry.debitAmount || entry.creditAmount || 0;
+      
+      // 날짜 안전 처리
+      const entryDate = (() => {
+        const date = new Date(entry.date);
+        return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+      })();
+      
+      // 상태 매핑
+      let status: "completed" | "pending" | "cancelled" = "completed";
+      if (entry.status === "pending" || entry.status === "draft") status = "pending";
+      else if (entry.status === "cancelled" || entry.status === "void") status = "cancelled";
+      
+      return {
+        id: entry.id,
+        date: entryDate,
+        description: entry.description || `${entry.accountName} - ${customer?.company || '미지정 거래처'}`,
+        category: entry.accountName || '기타',
+        type: isIncome ? "income" as const : "expense" as const,
+        amount: Math.abs(amount),
+        account: "기업은행 주계좌",
+        status,
+        reference: entry.entryNumber || entry.id,
+        taxDeductible: isExpense,
+        // ERP 추가 필드
+        arApType: isIncome ? "AR" : "AP",
+        voucher: entry.entryNumber,
+        customer: customer?.company || customer?.contactPerson || '미지정 거래처',
+        supplyAmount: Math.round(amount / 1.1),
+        vat: Math.round(amount - (amount / 1.1)),
+        totalAmount: amount,
+        collectionDueDate: isIncome && salesOrder ? salesOrder.deliveryDate : undefined,
+        paymentDueDate: !isIncome && purchaseOrder ? purchaseOrder.expectedDeliveryDate : undefined,
+        arApStatus: status === "pending" ? (isIncome ? "미수" : "미지급") : "완료"
+      };
+    });
+  } catch (error) {
+    console.error("Error processing massive ERP accounting data:", error);
+    return [];
+  }
+};
+
 // 샘플 회계 데이터 함수
 const getSampleTransactions = (): Transaction[] => {
   return mockTransactions;
 };
 
 // 현재 선택된 데이터 소스에 따른 거래 데이터 반환
-const getCurrentTransactions = (dataSource: "erp" | "sample"): Transaction[] => {
-  return dataSource === "erp" ? getERPTransactions() : getSampleTransactions();
+const getCurrentTransactions = (dataSource: "erp" | "sample" | "massive"): Transaction[] => {
+  if (dataSource === "erp") return getERPTransactions();
+  if (dataSource === "massive") return getMassiveERPTransactions();
+  return getSampleTransactions();
 };
 
 export const AccountingPage: React.FC = () => {
@@ -191,7 +254,7 @@ export const AccountingPage: React.FC = () => {
   const [newTransaction, setNewTransaction] = useState<Partial<Transaction>>({});
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
   const [editedTransaction, setEditedTransaction] = useState<Partial<Transaction>>({});
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   // 데이터 소스 변경 시 거래 데이터 업데이트
@@ -386,9 +449,15 @@ export const AccountingPage: React.FC = () => {
             </h1>
             {/* 데이터 소스 표시 배지 */}
             <div
-              className={`${styles.dataSourceBadge} ${selectedDataSource === "erp" ? styles.erp : styles.sample}`}
+              className={`${styles.dataSourceBadge} ${
+                selectedDataSource === "erp" ? styles.erp : 
+                selectedDataSource === "massive" ? styles.massive : 
+                styles.sample
+              }`}
             >
-              {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              {selectedDataSource === "erp" ? "닷코 시연 데이터" : 
+               selectedDataSource === "massive" ? "대량 ERP 데이터" : 
+               "생성된 샘플 데이터"}
             </div>
           </div>
           <div className={styles.headerActions}>
@@ -452,11 +521,12 @@ export const AccountingPage: React.FC = () => {
             <div className={styles.filterGroup}>
               <select
                 value={selectedDataSource}
-                onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+                onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
                 className={styles.filterSelect}
               >
                 <option value="erp">닷코 시연 데이터</option>
                 <option value="sample">생성된 샘플 데이터</option>
+                <option value="massive">대량 ERP 데이터</option>
               </select>
             </div>
             

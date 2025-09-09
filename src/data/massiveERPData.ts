@@ -571,136 +571,79 @@ const PRODUCTS: Product[] = [
   }
 ];
 
-const EMPLOYEES: Employee[] = [
-  {
-    id: 'EMP-001',
-    employeeNumber: 'E2021001',
-    name: '김철수',
-    department: '생산부',
-    position: '생산팀장',
-    jobGrade: 'M2',
-    hireDate: new Date('2021-03-15'),
-    baseSalary: 4500000,
-    hourlyRate: 21600,
-    overtimeRate: 32400,
-    nightShiftRate: 25920,
-    weekendRate: 43200,
-    holidayRate: 64800,
-    status: 'active'
-  },
-  {
-    id: 'EMP-002',
-    employeeNumber: 'E2022005',
-    name: '이영희',
-    department: '생산부',
-    position: '생산작업자',
-    jobGrade: 'S3',
-    hireDate: new Date('2022-01-10'),
-    baseSalary: 3200000,
-    hourlyRate: 15400,
-    overtimeRate: 23100,
-    nightShiftRate: 18480,
-    weekendRate: 30800,
-    holidayRate: 46200,
-    status: 'active'
-  },
-  {
-    id: 'EMP-003',
-    employeeNumber: 'E2020012',
-    name: '박민수',
-    department: '품질부',
-    position: '품질검사원',
-    jobGrade: 'S4',
-    hireDate: new Date('2020-09-01'),
-    baseSalary: 3500000,
-    hourlyRate: 16800,
-    overtimeRate: 25200,
-    nightShiftRate: 20160,
-    weekendRate: 33600,
-    holidayRate: 50400,
-    status: 'active'
-  },
-  {
-    id: 'EMP-004',
-    employeeNumber: 'E2023001',
-    name: '정수진',
-    department: '생산부',
-    position: '생산작업자',
-    jobGrade: 'S2',
-    hireDate: new Date('2023-02-01'),
-    baseSalary: 3200000,
-    hourlyRate: 15400,
-    overtimeRate: 23100,
-    nightShiftRate: 18480,
-    weekendRate: 30800,
-    holidayRate: 46200,
-    status: 'active'
-  },
-  {
-    id: 'EMP-005',
-    employeeNumber: 'E2021008',
-    name: '최영호',
-    department: '생산부',
-    position: '생산반장',
-    jobGrade: 'S5',
-    hireDate: new Date('2021-06-15'),
-    baseSalary: 3800000,
-    hourlyRate: 18300,
-    overtimeRate: 27450,
-    nightShiftRate: 21960,
-    weekendRate: 36600,
-    holidayRate: 54900,
-    status: 'active'
-  },
-  {
-    id: 'EMP-006',
-    employeeNumber: 'E2022010',
-    name: '김영수',
-    department: '구매부',
-    position: '구매담당자',
-    jobGrade: 'S4',
-    hireDate: new Date('2022-04-01'),
-    baseSalary: 3600000,
-    hourlyRate: 17300,
-    overtimeRate: 25950,
-    nightShiftRate: 20760,
-    weekendRate: 34600,
-    holidayRate: 51900,
-    status: 'active'
-  },
-  {
-    id: 'EMP-007',
-    employeeNumber: 'E2021015',
-    name: '이미경',
-    department: '영업부',
-    position: '영업대표',
-    jobGrade: 'M1',
-    hireDate: new Date('2021-08-01'),
-    baseSalary: 4200000,
-    hourlyRate: 20200,
-    overtimeRate: 30300,
-    nightShiftRate: 24240,
-    weekendRate: 40400,
-    holidayRate: 60600,
-    status: 'active'
-  },
-  {
-    id: 'EMP-008',
-    employeeNumber: 'E2023005',
-    name: '송현우',
-    department: '품질부',
-    position: '품질관리자',
-    jobGrade: 'S5',
-    hireDate: new Date('2023-01-15'),
-    baseSalary: 3800000,
-    hourlyRate: 18300,
-    overtimeRate: 27450,
-    nightShiftRate: 21960,
-    weekendRate: 36600,
-    holidayRate: 54900,
-    status: 'active'
-  }
-];
+// 대량 직원 데이터 생성 함수
+const generateEmployees = (): Employee[] => {
+  const employees: Employee[] = [];
+  const departments = [
+    { name: '생산부', positions: ['생산팀장', '생산반장', '생산작업자', '설비기사', '품질검사원'], count: 25 },
+    { name: '품질부', positions: ['품질관리자', '품질검사원', '품질분석가'], count: 8 },
+    { name: '영업부', positions: ['영업대표', '영업담당자', '고객관리자'], count: 12 },
+    { name: '구매부', positions: ['구매담당자', '자재관리자', '공급업체관리자'], count: 6 },
+    { name: '관리부', positions: ['인사담당자', '회계담당자', '총무담당자', 'IT관리자'], count: 8 },
+    { name: '연구개발부', positions: ['연구원', '개발엔지니어', '설계담당자'], count: 10 },
+    { name: '물류부', positions: ['물류담당자', '창고관리자', '배송담당자'], count: 7 }
+  ];
+
+  const names = [
+    '김철수', '이영희', '박민수', '정수진', '최영호', '김영수', '이미경', '송현우',
+    '조성민', '한지영', '윤태호', '강수연', '임동혁', '오세라', '배준호', '신혜진',
+    '류성호', '문지은', '홍길동', '장미란', '서준석', '김나영', '이동준', '박소영',
+    '최민호', '정은지', '황태준', '김수현', '이준혁', '박지민', '최서연', '정민수',
+    '강태영', '오지혜', '윤성민', '한예슬', '임재현', '송지원', '배성호', '신민아',
+    '류지훈', '문채영', '홍성민', '장예진', '서동현', '김하늘', '이성호', '박민지',
+    '최준영', '정소희', '황민석', '김예린', '이태호', '박수빈', '최성민', '정지우',
+    '강민호', '오예은', '윤지성', '한소영', '임성준', '송민경', '배지훈', '신예진',
+    '류태민', '문서현', '홍지은', '장성호', '서민지', '김태영', '이지혜', '박성민',
+    '최예슬', '정태호', '황지원', '김성호', '이민지', '박지훈', '최서현', '정예린'
+  ];
+
+  const jobGrades = ['M1', 'M2', 'S1', 'S2', 'S3', 'S4', 'S5'];
+  let empCounter = 1;
+
+  departments.forEach(dept => {
+    for (let i = 0; i < dept.count; i++) {
+      const position = dept.positions[i % dept.positions.length];
+      const name = names[(empCounter - 1) % names.length];
+      const jobGrade = dept.name === '생산부' && position.includes('팀장') ? 'M2' :
+                      dept.name === '생산부' && position.includes('반장') ? 'S5' :
+                      position.includes('관리자') || position.includes('대표') ? 'M1' :
+                      jobGrades[Math.floor(Math.random() * jobGrades.length)];
+      
+      const baseSalary = jobGrade.startsWith('M') ? 
+                        (jobGrade === 'M1' ? 4200000 : 4500000) :
+                        (3000000 + Math.floor(Math.random() * 1000000));
+      
+      const hourlyRate = Math.floor(baseSalary / 209); // 월 근무시간 209시간 기준
+      
+      const hireYear = 2020 + Math.floor(Math.random() * 4);
+      const hireMonth = Math.floor(Math.random() * 12) + 1;
+      const hireDay = Math.floor(Math.random() * 28) + 1;
+
+      employees.push({
+        id: `EMP-${empCounter.toString().padStart(3, '0')}`,
+        employeeNumber: `E${hireYear}${empCounter.toString().padStart(3, '0')}`,
+        name: name,
+        department: dept.name,
+        position: position,
+        jobGrade: jobGrade,
+        hireDate: new Date(hireYear, hireMonth - 1, hireDay),
+        baseSalary: baseSalary,
+        hourlyRate: hourlyRate,
+        overtimeRate: Math.floor(hourlyRate * 1.5),
+        nightShiftRate: Math.floor(hourlyRate * 1.2),
+        weekendRate: Math.floor(hourlyRate * 2),
+        holidayRate: Math.floor(hourlyRate * 3),
+        status: Math.random() < 0.95 ? 'active' : (Math.random() < 0.5 ? 'inactive' : 'terminated')
+      });
+      
+      empCounter++;
+    }
+  });
+
+  return employees;
+};
+
+const EMPLOYEES: Employee[] = generateEmployees();
 
 const WORK_CENTERS = [
   { id: 'WC-001', name: '레일 가공 라인', efficiency: 95 },

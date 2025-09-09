@@ -43,6 +43,10 @@
   background-color: #f59e0b;
 }
 
+.dataSourceBadge.massive {
+  background-color: #10b981;
+}
+
 .headerActions {
   display: flex;
   align-items: center;
@@ -676,17 +680,6 @@
   letter-spacing: 0.025em;
 }
 
-.dataSourceBadge.erp {
-  background: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-.dataSourceBadge.sample {
-  background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
-  border: 1px solid rgba(245, 158, 11, 0.2);
-}
 
 .dataSourceSelector {
   display: flex;

@@ -593,7 +593,7 @@ export const AttendancePage: React.FC = () => {
                         <Clock className={styles.hoursIcon} />
                         <div className={styles.hoursData}>
                           <span className={styles.hoursLabel}>연장근무</span>
-                          <span className={styles.overtimeValue}>{record.overtimeHours}시간</span>
+                          <span className={styles.overtimeValue}>{record.overtimeHours?.toFixed(1)}시간</span>
                         </div>
                       </div>
                     )}
