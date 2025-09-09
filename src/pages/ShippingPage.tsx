@@ -7,6 +7,7 @@ import { Search, Plus, Filter, Eye, Edit3, Truck, Package, MapPin, Clock, CheckC
 import styles from "./ShippingPage.module.css";
 // Import the ERP data from the JSON file
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 interface Shipment {
   id: string;
@@ -100,6 +101,78 @@ const getShipmentsFromERPData = (): Shipment[] => {
     return erpShipments;
   } catch (error) {
     console.error("Error processing ERP shipping data:", error);
+    return [];
+  }
+};
+
+// Function to get massive ERP shipments
+const getMassiveERPShipments = (): Shipment[] => {
+  try {
+    const massiveData = generateMassiveERPData();
+    const shipments = massiveData.shipments || [];
+    const customers = massiveData.customers || [];
+    const salesOrders = massiveData.salesOrders || [];
+
+    return shipments.map((shipment: any) => {
+      const customer = customers.find((c: any) => c.id === shipment.customerId);
+      const salesOrder = salesOrders.find((so: any) => so.id === shipment.salesOrderId);
+      
+      // Map massive ERP status to internal status
+      let status: "preparing" | "shipped" | "transit" | "delivered" | "returned" | "cancelled" = "preparing";
+      if (shipment.status === "delivered") status = "delivered";
+      else if (shipment.status === "shipped") status = "shipped";
+      else if (shipment.status === "in_transit") status = "transit";
+      else if (shipment.status === "cancelled") status = "cancelled";
+      else if (shipment.status === "returned") status = "returned";
+      
+      // Determine priority based on order amount
+      const orderAmount = salesOrder?.totalAmount || 0;
+      let priority: "standard" | "express" | "urgent" = "standard";
+      if (orderAmount > 100000000) priority = "urgent";
+      else if (orderAmount > 50000000) priority = "express";
+      
+      const shippingDate = (() => {
+        const date = new Date(shipment.actualShipDate || shipment.plannedShipDate);
+        return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+      })();
+      
+      const estimatedDelivery = (() => {
+        const date = new Date(shipment.estimatedDeliveryDate);
+        return isNaN(date.getTime()) ? new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+      })();
+      
+      return {
+        id: shipment.id,
+        trackingNumber: shipment.trackingNumber,
+        orderId: shipment.salesOrderId,
+        customer: customer?.contactPerson || "알 수 없는 고객",
+        customerAddress: `${customer?.company || "미지정 회사"} - ${customer?.address || "주소 미상"}`,
+        status,
+        priority,
+        carrier: shipment.carrier || "한진택배",
+        shippingMethod: shipment.shippingMethod || "택배",
+        shippingDate,
+        estimatedDelivery,
+        actualDelivery: status === "delivered" ? shippingDate : undefined,
+        weight: `${shipment.totalWeight || 0}`,
+        dimensions: `${shipment.dimensions || "40x30x20cm"}`,
+        shippingCost: shipment.shippingCost || 0,
+        destination: customer?.address?.split(' ')[0] || "기타 지역",
+        createdDate: shippingDate,
+        items: shipment.items?.map((item: any) => ({
+          name: item.productName,
+          quantity: item.quantity,
+          weight: `${(item.quantity * 0.5).toFixed(1)}kg`
+        })) || [],
+        notes: `대량 ERP 출하: ${shipment.items?.map((item: any) => item.productName).join(', ') || '상품'} 배송`,
+        customerCode: customer?.id,
+        itemCode: shipment.items?.[0]?.productCode,
+        itemName: shipment.items?.[0]?.productName,
+        shipmentQuantity: shipment.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0
+      };
+    });
+  } catch (error) {
+    console.error("Error processing massive ERP shipping data:", error);
     return [];
   }
 };
@@ -214,13 +287,15 @@ export const ShippingPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [showNewShipmentModal, setShowNewShipmentModal] = useState(false);
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   
   // Get current shipments based on selected data source
   const getCurrentShipments = (): Shipment[] => {
-    return selectedDataSource === "erp" ? getShipmentsFromERPData() : getSampleShipments();
+    if (selectedDataSource === "erp") return getShipmentsFromERPData();
+    if (selectedDataSource === "massive") return getMassiveERPShipments();
+    return getSampleShipments();
   };
 
   const [shipments, setShipments] = useState<Shipment[]>(getCurrentShipments());
@@ -351,8 +426,12 @@ export const ShippingPage: React.FC = () => {
             <h1 className={styles.title}>배송 관리</h1>
             <p className={styles.subtitle}>주문 배송 상태를 추적하고 물류를 관리하세요</p>
             <div className={styles.dataSourceBadge}>
-              <Badge variant={selectedDataSource === "erp" ? "default" : "secondary"}>
-                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              <Badge variant={
+                selectedDataSource === "erp" ? "default" : 
+                selectedDataSource === "massive" ? "destructive" : "secondary"
+              }>
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : 
+                 selectedDataSource === "massive" ? "대량 ERP 데이터" : "생성된 샘플 데이터"}
               </Badge>
             </div>
           </div>
@@ -409,28 +488,30 @@ export const ShippingPage: React.FC = () => {
           </Card>
         </div>
 
-        <div className={styles.controls}>
-          <div className={styles.searchBox}>
+        <div className={styles.filtersSection}>
+          <div className={styles.searchContainer}>
             <Search className={styles.searchIcon} />
             <Input
-              placeholder="추적번호, 고객명, 주문번호로 검색..."
+              type="text"
+              placeholder="배송번호, 고객명, 주문번호로 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={styles.searchInput}
             />
           </div>
-
-          <div className={styles.filterSection}>
+          
+          <div className={styles.filterGroup}>
+            {/* <label className={styles.filterLabel}>데이터 소스</label> */}
             <select 
               value={selectedDataSource} 
-              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
               className={styles.filterSelect}
             >
               <option value="erp">닷코 시연 데이터</option>
               <option value="sample">생성된 샘플 데이터</option>
+              <option value="massive">대량 ERP 데이터</option>
             </select>
             
-            <Filter className={styles.filterIcon} />
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={styles.filterSelect}>
               <option value="all">모든 상태</option>
               <option value="preparing">준비중</option>
@@ -660,6 +741,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>추적번호</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.trackingNumber || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, trackingNumber: e.target.value }))}
                     placeholder="추적번호"
@@ -669,6 +751,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>주문번호 *</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.orderId || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, orderId: e.target.value }))}
                     placeholder="주문번호를 입력하세요"
@@ -677,14 +760,16 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>고객명 *</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.customer || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, customer: e.target.value }))}
                     placeholder="고객명을 입력하세요"
                   />
                 </div>
-                <div className={styles.formGroup}>
+                <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                   <label>배송지 주소</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.customerAddress || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, customerAddress: e.target.value }))}
                     placeholder="배송지 주소를 입력하세요"
@@ -749,6 +834,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>중량 (kg)</label>
                   <Input
+                    className={styles.formInput}
                     type="number"
                     min="0"
                     step="0.1"
@@ -760,6 +846,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>크기</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.dimensions || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, dimensions: e.target.value }))}
                     placeholder="예: 30x20x15 cm"
@@ -768,6 +855,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>배송비 (원)</label>
                   <Input
+                    className={styles.formInput}
                     type="number"
                     min="0"
                     value={newShipment.cost || 0}
@@ -778,6 +866,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>목적지</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.destination || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, destination: e.target.value }))}
                     placeholder="목적지를 입력하세요"
@@ -786,6 +875,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>예상 배송일</label>
                   <Input
+                    className={styles.formInput}
                     type="date"
                     value={newShipment.estimatedDelivery || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, estimatedDelivery: e.target.value }))}

@@ -9,8 +9,12 @@ export function EmployeesPage() {
   const [selectedDepartment, setSelectedDepartment] = useState("전체");
   const [selectedStatus, setSelectedStatus] = useState("전체");
   const [selectedWorkType, setSelectedWorkType] = useState("전체");
-  const [selectedDataSource, setSelectedDataSource] = useState("전체");
+  const [selectedDataSource, setSelectedDataSource] = useState("massive");
   const [currentEmployees, setCurrentEmployees] = useState<Employee[]>([]);
+  
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
   const [salaryRange, setSalaryRange] = useState({ min: 0, max: 10000000 });
   const [performanceRange, setPerformanceRange] = useState({ min: 0, max: 100 });
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
@@ -244,6 +248,7 @@ export function EmployeesPage() {
   };
 
 
+
   // 데이터 소스 변경 시 직원 데이터 업데이트
   useEffect(() => {
     if (selectedDataSource === "전체") {
@@ -280,6 +285,17 @@ export function EmployeesPage() {
       matchesPerformance
     );
   });
+  
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedEmployees = filteredEmployees.slice(startIndex, endIndex);
+  
+  // 필터 변경 시 페이지 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedDepartment, selectedStatus, selectedWorkType, salaryRange, performanceRange, selectedDataSource]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR", {
@@ -520,6 +536,34 @@ export function EmployeesPage() {
         <p style={subtitleStyle}>직원 정보와 성과를 체계적으로 관리하세요</p>
       </div>
 
+      {/* Data Source Badge */}
+      {selectedDataSource !== "전체" && (
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          marginBottom: "1.5rem"
+        }}>
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "0.5rem 1rem",
+            backgroundColor: selectedDataSource === "generated" ? "#fef3c7" : 
+                           selectedDataSource === "erp" ? "#dbeafe" : "#f3e8ff",
+            color: selectedDataSource === "generated" ? "#92400e" : 
+                   selectedDataSource === "erp" ? "#1e40af" : "#6b21a8",
+            borderRadius: "9999px",
+            fontSize: "0.875rem",
+            fontWeight: "500",
+            border: `1px solid ${selectedDataSource === "generated" ? "#fbbf24" : 
+                                selectedDataSource === "erp" ? "#3b82f6" : "#8b5cf6"}`
+          }}>
+            현재 데이터 소스: {selectedDataSource === "generated" ? "생성된 샘플 데이터" : 
+                            selectedDataSource === "erp" ? "닷코 시연 데이터" : "대량 ERP 데이터"} 
+            ({currentEmployees.length}명)
+          </div>
+        </div>
+      )}
+
       {/* Statistics Cards */}
       <div style={statsContainerStyle}>
         <div style={statCardStyle}>
@@ -547,6 +591,25 @@ export function EmployeesPage() {
       {/* Actions Bar */}
       <div style={actionsBarStyle}>
         <div style={searchContainerStyle}>
+          {/* Data Source Selection */}
+          <select 
+            style={{
+              ...filterSelectStyle,
+              marginRight: "1rem",
+              minWidth: "200px",
+              backgroundColor: "white",
+              border: "1px solid #d1d5db",
+              borderRadius: "0.5rem"
+            }} 
+            value={selectedDataSource} 
+            onChange={(e) => setSelectedDataSource(e.target.value as "전체" | "generated" | "erp" | "massive")}
+          >
+            <option value="전체">전체 데이터</option>
+            <option value="generated">생성된 샘플 데이터</option>
+            <option value="erp">닷코 시연 데이터</option>
+            <option value="massive">대량 ERP 데이터</option>
+          </select>
+
           <div style={{ position: "relative" }}>
             <Search
               style={{
@@ -628,7 +691,7 @@ export function EmployeesPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredEmployees.map((employee) => (
+            {paginatedEmployees.map((employee) => (
               <tr key={employee.id} style={{ transition: "background-color 0.2s ease" }}>
                 <td style={tdStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -772,6 +835,101 @@ export function EmployeesPage() {
       >
         총 {filteredEmployees.length}명의 직원이 표시됨 (현재 데이터 소스: {currentEmployees.length}명 중)
       </div>
+
+      {/* 페이지네이션 */}
+      {totalPages > 1 && (
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "2rem auto",
+          padding: "1rem 0"
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            marginBottom: "1rem"
+          }}>
+            <button
+              style={{
+                padding: "0.5rem 1rem",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.375rem",
+                background: "white",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: currentPage === 1 ? "#d1d5db" : "#374151",
+                cursor: currentPage === 1 ? "not-allowed" : "pointer"
+              }}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              이전
+            </button>
+            
+            <div style={{ display: "flex", gap: "0.25rem" }}>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={pageNum}
+                    style={{
+                      width: "2.5rem",
+                      height: "2.5rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "0.375rem",
+                      background: currentPage === pageNum ? "#3b82f6" : "white",
+                      color: currentPage === pageNum ? "white" : "#374151",
+                      fontWeight: 500,
+                      cursor: "pointer"
+                    }}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              style={{
+                padding: "0.5rem 1rem",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.375rem",
+                background: "white",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: currentPage === totalPages ? "#d1d5db" : "#374151",
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer"
+              }}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              다음
+            </button>
+          </div>
+          
+          <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+            {startIndex + 1}-{Math.min(endIndex, filteredEmployees.length)} / {filteredEmployees.length}명
+          </div>
+        </div>
+      )}
 
       {/* Advanced Filter Modal */}
       {showAdvancedFilter && (

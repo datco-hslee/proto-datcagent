@@ -26,6 +26,8 @@ export function OrdersPage() {
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   // 새 주문 폼 상태
   const [newOrderForm, setNewOrderForm] = useState({
@@ -247,7 +249,13 @@ export function OrdersPage() {
   // 데이터 소스 변경 시 주문 목록 업데이트
   useEffect(() => {
     // 데이터 소스가 변경되면 현재 주문 목록을 업데이트
+    setCurrentPage(1); // 데이터 소스 변경 시 첫 페이지로 이동
   }, [selectedDataSource]);
+
+  // 필터 변경 시 첫 페이지로 이동
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedStatus, selectedPriority, advancedFilters]);
 
   // 버튼 핸들러들
   const handleAdvancedFilter = () => {
@@ -714,6 +722,12 @@ export function OrdersPage() {
     return matchesSearch && matchesStatus && matchesPriority && matchesCompany && matchesRepresentative && matchesProgress;
   });
 
+  // 페이지네이션 로직
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const paginatedOrders = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR", {
       style: "currency",
@@ -914,7 +928,7 @@ export function OrdersPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.map((order) => (
+            {paginatedOrders.map((order) => (
               <tr key={order.id} style={{ transition: "background-color 0.2s ease" }}>
                 <td style={tdStyle}>
                   <div style={{ fontWeight: 600, color: "#374151" }}>{order.orderNumber}</div>
@@ -982,7 +996,34 @@ export function OrdersPage() {
           color: "#6b7280",
         }}
       >
-        총 {filteredOrders.length}개의 주문이 표시됨 (전체 {orders.length}개 중)
+        총 {filteredOrders.length}개의 주문 중 {paginatedOrders.length}개가 표시됨 (전체 {allOrders.length}개 중)
+      </div>
+
+      {/* Pagination Controls */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: '1.5rem',
+        gap: '1rem'
+      }}>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          style={currentPage === 1 ? {...secondaryButtonStyle, cursor: 'not-allowed', opacity: 0.5} : secondaryButtonStyle}
+        >
+          이전
+        </button>
+        <span style={{fontSize: '0.875rem', fontWeight: 500}}>
+          페이지 {currentPage} / {totalPages}
+        </span>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          style={currentPage === totalPages ? {...secondaryButtonStyle, cursor: 'not-allowed', opacity: 0.5} : secondaryButtonStyle}
+        >
+          다음
+        </button>
       </div>
 
       {/* 모달들 */}

@@ -1,40 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
-import { useEmployees } from "../context/EmployeeContext";
-import erpDataJson from "../../DatcoDemoData2.json";
-import { generateMassiveERPData } from "../data/massiveERPData";
-import {
-  Search,
-  Plus,
-  Filter,
-  Eye,
-  Download,
-  Calendar,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  User,
-  Briefcase,
-  Home,
-  Coffee,
-} from "lucide-react";
+import { EmployeeContext } from "../context/EmployeeContext";
+import { Plus, Search, User, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 import styles from "./AttendancePage.module.css";
+import type { Employee } from '../types/employee';
 
 interface AttendanceRecord {
   id: string;
   employeeId: string;
   employeeName: string;
-  department: string;
+  department?: string;
   date: string;
-  checkInTime: string;
-  checkOutTime: string;
-  workHours: string;
-  status: "present" | "absent" | "late" | "early_leave" | "vacation" | "sick_leave";
-  overtime: string;
+  checkIn: string;
+  checkOut: string;
+  workHours: number;
+  overtime: number;
+  status: 'present' | 'absent' | 'late' | 'early_leave' | 'vacation' | 'sick_leave';
   notes?: string;
   breakStart?: string;
   breakEnd?: string;
@@ -250,6 +234,60 @@ const getSampleAttendanceRecords = (): AttendanceRecord[] => {
   return records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
 
+const generateAttendanceRecordsFromEmployees = (employees: any[]): AttendanceRecord[] => {
+  const records: AttendanceRecord[] = [];
+  const today = new Date();
+  
+  // 최근 30일간의 근태 기록 생성
+  for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - dayOffset);
+    
+    // 주말 제외
+    if (date.getDay() === 0 || date.getDay() === 6) continue;
+    
+    employees.forEach((employee) => {
+      const isPresent = Math.random() > 0.1; // 90% 출근율
+      const isLate = isPresent && Math.random() > 0.8; // 20% 지각율
+      
+      let status: AttendanceRecord['status'] = 'present';
+      let checkIn = '09:00';
+      let checkOut = '18:00';
+      
+      if (!isPresent) {
+        const absenceTypes: AttendanceRecord['status'][] = ['absent', 'vacation', 'sick_leave'];
+        status = absenceTypes[Math.floor(Math.random() * absenceTypes.length)];
+        checkIn = '';
+        checkOut = '';
+      } else if (isLate) {
+        status = 'late';
+        const lateMinutes = Math.floor(Math.random() * 60) + 10;
+        const lateTime = new Date();
+        lateTime.setHours(9, lateMinutes);
+        checkIn = lateTime.toTimeString().slice(0, 5);
+      }
+      
+      const workHours = status === 'present' || status === 'late' ? 
+        8 + (Math.random() > 0.7 ? Math.random() * 2 : 0) : 0;
+      
+      records.push({
+        id: `${employee.id}-${date.toISOString().split('T')[0]}`,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        date: date.toISOString().split('T')[0],
+        checkIn,
+        checkOut,
+        workHours: Number(workHours.toFixed(1)),
+        overtime: workHours > 8 ? Number((workHours - 8).toFixed(1)) : 0,
+        status,
+        notes: status === 'late' ? '지각' : status === 'absent' ? '무단결근' : ''
+      });
+    });
+  }
+  
+  return records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+};
+
 const statusConfig = {
   present: { label: "정상출근", color: "success", icon: CheckCircle },
   absent: { label: "결근", color: "destructive", icon: AlertTriangle },
@@ -260,80 +298,41 @@ const statusConfig = {
 };
 
 export const AttendancePage: React.FC = () => {
-  const { employees } = useEmployees();
+  const { employees } = useContext(EmployeeContext);
+  const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [departmentFilter, setDepartmentFilter] = useState("all");
-  const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newRecord, setNewRecord] = useState<Partial<AttendanceRecord>>({});
+  const [selectedDataSource, setSelectedDataSource] = useState<'erp' | 'sample'>('erp');
   
   // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newRecord, setNewRecord] = useState<Partial<AttendanceRecord>>({});
 
-  // 직원 데이터를 기반으로 출근 기록 생성
-  const generateAttendanceRecordsFromEmployees = (): AttendanceRecord[] => {
-    const activeEmployees = employees.filter(emp => emp.status === "재직");
-    const today = new Date().toISOString().split('T')[0];
-
-    return activeEmployees.map(emp => ({
-      id: `att_${emp.id}_${today}`,
-      employeeId: emp.employeeId,
-      employeeName: emp.name,
-      department: emp.department,
-      date: today,
-      checkInTime: "09:00",
-      checkOutTime: "18:00",
-      workHours: "8:00",
-      status: "present" as const,
-      overtime: "0:00",
-      notes: ""
-    }));
-  };
-
-  // 현재 출근 기록 가져오기
-  const getCurrentAttendanceRecords = (): AttendanceRecord[] => {
-    if (selectedDataSource === "sample") {
-      return getSampleAttendanceRecords();
-    } else if (selectedDataSource === "massive") {
-      return getMassiveERPAttendanceRecords();
-    } else {
-      // ERP 인원마스터 데이터 기반 출근 기록
-      return getERPAttendanceRecords();
-    }
-  };
-
-  // 데이터 소스 변경 시 출근 기록 업데이트
-  useEffect(() => {
-    const records = getCurrentAttendanceRecords();
-    setAttendanceRecords(records);
-  }, [selectedDataSource]);
-
-  const currentAttendanceRecords = getCurrentAttendanceRecords();
+  const currentAttendanceRecords = generateAttendanceRecordsFromEmployees(employees);
 
   const filteredRecords = currentAttendanceRecords.filter((record) => {
     const matchesSearch =
       record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.department.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || record.status === statusFilter;
-    const matchesDepartment = departmentFilter === "all" || record.department === departmentFilter;
-    return matchesSearch && matchesStatus && matchesDepartment;
+    const matchesStatus = selectedStatus === "all" || record.status === selectedStatus;
+    const matchesDate = selectedDate === "" || record.date === selectedDate;
+    return matchesSearch && matchesStatus && matchesDate;
   });
-  
+
   // 페이지네이션 계산
   const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedRecords = filteredRecords.slice(startIndex, endIndex);
-  
-  // 필터 변경 시 페이지 리셋
+
+  // 필터 변경 시 첫 페이지로 리셋
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, departmentFilter, selectedDataSource]);
+  }, [searchTerm, selectedStatus, selectedDate, selectedDataSource]);
 
   const getStatusIcon = (status: string) => {
     const StatusIcon = statusConfig[status as keyof typeof statusConfig]?.icon || Clock;
@@ -341,31 +340,24 @@ export const AttendancePage: React.FC = () => {
   };
 
   // 통계 계산
-  const getTotalEmployees = (): number => {
-    if (selectedDataSource === "massive") {
-      // 대량 ERP 데이터의 경우 전체 데이터에서 고유 직원 수 계산
-      try {
-        const massiveData = generateMassiveERPData();
-        const allAttendanceRecords = massiveData.attendanceRecords || [];
-        return [...new Set(allAttendanceRecords.map((r: any) => r.employeeId))].length;
-      } catch (error) {
-        console.error('대량 ERP 직원 수 계산 오류:', error);
-        return 0;
-      }
-    } else {
-      // 기존 로직: 현재 표시된 기록에서 고유 직원 수 계산
-      return [...new Set(currentAttendanceRecords.map(r => r.employeeId))].length;
-    }
-  };
-  
-  const totalEmployees = getTotalEmployees();
-  const presentEmployees = currentAttendanceRecords.filter((r) => r.status === "present").length;
-  const lateEmployees = currentAttendanceRecords.filter((r) => r.status === "late").length;
-  const totalWorkingHours = currentAttendanceRecords.reduce((sum, r) => {
+  const totalEmployees = employees.length;
+  const presentEmployees = filteredRecords.filter(record => 
+    record.date === new Date().toISOString().split('T')[0] && 
+    (record.status === 'present' || record.status === 'late')
+  ).length;
+  const absentEmployees = filteredRecords.filter(record => 
+    record.date === new Date().toISOString().split('T')[0] && 
+    record.status === 'absent'
+  ).length;
+  const lateEmployees = filteredRecords.filter(record => 
+    record.date === new Date().toISOString().split('T')[0] && 
+    record.status === 'late'
+  ).length;
+  const totalWorkingHours = filteredRecords.reduce((sum, r) => {
     const [hours, minutes] = r.workHours.split(':').map(Number);
     return sum + hours + (minutes / 60);
   }, 0);
-  const totalOvertimeHours = currentAttendanceRecords.reduce((sum, r) => {
+  const totalOvertimeHours = filteredRecords.reduce((sum, r) => {
     const [hours, minutes] = r.overtime.split(':').map(Number);
     return sum + hours + (minutes / 60);
   }, 0);
@@ -619,66 +611,6 @@ export const AttendancePage: React.FC = () => {
           ))}
         </div>
       </div>
-      
-      {/* 페이지네이션 - 화면 중앙 아래로 이동 */}
-      <div className={styles.paginationContainer}>
-        {totalPages > 1 && (
-          <div className={styles.pagination}>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className={styles.prevButton}
-            >
-              이전
-            </Button>
-            
-            <div className={styles.pageNumbers}>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={styles.pageButton}
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className={styles.nextButton}
-            >
-              다음
-            </Button>
-          </div>
-        )}
-        
-        {totalPages > 1 && (
-          <div className={styles.pageInfo}>
-            {startIndex + 1}-{Math.min(endIndex, filteredRecords.length)} / {filteredRecords.length}개
-          </div>
-        )}
-      </div>
 
       {selectedRecord && (
         <div className={styles.modal} onClick={() => setSelectedRecord(null)}>
@@ -906,10 +838,64 @@ export const AttendancePage: React.FC = () => {
                   </Button>
                 </div>
               </div>
+            </Card>
+          </div>
+        )}
+        
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className={styles.pagination}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              이전
+            </Button>
+            
+            <div className={styles.pageNumbers}>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={styles.pageButton}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
             </div>
-          </Card>
-        </div>
-      )}
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              다음
+            </Button>
+            
+            <div className={styles.pageInfo}>
+              {startIndex + 1}-{Math.min(endIndex, filteredRecords.length)} / {filteredRecords.length}개
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -43,20 +43,20 @@ const convertERPEmployeeToEmployee = (erpEmployee: any): Employee => {
 // Convert massive ERP employee data to Employee interface
 const convertMassiveERPEmployeeToEmployee = (erpEmployee: any): Employee => {
   return {
-    id: `MASSIVE-${erpEmployee.id}`,
-    employeeId: erpEmployee.id,
+    id: erpEmployee.id || `MASSIVE-${erpEmployee.employeeNumber}`,
+    employeeId: erpEmployee.employeeNumber || erpEmployee.employeeId || erpEmployee.id,
     name: erpEmployee.name,
     position: erpEmployee.position,
     department: erpEmployee.department,
-    email: erpEmployee.email,
-    phone: erpEmployee.phone,
-    hireDate: erpEmployee.hireDate,
-    salary: erpEmployee.salary,
-    status: erpEmployee.status === 'active' ? '재직' : '퇴직',
-    workType: erpEmployee.workType === 'full_time' ? '정규직' : '계약직',
-    manager: erpEmployee.manager || '',
-    skills: erpEmployee.skills || [],
-    performanceScore: erpEmployee.performanceScore || 85,
+    email: `${(erpEmployee.employeeNumber || erpEmployee.employeeId || erpEmployee.id).toLowerCase()}@company.com`,
+    phone: "010-0000-0000",
+    hireDate: erpEmployee.hireDate ? (erpEmployee.hireDate instanceof Date ? erpEmployee.hireDate.toISOString().split('T')[0] : erpEmployee.hireDate) : "2023-01-01",
+    salary: erpEmployee.baseSalary || erpEmployee.salary || 3500000,
+    status: erpEmployee.status === 'active' ? '재직' : (erpEmployee.status === 'inactive' ? '휴직' : '퇴사'),
+    workType: '정규직',
+    manager: '',
+    skills: [],
+    performanceScore: Math.floor(Math.random() * 30) + 70, // 70-100 범위
     dataSource: "massive" as const,
     dataSourceLabel: "대량 ERP 데이터"
   };
@@ -66,7 +66,10 @@ const convertMassiveERPEmployeeToEmployee = (erpEmployee: any): Employee => {
 const getMassiveERPEmployees = (): Employee[] => {
   try {
     const massiveData = generateMassiveERPData();
-    return massiveData.employees.map(convertMassiveERPEmployeeToEmployee);
+    console.log('Massive ERP data loaded:', massiveData.employees.length, 'employees');
+    const convertedEmployees = massiveData.employees.map(convertMassiveERPEmployeeToEmployee);
+    console.log('Converted employees:', convertedEmployees.length);
+    return convertedEmployees;
   } catch (error) {
     console.warn('Failed to load massive ERP data:', error);
     return [];
@@ -223,7 +226,8 @@ const GENERATED_EMPLOYEES: Employee[] = [
 
 // Load employees from comprehensive ERP data and combine with generated data
 const ERP_EMPLOYEES: Employee[] = (erpDataJson.sheets.인원마스터 || []).map(convertERPEmployeeToEmployee);
-const INITIAL_EMPLOYEES: Employee[] = [...GENERATED_EMPLOYEES, ...ERP_EMPLOYEES];
+const MASSIVE_ERP_EMPLOYEES: Employee[] = getMassiveERPEmployees();
+const INITIAL_EMPLOYEES: Employee[] = [...GENERATED_EMPLOYEES, ...ERP_EMPLOYEES, ...MASSIVE_ERP_EMPLOYEES];
 
 export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
@@ -270,6 +274,11 @@ export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       summary[source].count++;
     });
+    
+    // 대량 ERP 데이터 정보 추가
+    if (summary.massive) {
+      summary.massive.label = `대량 ERP 데이터 (${summary.massive.count}명)`;
+    }
     
     return summary;
   };

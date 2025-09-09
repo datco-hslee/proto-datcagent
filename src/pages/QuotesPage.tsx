@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Plus, Filter, Download, Edit, Send, Clock, CheckCircle, XCircle, FileText } from "lucide-react";
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
+import type { SalesOrder } from '../data/massiveERPData';
 
 interface Quote {
   id: string;
@@ -21,11 +23,15 @@ interface Quote {
 export function QuotesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("전체");
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [dateRange, setDateRange] = useState("전체");
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [showCreateQuote, setShowCreateQuote] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
+  
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
   
   // 새 견적 폼 상태
   const [newQuoteForm, setNewQuoteForm] = useState({
@@ -244,7 +250,12 @@ export function QuotesPage() {
       notes: editQuoteForm.notes,
     };
 
-    setUserAddedQuotes(userAddedQuotes.map((quote: Quote) => quote.id === editingQuote!.id ? updatedQuote : quote));
+    // 편집 대상이 사용자가 추가한 견적인지, 아니면 데이터 소스에서 온 것인지 확인
+    if (userAddedQuotes.some(q => q.id === editingQuote!.id)) {
+      setUserAddedQuotes(userAddedQuotes.map((quote: Quote) => quote.id === editingQuote!.id ? updatedQuote : quote));
+    } else {
+      setCurrentQuotes(currentQuotes.map((quote: Quote) => quote.id === editingQuote!.id ? updatedQuote : quote));
+    }
     setEditingQuote(null);
     alert('견적이 성공적으로 수정되었습니다.');
   };
@@ -528,6 +539,42 @@ export function QuotesPage() {
     });
   };
 
+  // 대량 ERP 데이터에서 견적 추출
+  const getMassiveERPQuotes = (): Quote[] => {
+    const massiveData = generateMassiveERPData();
+    const salesOrders = massiveData.salesOrders || [];
+
+    return salesOrders.map((order: SalesOrder): Quote => {
+      let quoteStatus: Quote['status'] = "발송완료";
+      switch (order.status) {
+        case 'quotation': quoteStatus = '발송완료'; break;
+        case 'confirmed': quoteStatus = '승인'; break;
+        case 'cancelled': quoteStatus = '거절'; break;
+        default: quoteStatus = '임시저장';
+      }
+
+      const discount = Math.floor(order.totalAmount * (Math.random() * 0.1)); // 0-10% 할인
+      const validUntil = new Date(order.orderDate);
+      validUntil.setDate(validUntil.getDate() + 30);
+
+      return {
+        id: `MASSIVE-QUO-${order.id}`,
+        quoteNumber: order.orderNumber.replace('SO', 'QT'),
+        customer: order.customerName,
+        company: order.customerName,
+        status: quoteStatus,
+        quoteDate: new Date(order.orderDate).toISOString().split('T')[0],
+        validUntil: validUntil.toISOString().split('T')[0],
+        totalAmount: order.totalAmount + discount,
+        discount: discount,
+        finalAmount: order.totalAmount,
+        items: order.items.length,
+        representative: order.salesPerson,
+        notes: order.notes,
+      };
+    });
+  };
+
   // 샘플 견적 데이터
   const getSampleQuotes = (): Quote[] => {
     return [
@@ -579,17 +626,30 @@ export function QuotesPage() {
     ];
   };
 
+  const [currentQuotes, setCurrentQuotes] = useState<Quote[]>([]);
+
+  useEffect(() => {
+    setCurrentQuotes(getCurrentQuotes());
+  }, [selectedDataSource]);
+
   // 현재 선택된 데이터 소스에 따른 견적 반환
   const getCurrentQuotes = (): Quote[] => {
-    return selectedDataSource === "erp" ? getERPQuotes() : getSampleQuotes();
+    switch (selectedDataSource) {
+      case 'erp':
+        return getERPQuotes();
+      case 'massive':
+        return getMassiveERPQuotes();
+      case 'sample':
+      default:
+        return getSampleQuotes();
+    }
   };
 
   // 사용자가 추가한 견적 데이터 (빈 배열로 시작)
   const [userAddedQuotes, setUserAddedQuotes] = useState<Quote[]>([]);
 
   // 현재 견적 목록 가져오기
-  const currentQuotes = getCurrentQuotes();
-  const allQuotes = [...currentQuotes, ...userAddedQuotes]; // ERP/샘플 데이터 + 사용자 추가 데이터
+  const allQuotes = [...currentQuotes, ...userAddedQuotes]; // ERP/샘플/Massive 데이터 + 사용자 추가 데이터
   
   const filteredQuotes = allQuotes.filter((quote) => {
     const matchesSearch =
@@ -613,6 +673,17 @@ export function QuotesPage() {
     
     return matchesSearch && matchesStatus && matchesCompany && matchesRepresentative && matchesAmount && matchesItems && matchesDiscount;
   });
+  
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(filteredQuotes.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedQuotes = filteredQuotes.slice(startIndex, endIndex);
+  
+  // 필터 변경 시 페이지 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedStatus, selectedDataSource, advancedFilters]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR", {
@@ -677,12 +748,12 @@ export function QuotesPage() {
               borderRadius: "0.5rem",
               fontSize: "0.875rem",
               fontWeight: 500,
-              backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : "#fef3c7",
-              color: selectedDataSource === "erp" ? "#1e40af" : "#92400e",
-              border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : "#fcd34d"}`,
+              backgroundColor: selectedDataSource === "erp" ? "#dbeafe" : selectedDataSource === 'massive' ? '#e0f2fe' : "#fef3c7",
+              color: selectedDataSource === "erp" ? "#1e40af" : selectedDataSource === 'massive' ? '#0ea5e9' : "#92400e",
+              border: `1px solid ${selectedDataSource === "erp" ? "#93c5fd" : selectedDataSource === 'massive' ? '#7dd3fc' : "#fcd34d"}`,
             }}
           >
-            현재 데이터: {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+            현재 데이터: {selectedDataSource === "erp" ? "닷코 시연 데이터" : selectedDataSource === 'massive' ? '대량 ERP 데이터' : "생성된 샘플 데이터"}
           </div>
         </div>
       </div>
@@ -718,10 +789,11 @@ export function QuotesPage() {
           <select 
             style={filterSelectStyle} 
             value={selectedDataSource} 
-            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+            onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
           >
             <option value="erp">닷코 시연 데이터</option>
             <option value="sample">생성된 샘플 데이터</option>
+            <option value="massive">대량 ERP 데이터</option>
           </select>
 
           <div style={{ position: "relative" }}>
@@ -798,7 +870,7 @@ export function QuotesPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredQuotes.map((quote) => (
+            {paginatedQuotes.map((quote) => (
               <tr key={quote.id} style={{ transition: "background-color 0.2s ease" }}>
                 <td style={tdStyle}>
                   <div style={{ fontWeight: 600, color: "#374151" }}>{quote.quoteNumber}</div>
@@ -1037,7 +1109,19 @@ export function QuotesPage() {
                 
                 <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
                   <button
-                    onClick={resetQuoteFilters}
+                    onClick={() => {
+                      setAdvancedFilters({
+                        company: "",
+                        representative: "",
+                        minAmount: "",
+                        maxAmount: "",
+                        validFrom: "",
+                        validTo: "",
+                        hasDiscount: "",
+                        minItems: "",
+                        maxItems: "",
+                      });
+                    }}
                     style={{
                       padding: "0.5rem 1rem",
                       border: "1px solid #d1d5db",
@@ -1051,7 +1135,7 @@ export function QuotesPage() {
                     초기화
                   </button>
                   <button
-                    onClick={applyQuoteFilters}
+                    onClick={closeModals}
                     style={{
                       padding: "0.5rem 1rem",
                       border: "none",
@@ -1067,6 +1151,101 @@ export function QuotesPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 페이지네이션 */}
+      {totalPages > 1 && (
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "2rem auto",
+          padding: "1rem 0"
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
+            marginBottom: "1rem"
+          }}>
+            <button
+              style={{
+                padding: "0.5rem 1rem",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.375rem",
+                background: "white",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: currentPage === 1 ? "#d1d5db" : "#374151",
+                cursor: currentPage === 1 ? "not-allowed" : "pointer"
+              }}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              이전
+            </button>
+            
+            <div style={{ display: "flex", gap: "0.25rem" }}>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <button
+                    key={pageNum}
+                    style={{
+                      width: "2.5rem",
+                      height: "2.5rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "0.375rem",
+                      background: currentPage === pageNum ? "#3b82f6" : "white",
+                      color: currentPage === pageNum ? "white" : "#374151",
+                      fontWeight: 500,
+                      cursor: "pointer"
+                    }}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              style={{
+                padding: "0.5rem 1rem",
+                border: "1px solid #e5e7eb",
+                borderRadius: "0.375rem",
+                background: "white",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                color: currentPage === totalPages ? "#d1d5db" : "#374151",
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer"
+              }}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              다음
+            </button>
+          </div>
+          
+          <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+            {startIndex + 1}-{Math.min(endIndex, filteredQuotes.length)} / {filteredQuotes.length}개
           </div>
         </div>
       )}
@@ -1313,7 +1492,7 @@ export function QuotesPage() {
       )}
 
       {editingQuote && (
-        <div style={modalOverlayStyle} onClick={closeModals}>
+        <div style={modalOverlayStyle}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
             <div style={modalHeaderStyle}>
               <h2 style={modalTitleStyle}>{editingQuote.quoteNumber} 편집</h2>

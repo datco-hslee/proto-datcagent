@@ -7,6 +7,7 @@ import { Search, Plus, Filter, Eye, Edit3, Trash2, Building2, Phone, Mail, MapPi
 import styles from "./SuppliersPage.module.css";
 // Import the ERP data from the JSON file
 import erpDataJson from '../../DatcoDemoData2.json';
+import { generateMassiveERPData } from '../data/massiveERPData';
 
 interface Supplier {
   id: string;
@@ -29,8 +30,8 @@ interface Supplier {
   incoterms?: string;
 }
 
-// ERP 데이터에서 거래처 정보 추출 (공급사 + 고객사)
-const getSuppliersFromERPData = (companyTypeFilter: string = "all"): Supplier[] => {
+// ERP 데이터에서 거래처 정보 추출 (공급사만)
+const getSuppliersFromERPData = (): Supplier[] => {
   try {
     if (!erpDataJson || !erpDataJson.sheets) {
       console.warn("ERP 데이터가 없습니다. 빈 배열을 반환합니다.");
@@ -39,23 +40,13 @@ const getSuppliersFromERPData = (companyTypeFilter: string = "all"): Supplier[] 
 
     const suppliers = erpDataJson.sheets?.거래처마스터?.filter((item: any) => item.구분 === '공급사') || [];
     const purchaseOrders = erpDataJson.sheets?.구매발주 || [];
-    const itemMaster = erpDataJson.sheets?.품목마스터 || [];
-    const arData = erpDataJson.sheets['회계(AR_AP)']?.filter((item: any) => item.구분 === '매입채무') || [];
 
     if (!Array.isArray(suppliers)) {
       console.warn("거래처마스터 데이터가 배열이 아닙니다.");
       return [];
     }
-
-    // 회사 유형에 따른 필터링
-    const filteredSuppliers = suppliers.filter((supplier: any) => {
-      if (companyTypeFilter === "all") return true;
-      if (companyTypeFilter === "supplier") return supplier.구분 === "공급사";
-      if (companyTypeFilter === "customer") return supplier.구분 === "고객사";
-      return true;
-    });
     
-    return filteredSuppliers.map((supplier: any) => {
+    return suppliers.map((supplier: any) => {
       // 해당 공급업체의 구매 주문 정보 집계
       const supplierOrders = Array.isArray(purchaseOrders) 
         ? purchaseOrders.filter((po: any) => po.공급업체코드 === supplier.거래처코드)
@@ -66,28 +57,88 @@ const getSuppliersFromERPData = (companyTypeFilter: string = "all"): Supplier[] 
         ? supplierOrders.sort((a: any, b: any) => new Date(b.발주일자).getTime() - new Date(a.발주일자).getTime())[0]
         : null;
       
+      // 0.5 단위로 별점 생성
+      const generateERPRating = (): number => {
+        const baseRating = 3 + Math.random() * 2; // 3-5 범위
+        return Math.round(baseRating * 2) / 2; // 0.5 단위로 반올림
+      };
+      
       return {
-        id: `ERP-${supplier.거래처코드}`,
+        id: supplier.거래처코드,
         supplierCode: supplier.거래처코드,
-        name: supplier.거래처명 || "공급업체명 없음",
-        contact: "담당자",
-        email: `${(supplier.거래처코드 || 'supplier').toLowerCase()}@company.com`,
-        phone: "02-1234-5678",
-        address: "서울시 강남구",
-        category: "제조업",
-        rating: Math.min(5, Math.max(1, Math.floor(Math.random() * 5) + 1)),
-        status: "active",
+        name: supplier.거래처명,
+        contact: supplier.담당자 || "담당자",
+        email: `${supplier.거래처코드.toLowerCase()}@${supplier.거래처명.replace(/\s+/g, '').toLowerCase()}.com`,
+        phone: supplier.전화번호 || "02-1234-5678",
+        address: supplier.주소 || "서울시 강남구",
+        category: supplier.업종 || "제조업",
+        rating: generateERPRating(),
+        status: "active" as const,
         totalOrders: totalOrders,
         totalAmount: totalAmount,
-        lastOrderDate: lastOrder ? lastOrder.발주일자 : "2024-01-01",
-        leadTime: supplier.납기리드타임일 || 7,
-        paymentTerms: supplier.결제조건 || "30D",
+        lastOrderDate: lastOrder ? new Date(lastOrder.발주일자).toISOString().split('T')[0] : "2024-01-01",
+        leadTime: supplier.리드타임일 || 7,
+        paymentTerms: supplier.결제조건 || "월말 결제",
         creditRating: supplier.신용등급 || "A",
         incoterms: supplier.인코텀즈 || "DDP"
       };
     });
   } catch (error) {
     console.error("ERP 데이터 로딩 오류:", error);
+    return [];
+  }
+};
+
+// 대량 ERP 데이터에서 공급업체 정보 추출
+const getMassiveERPSuppliers = (): Supplier[] => {
+  try {
+    const massiveData = generateMassiveERPData();
+    const suppliers = massiveData.suppliers || [];
+    const purchaseOrders = massiveData.purchaseOrders || [];
+    
+    return suppliers.map((supplier: any) => {
+      // 해당 공급업체의 구매 주문 정보 집계
+      const supplierOrders = purchaseOrders.filter((po: any) => po.supplierId === supplier.id);
+      const totalOrders = supplierOrders.length;
+      const totalAmount = supplierOrders.reduce((sum: number, po: any) => sum + (po.totalAmount || 0), 0);
+      const lastOrder = supplierOrders.length > 0 
+        ? supplierOrders.sort((a: any, b: any) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())[0]
+        : null;
+      
+      // 공급업체 신뢰도에 따른 등급 매핑 (0.5 단위로 제한)
+      const generateRating = (min: number, max: number): number => {
+        const range = (max - min) * 2; // 0.5 단위로 변환
+        const randomStep = Math.floor(Math.random() * (range + 1));
+        return Math.min(5, Math.max(0, min + (randomStep * 0.5)));
+      };
+      
+      const ratingMap = {
+        'high': generateRating(4.0, 5.0),
+        'medium': generateRating(3.0, 4.5),
+        'low': generateRating(2.0, 3.5)
+      };
+      
+      return {
+        id: supplier.id,
+        supplierCode: supplier.id,
+        name: supplier.name,
+        contact: "담당자",
+        email: `${supplier.id.toLowerCase().replace('-', '')}@${supplier.name.replace(/\s+/g, '').toLowerCase()}.com`,
+        phone: "02-" + Math.floor(Math.random() * 9000 + 1000) + "-" + Math.floor(Math.random() * 9000 + 1000),
+        address: "서울시 " + ["강남구", "서초구", "송파구", "영등포구", "마포구"][Math.floor(Math.random() * 5)],
+        category: ["제조업", "유통업", "서비스업", "IT업"][Math.floor(Math.random() * 4)],
+        rating: ratingMap[supplier.reliability as keyof typeof ratingMap] || 3.0,
+        status: "active" as const,
+        totalOrders: totalOrders,
+        totalAmount: totalAmount,
+        lastOrderDate: lastOrder ? new Date(lastOrder.orderDate).toISOString().split('T')[0] : "2024-01-01",
+        leadTime: supplier.leadTime || 7,
+        paymentTerms: "30일 후 지급",
+        creditRating: supplier.reliability === 'high' ? 'A+' : supplier.reliability === 'medium' ? 'A' : 'B+'
+      };
+    });
+  } catch (error) {
+    console.error("Error processing massive ERP supplier data:", error);
     return [];
   }
 };
@@ -102,7 +153,7 @@ const getSampleSuppliers = (): Supplier[] => [
     phone: "02-123-4567",
     address: "서울시 강남구 테헤란로 123",
     category: "전자부품",
-    rating: 4.8,
+    rating: 4.5,
     status: "active",
     totalOrders: 45,
     totalAmount: 12500000,
@@ -118,7 +169,7 @@ const getSampleSuppliers = (): Supplier[] => [
     phone: "031-987-6543",
     address: "경기도 성남시 분당구 판교로 456",
     category: "원재료",
-    rating: 4.5,
+    rating: 4.0,
     status: "active",
     totalOrders: 32,
     totalAmount: 8200000,
@@ -134,7 +185,7 @@ const getSampleSuppliers = (): Supplier[] => [
     phone: "02-555-7890",
     address: "서울시 마포구 월드컵북로 789",
     category: "소프트웨어",
-    rating: 4.9,
+    rating: 5.0,
     status: "active",
     totalOrders: 18,
     totalAmount: 15600000,
@@ -150,7 +201,7 @@ const getSampleSuppliers = (): Supplier[] => [
     phone: "051-222-3333",
     address: "부산시 해운대구 센텀중앙로 101",
     category: "사무용품",
-    rating: 4.2,
+    rating: 4.0,
     status: "active",
     totalOrders: 67,
     totalAmount: 5400000,
@@ -166,7 +217,7 @@ const getSampleSuppliers = (): Supplier[] => [
     phone: "032-777-8888",
     address: "인천시 연수구 송도국제도시 202",
     category: "기계부품",
-    rating: 3.8,
+    rating: 4.0,
     status: "pending",
     totalOrders: 12,
     totalAmount: 3200000,
@@ -184,25 +235,27 @@ const statusConfig = {
 
 export const SuppliersPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [companyTypeFilter, setCompanyTypeFilter] = useState<string>("all");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample">("erp");
-  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
   
   // 데이터 소스에 따른 공급업체 목록 가져오기
   const getCurrentSuppliers = (): Supplier[] => {
-    return selectedDataSource === "erp" ? getSuppliersFromERPData(companyTypeFilter) : getSampleSuppliers();
+    return selectedDataSource === "erp" ? getSuppliersFromERPData() : selectedDataSource === "massive" ? getMassiveERPSuppliers() : getSampleSuppliers();
   };
   
   const [suppliers, setSuppliers] = useState<Supplier[]>(getCurrentSuppliers());
   
-  // 데이터 소스 또는 회사 유형 변경 시 공급업체 목록 업데이트
+  // 데이터 소스 변경 시 공급업체 목록 업데이트
   useEffect(() => {
     setSuppliers(getCurrentSuppliers());
-  }, [selectedDataSource, companyTypeFilter]);
+  }, [selectedDataSource]);
   const [newSupplier, setNewSupplier] = useState<Partial<Supplier>>({
     name: "",
     contact: "",
@@ -307,7 +360,23 @@ export const SuppliersPage: React.FC = () => {
   };
 
   const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => <Star key={i} className={`${styles.star} ${i < Math.floor(rating) ? styles.starFilled : ""}`} />);
+    // 0.5 단위로 반올림
+    const normalizedRating = Math.round(rating * 2) / 2;
+    
+    return Array.from({ length: 5 }, (_, i) => {
+      const starValue = i + 1;
+      let starClass = styles.star;
+      
+      if (normalizedRating >= starValue) {
+        // 완전히 채워진 별
+        starClass += ` ${styles.starFilled}`;
+      } else if (normalizedRating > starValue - 1 && normalizedRating < starValue) {
+        // 반만 채워진 별 (예: 4.5일 때 5번째 별이 반별)
+        starClass += ` ${styles.starHalf}`;
+      }
+      
+      return <Star key={i} className={starClass} />;
+    });
   };
 
   const categories = [...new Set(suppliers.map((s) => s.category))];
@@ -320,8 +389,9 @@ export const SuppliersPage: React.FC = () => {
             <h1 className={styles.title}>공급업체 관리</h1>
             <p className={styles.subtitle}>공급업체 정보를 관리하고 성과를 모니터링하세요</p>
             <div className={styles.dataSourceBadge}>
-              <Badge variant={selectedDataSource === "erp" ? "default" : "secondary"}>
-                {selectedDataSource === "erp" ? "닷코 시연 데이터" : "생성된 샘플 데이터"}
+              <Badge variant={selectedDataSource === "erp" ? "default" : selectedDataSource === "massive" ? "destructive" : "secondary"}>
+                {selectedDataSource === "erp" ? "닷코 시연 데이터" : 
+                 selectedDataSource === "massive" ? "대량 ERP 데이터" : "생성된 샘플 데이터"}
               </Badge>
             </div>
           </div>
@@ -382,30 +452,17 @@ export const SuppliersPage: React.FC = () => {
             {/* 데이터 소스 선택 */}
             <select 
               value={selectedDataSource} 
-              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample")}
+              onChange={(e) => setSelectedDataSource(e.target.value as "erp" | "sample" | "massive")}
               className={styles.filterSelect}
               style={{ marginRight: '10px' }}
             >
               <option value="erp">닷코 시연 데이터</option>
               <option value="sample">생성된 샘플 데이터</option>
+              <option value="massive">대량 ERP 데이터</option>
             </select>
-
-            {/* 회사 유형 필터 (ERP 데이터일 때만 표시) */}
-            {selectedDataSource === "erp" && (
-              <select 
-                value={companyTypeFilter} 
-                onChange={(e) => setCompanyTypeFilter(e.target.value)}
-                className={styles.filterSelect}
-                style={{ marginRight: '10px' }}
-              >
-                <option value="all">모든 거래처</option>
-                <option value="supplier">공급사</option>
-                <option value="customer">고객사</option>
-              </select>
-            )}
             
             <Filter className={styles.filterIcon} />
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={styles.filterSelect}>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")} className={styles.filterSelect}>
               <option value="all">모든 상태</option>
               <option value="active">활성</option>
               <option value="inactive">비활성</option>
@@ -610,6 +667,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>업체명 *</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.name || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="업체명을 입력하세요"
@@ -618,6 +676,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>담당자 *</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.contact || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, contact: e.target.value }))}
                     placeholder="담당자명을 입력하세요"
@@ -626,6 +685,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>이메일 *</label>
                   <Input
+                    className={styles.formInput}
                     type="email"
                     value={newSupplier.email || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, email: e.target.value }))}
@@ -635,14 +695,16 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>전화번호</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.phone || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, phone: e.target.value }))}
                     placeholder="전화번호를 입력하세요"
                   />
                 </div>
-                <div className={styles.formGroup}>
+                <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                   <label>주소</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.address || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, address: e.target.value }))}
                     placeholder="주소를 입력하세요"
@@ -666,6 +728,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>평점</label>
                   <Input
+                    className={styles.formInput}
                     type="number"
                     min="0"
                     max="5"
@@ -690,6 +753,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>결제 조건</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.paymentTerms || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, paymentTerms: e.target.value }))}
                     placeholder="결제 조건을 입력하세요"
@@ -698,6 +762,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>리드타임 (일)</label>
                   <Input
+                    className={styles.formInput}
                     type="number"
                     min="0"
                     value={newSupplier.leadTime || 0}

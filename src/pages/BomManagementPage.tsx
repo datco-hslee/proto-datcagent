@@ -1050,8 +1050,8 @@ export function BomManagementPage() {
           <div style={{ marginTop: "0.75rem", padding: "0.75rem", backgroundColor: "#f0f9ff", borderRadius: "0.5rem", border: "1px solid #0ea5e9" }}>
             <p style={{ fontSize: "0.875rem", color: "#0369a1", fontWeight: 500 }}>📋 BOM 상태 안내</p>
             <div style={{ marginTop: "0.5rem", fontSize: "0.75rem", color: "#0369a1" }}>
-              <span style={{ fontWeight: 500 }}>• 활성 (생산중):</span> 현재 생산이 진행 중인 제품의 BOM<br/>
-              <span style={{ fontWeight: 500 }}>• 개발중 (계획):</span> 생산 계획 단계에 있는 제품의 BOM<br/>
+              <span style={{ fontWeight: 500 }}>• 활성 (진행중):</span> 현재 생산이 진행 중인 제품의 BOM<br/>
+              <span style={{ fontWeight: 500 }}>• 기획 (계획중):</span> 생산 계획 단계에 있는 제품의 BOM<br/>
               <span style={{ fontWeight: 500 }}>• 비활성 (완료):</span> 생산이 완료되었거나 중단된 제품의 BOM
             </div>
           </div>

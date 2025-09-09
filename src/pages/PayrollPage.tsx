@@ -479,7 +479,7 @@ export function PayrollPage() {
             >
               <option value="erp">닷코 시연 데이터</option>
               <option value="sample">생성된 샘플 데이터</option>
-              <option value="massive">대량 ERP 데이터 (payrollRecords 포함)</option>
+              <option value="massive">대량 ERP 데이터 </option>
             </select>
           </div>
           

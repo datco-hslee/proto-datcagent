@@ -6,7 +6,7 @@ import erpDataJson from '../../DatcoDemoData2.json';
 import { generateMassiveERPData } from '../data/massiveERPData';
 
 export function CustomersPage() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
+  const { addCustomer, updateCustomer, deleteCustomer } = useCustomers();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("전체");
   const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
@@ -14,6 +14,9 @@ export function CustomersPage() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
+  const [currentCustomers, setCurrentCustomers] = useState<Customer[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
   
   // 새 고객 추가 폼 데이터
   const [newCustomerForm, setNewCustomerForm] = useState({
@@ -213,8 +216,15 @@ export function CustomersPage() {
 
   // 데이터 소스 변경 시 고객 목록 업데이트
   useEffect(() => {
-    // 데이터 소스가 변경되면 현재 고객 목록을 업데이트
+    const newCustomers = getCurrentCustomers();
+    setCurrentCustomers(newCustomers);
+    setCurrentPage(1); // 데이터 소스 변경 시 1페이지로
   }, [selectedDataSource]);
+
+  // 필터 변경 시 1페이지로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedStatus, advancedFilters]);
 
   // 새 고객 추가 핸들러
   const handleAddCustomer = () => {
@@ -365,7 +375,17 @@ export function CustomersPage() {
     }
 
     if (editingCustomer) {
-      updateCustomer(editingCustomer.id, editForm);
+      if (selectedDataSource === 'sample') {
+        const updatedCustomers = currentCustomers.map(c =>
+          c.id === editingCustomer.id ? { ...c, ...editForm, id: editingCustomer.id } : c
+        );
+        setCurrentCustomers(updatedCustomers);
+      } else {
+        updateCustomer(editingCustomer.id, editForm);
+        // Refresh the list from the source after updating the context
+        setCurrentCustomers(getCurrentCustomers());
+      }
+
       setEditingCustomer(null);
       alert('고객 정보가 업데이트되었습니다.');
     }
@@ -596,7 +616,6 @@ export function CustomersPage() {
   };
 
   // 필터링된 고객 목록
-  const currentCustomers = getCurrentCustomers();
   const filteredCustomers = currentCustomers.filter((customer: Customer) => {
     const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          customer.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -615,6 +634,12 @@ export function CustomersPage() {
     
     return matchesSearch && matchesStatus && matchesCompany && matchesMinOrders && matchesMaxOrders && matchesLocation;
   });
+
+  // 페이지네이션 로직
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const paginatedCustomers = filteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR", {
@@ -723,7 +748,7 @@ export function CustomersPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredCustomers.map((customer, index) => (
+            {paginatedCustomers.map((customer, index) => (
               <tr key={customer.id} style={{ transition: "background-color 0.2s ease" }}>
                 <td style={tdStyle}>{customer.id}</td>
                 <td style={tdStyle}>
@@ -805,7 +830,34 @@ export function CustomersPage() {
           color: "#6b7280",
         }}
       >
-        총 {filteredCustomers.length}명의 고객이 표시됨 (전체 {currentCustomers.length}명 중)
+        총 {filteredCustomers.length}명의 고객 중 {paginatedCustomers.length}명이 표시됨 (전체 {currentCustomers.length}명)
+      </div>
+
+      {/* Pagination Controls */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: '1.5rem',
+        gap: '1rem'
+      }}>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          style={currentPage === 1 ? {...secondaryButtonStyle, cursor: 'not-allowed', opacity: 0.5} : secondaryButtonStyle}
+        >
+          이전
+        </button>
+        <span style={{fontSize: '0.875rem', fontWeight: 500}}>
+          페이지 {currentPage} / {totalPages}
+        </span>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          style={currentPage === totalPages ? {...secondaryButtonStyle, cursor: 'not-allowed', opacity: 0.5} : secondaryButtonStyle}
+        >
+          다음
+        </button>
       </div>
 
       {/* 모달들 */}
@@ -1119,7 +1171,7 @@ export function CustomersPage() {
       )}
 
       {editingCustomer && (
-        <div style={modalOverlayStyle} onClick={closeModals}>
+        <div style={modalOverlayStyle}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
             <div style={modalHeaderStyle}>
               <h2 style={modalTitleStyle}>{editingCustomer.name} 편집</h2>
