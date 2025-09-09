@@ -26,6 +26,7 @@ import {
   Building2,
   X,
   TrendingUp,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -158,12 +159,13 @@ const MOCK_LEADS: Lead[] = [
 ];
 
 // 단계별 섹션 컴포넌트
-function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead }: {
+function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead, onDeleteLead }: {
   stage: typeof PIPELINE_STAGES[0];
   leads: Lead[];
   selectedLead: Lead | null;
   onSelectLead: (lead: Lead) => void;
   onEditLead: (lead: Lead) => void;
+  onDeleteLead: (lead: Lead) => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: stage.id,
@@ -205,6 +207,7 @@ function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead }: 
                 onSelect={onSelectLead}
                 isSelected={selectedLead?.id === lead.id}
                 onEdit={onEditLead}
+                onDelete={onDeleteLead}
               />
             ))}
           </div>
@@ -219,12 +222,13 @@ function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead }: 
   );
 }
 
-function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit }: {
+function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit, onDelete }: {
   lead: Lead;
   stage: typeof PIPELINE_STAGES[0];
   onSelect: (lead: Lead) => void;
   isSelected: boolean;
   onEdit: (lead: Lead) => void;
+  onDelete: (lead: Lead) => void;
 }) {
   const {
     attributes,
@@ -301,16 +305,29 @@ function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit }: {
           <span className={styles.leadCardDate}>
             {new Date(lead.updatedAt).toLocaleDateString('ko-KR')}
           </span>
-          <button 
-            className={styles.leadCardEditButton}
-            onClick={(e) => { 
-              e.stopPropagation(); 
-              onEdit(lead); 
-            }}
-            title="리드 편집"
-          >
-            <Edit className={styles.leadCardEditIcon} />
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              className={styles.leadCardEditButton}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onEdit(lead); 
+              }}
+              title="리드 편집"
+            >
+              <Edit className={styles.leadCardEditIcon} />
+            </button>
+            <button 
+              className={styles.leadCardEditButton}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onDelete(lead); 
+              }}
+              title="리드 삭제"
+              style={{ color: '#ef4444' }}
+            >
+              <Trash2 className={styles.leadCardEditIcon} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -565,6 +582,18 @@ export function CrmPipelinePage() {
     alert('리드 정보가 수정되었습니다.');
   };
 
+  // 리드 삭제
+  const handleDeleteLead = (lead: Lead) => {
+    if (window.confirm(`"${lead.companyName}" 리드를 삭제하시겠습니까?`)) {
+      const updatedLeads = leads.filter(l => l.id !== lead.id);
+      setLeads(updatedLeads);
+      if (selectedLead?.id === lead.id) {
+        setSelectedLead(null);
+      }
+      alert('리드가 삭제되었습니다.');
+    }
+  };
+
   // 활동 추가
   const handleAddActivity = (lead: Lead) => {
     setEditingLead(lead);
@@ -693,6 +722,7 @@ export function CrmPipelinePage() {
               selectedLead={selectedLead}
               onSelectLead={setSelectedLead}
               onEditLead={handleEditLead}
+              onDeleteLead={handleDeleteLead}
             />
           ))}
         </div>
@@ -703,6 +733,7 @@ export function CrmPipelinePage() {
               stage={PIPELINE_STAGES[0]}
               onSelect={() => {}}
               onEdit={() => {}}
+              onDelete={() => {}}
               isSelected={false}
             />
           ) : null}
