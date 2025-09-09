@@ -259,8 +259,30 @@ export const BudgetPage: React.FC = () => {
   };
 
   const handleCreateBudget = () => {
-    // Create new budget logic here
-    console.log('Creating new budget:', newBudget);
+    if (!newBudget.budgetName || !newBudget.category || !newBudget.plannedAmount || !newBudget.department) {
+      alert('모든 필수 필드를 입력해주세요.');
+      return;
+    }
+
+    const budget: BudgetItem = {
+      id: `BUD-${Date.now()}`,
+      budgetName: newBudget.budgetName,
+      category: newBudget.category,
+      department: newBudget.department,
+      plannedAmount: Number(newBudget.plannedAmount),
+      actualAmount: 0,
+      remainingAmount: Number(newBudget.plannedAmount),
+      period: `${newBudget.startDate?.substring(0, 7) || '2024-12'}`,
+      startDate: newBudget.startDate || new Date().toISOString().split('T')[0],
+      endDate: newBudget.endDate || new Date().toISOString().split('T')[0],
+      status: "on_track",
+      priority: newBudget.priority || "medium",
+      owner: "관리자",
+      description: newBudget.description || "",
+      currency: "KRW"
+    };
+
+    setBudgetItems([budget, ...budgetItems]);
     setShowPlanningModal(false);
     setNewBudget({
       budgetName: "",

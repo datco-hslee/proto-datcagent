@@ -256,6 +256,10 @@ export const AccountingPage: React.FC = () => {
   const [editedTransaction, setEditedTransaction] = useState<Partial<Transaction>>({});
   const [selectedDataSource, setSelectedDataSource] = useState<"erp" | "sample" | "massive">("erp");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   // 데이터 소스 변경 시 거래 데이터 업데이트
   useEffect(() => {
@@ -272,6 +276,17 @@ export const AccountingPage: React.FC = () => {
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  // 페이지네이션 계산
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  // 페이지 변경 시 첫 페이지로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, statusFilter, selectedDataSource]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR", {
@@ -562,7 +577,7 @@ export const AccountingPage: React.FC = () => {
 
       <div className={styles.content}>
         <div className={styles.transactionsGrid}>
-          {filteredTransactions.map((transaction) => (
+          {paginatedTransactions.map((transaction) => (
             <Card key={transaction.id} className={styles.transactionCard}>
               <div className={styles.cardHeader}>
                 <div className={styles.transactionInfo}>
@@ -635,7 +650,7 @@ export const AccountingPage: React.FC = () => {
                           placeholder="금액"
                         />
                       ) : (
-                        <span className={styles.amountValue}>
+                        <span className={`${styles.amountValue} ${transaction.type === 'income' ? styles.income : styles.expense}`}>
                           {transaction.type === "income" ? "+" : "-"}
                           {formatCurrency(transaction.amount)}
                         </span>
@@ -901,6 +916,60 @@ export const AccountingPage: React.FC = () => {
               </div>
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* 페이지네이션 */}
+      {totalPages > 1 && (
+        <div className={styles.pagination}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            이전
+          </Button>
+          
+          <div className={styles.pageNumbers}>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={styles.pageButton}
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+          </div>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            다음
+          </Button>
+          
+          <div className={styles.pageInfo}>
+            {startIndex + 1}-{Math.min(endIndex, filteredTransactions.length)} / {filteredTransactions.length}개
+          </div>
         </div>
       )}
 

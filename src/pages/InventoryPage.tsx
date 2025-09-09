@@ -39,6 +39,8 @@ export function InventoryPage() {
   const [showAdjustStock, setShowAdjustStock] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
   
   // 고급 필터 상태
   const [advancedFilters, setAdvancedFilters] = useState({
@@ -491,9 +493,10 @@ export function InventoryPage() {
   ];
 
   // 초기 데이터 로드
+  // 필터나 데이터 소스가 변경되면 1페이지로 리셋
   useEffect(() => {
-    setInventoryItems(getCurrentInventoryItems());
-  }, []);
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, selectedStatus, selectedDataSource, advancedFilters]);
 
   const filteredItems = inventoryItems.filter((item) => {
     const matchesSearch =
@@ -517,6 +520,12 @@ export function InventoryPage() {
            matchesSupplier && matchesLocation && matchesMinStock && 
            matchesMaxStock && matchesMinValue && matchesMaxValue;
   });
+
+  // 페이지네이션 로직
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const paginatedItems = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR", {
@@ -970,22 +979,19 @@ export function InventoryPage() {
         <table style={tableStyle}>
           <thead style={tableHeaderStyle}>
             <tr>
-              <th style={thStyle}>품목코드</th>
-              <th style={thStyle}>품목명</th>
-              <th style={thStyle}>카테고리</th>
-              <th style={thStyle}>현재고</th>
-              <th style={thStyle}>재고수준</th>
-              <th style={thStyle}>상태</th>
-              <th style={thStyle}>단가</th>
-              <th style={thStyle}>총 가치</th>
+              <th style={thStyle}>품목</th>
+              <th style={thStyle}>재고 수준</th>
+              <th style={thStyle}>재고량 (단위)</th>
+              <th style={thStyle}>재고 가치</th>
               <th style={thStyle}>위치</th>
               <th style={thStyle}>공급업체</th>
-              <th style={thStyle}>최종수정</th>
+              <th style={thStyle}>상태</th>
+              <th style={thStyle}>최종 수정일</th>
               <th style={thStyle}>작업</th>
             </tr>
           </thead>
           <tbody>
-            {filteredItems.map((item) => (
+            {paginatedItems.map((item) => (
               <tr key={item.id} style={{ transition: "background-color 0.2s ease" }}>
                 <td style={tdStyle}>
                   <div style={{ fontWeight: 600, color: "#374151" }}>{item.code}</div>
@@ -1040,6 +1046,33 @@ export function InventoryPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination Controls */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: '1.5rem',
+        gap: '1rem'
+      }}>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          style={currentPage === 1 ? {...secondaryButtonStyle, cursor: 'not-allowed', opacity: 0.5} : secondaryButtonStyle}
+        >
+          이전
+        </button>
+        <span style={{fontSize: '0.875rem', fontWeight: 500}}>
+          페이지 {currentPage} / {totalPages}
+        </span>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          style={currentPage === totalPages ? {...secondaryButtonStyle, cursor: 'not-allowed', opacity: 0.5} : secondaryButtonStyle}
+        >
+          다음
+        </button>
       </div>
 
       {/* Results Summary */}

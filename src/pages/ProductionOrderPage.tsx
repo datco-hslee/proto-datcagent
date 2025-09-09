@@ -141,6 +141,8 @@ export function ProductionOrderPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
   
   // Generate sample production orders (original generated data)
   const getSampleProductionOrders = (): ProductionOrder[] => {
@@ -376,13 +378,25 @@ export function ProductionOrderPage() {
 
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
 
+  // Additional filter states
+  const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [customerFilter, setCustomerFilter] = useState<string>("all");
+  const [dateRangeFilter, setDateRangeFilter] = useState({ start: "", end: "" });
+  const [progressFilter, setProgressFilter] = useState({ min: 0, max: 100 });
+
   // Update orders when data source changes
   React.useEffect(() => {
     console.log("Data source changed to:", selectedDataSource);
     const newOrders = getCurrentOrders();
     console.log("Setting orders:", newOrders);
     setOrders(newOrders);
+    setCurrentPage(1); // 데이터 소스 변경 시 첫 페이지로 이동
   }, [selectedDataSource]);
+
+  // 필터 변경 시 첫 페이지로 이동
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, priorityFilter, teamFilter, customerFilter, dateRangeFilter, progressFilter]);
 
   // Initialize orders on component mount
   React.useEffect(() => {
@@ -391,12 +405,6 @@ export function ProductionOrderPage() {
     console.log("Initial orders:", initialOrders);
     setOrders(initialOrders);
   }, []);
-  
-  // Additional filter states
-  const [teamFilter, setTeamFilter] = useState<string>("all");
-  const [customerFilter, setCustomerFilter] = useState<string>("all");
-  const [dateRangeFilter, setDateRangeFilter] = useState({ start: "", end: "" });
-  const [progressFilter, setProgressFilter] = useState({ min: 0, max: 100 });
 
   // Calculate production metrics dynamically
   const productionMetrics = useMemo(() => calculateProductionMetrics(orders), [orders]);
@@ -673,6 +681,12 @@ export function ProductionOrderPage() {
 
     return matchesSearch && matchesStatus && matchesPriority && matchesTeam && matchesCustomer && matchesDateRange && matchesProgress;
   });
+
+  // 페이지네이션 로직
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const paginatedOrders = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("ko-KR", {
@@ -1049,7 +1063,7 @@ export function ProductionOrderPage() {
 
       {/* 생산 오더 목록 */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>
-        {filteredOrders.map((order) => (
+        {paginatedOrders.map((order) => (
           <div key={order.id} style={{...cardStyle, cursor: "pointer"}} onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 10px 15px -3px rgba(0, 0, 0, 0.1)"} onMouseLeave={(e) => e.currentTarget.style.boxShadow = cardStyle.boxShadow}>
             <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e5e7eb", marginBottom: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1169,6 +1183,33 @@ export function ProductionOrderPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* 페이지네이션 컨트롤 */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: '1.5rem',
+        gap: '1rem'
+      }}>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          style={currentPage === 1 ? {...secondaryButtonStyle, cursor: 'not-allowed', opacity: 0.5} : secondaryButtonStyle}
+        >
+          이전
+        </button>
+        <span style={{fontSize: '0.875rem', fontWeight: 500}}>
+          페이지 {currentPage} / {totalPages} (총 {filteredOrders.length}개 중 {paginatedOrders.length}개 표시)
+        </span>
+        <button 
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          style={currentPage === totalPages ? {...secondaryButtonStyle, cursor: 'not-allowed', opacity: 0.5} : secondaryButtonStyle}
+        >
+          다음
+        </button>
       </div>
 
       {/* 간트 차트 뷰 */}

@@ -741,6 +741,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>추적번호</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.trackingNumber || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, trackingNumber: e.target.value }))}
                     placeholder="추적번호"
@@ -750,6 +751,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>주문번호 *</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.orderId || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, orderId: e.target.value }))}
                     placeholder="주문번호를 입력하세요"
@@ -758,14 +760,16 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>고객명 *</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.customer || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, customer: e.target.value }))}
                     placeholder="고객명을 입력하세요"
                   />
                 </div>
-                <div className={styles.formGroup}>
+                <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                   <label>배송지 주소</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.customerAddress || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, customerAddress: e.target.value }))}
                     placeholder="배송지 주소를 입력하세요"
@@ -830,6 +834,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>중량 (kg)</label>
                   <Input
+                    className={styles.formInput}
                     type="number"
                     min="0"
                     step="0.1"
@@ -841,6 +846,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>크기</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.dimensions || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, dimensions: e.target.value }))}
                     placeholder="예: 30x20x15 cm"
@@ -849,6 +855,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>배송비 (원)</label>
                   <Input
+                    className={styles.formInput}
                     type="number"
                     min="0"
                     value={newShipment.cost || 0}
@@ -859,6 +866,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>목적지</label>
                   <Input
+                    className={styles.formInput}
                     value={newShipment.destination || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, destination: e.target.value }))}
                     placeholder="목적지를 입력하세요"
@@ -867,6 +875,7 @@ export const ShippingPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>예상 배송일</label>
                   <Input
+                    className={styles.formInput}
                     type="date"
                     value={newShipment.estimatedDelivery || ""}
                     onChange={(e) => setNewShipment(prev => ({ ...prev, estimatedDelivery: e.target.value }))}

@@ -667,6 +667,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>업체명 *</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.name || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="업체명을 입력하세요"
@@ -675,6 +676,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>담당자 *</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.contact || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, contact: e.target.value }))}
                     placeholder="담당자명을 입력하세요"
@@ -683,6 +685,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>이메일 *</label>
                   <Input
+                    className={styles.formInput}
                     type="email"
                     value={newSupplier.email || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, email: e.target.value }))}
@@ -692,14 +695,16 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>전화번호</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.phone || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, phone: e.target.value }))}
                     placeholder="전화번호를 입력하세요"
                   />
                 </div>
-                <div className={styles.formGroup}>
+                <div className={`${styles.formGroup} ${styles.fullWidth}`}>
                   <label>주소</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.address || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, address: e.target.value }))}
                     placeholder="주소를 입력하세요"
@@ -723,6 +728,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>평점</label>
                   <Input
+                    className={styles.formInput}
                     type="number"
                     min="0"
                     max="5"
@@ -747,6 +753,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>결제 조건</label>
                   <Input
+                    className={styles.formInput}
                     value={newSupplier.paymentTerms || ""}
                     onChange={(e) => setNewSupplier(prev => ({ ...prev, paymentTerms: e.target.value }))}
                     placeholder="결제 조건을 입력하세요"
@@ -755,6 +762,7 @@ export const SuppliersPage: React.FC = () => {
                 <div className={styles.formGroup}>
                   <label>리드타임 (일)</label>
                   <Input
+                    className={styles.formInput}
                     type="number"
                     min="0"
                     value={newSupplier.leadTime || 0}
