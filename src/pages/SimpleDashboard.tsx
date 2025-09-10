@@ -1,5 +1,5 @@
 // 통합 대시보드 컴포넌트
-import React, { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import erpDataJson from '../../DatcoDemoData2.json';
 
 interface RecentActivity {
@@ -10,6 +10,9 @@ interface RecentActivity {
   timestamp: Date;
   type: 'order' | 'production' | 'inventory' | 'shipment' | 'purchase';
 }
+
+// DashboardTutorial 컴포넌트 import
+import { DashboardTutorial } from './DashboardTutorial';
 
 export function SimpleDashboard() {
   // ERP 데이터에서 최근 활동 추출 함수
@@ -23,7 +26,7 @@ export function SimpleDashboard() {
       const customers = erpDataJson.sheets?.거래처마스터 || [];
       const customerMap = new Map(customers.map(c => [c.거래처코드, c.거래처명]));
 
-      salesOrders.forEach((order: any, index: number) => {
+      salesOrders.forEach((order: any, i: number) => {
         const customerName = customerMap.get(order.거래처코드) || order.거래처코드;
         const orderDate = new Date(order.수주일자);
         const hoursAgo = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60 * 60));
@@ -126,7 +129,10 @@ export function SimpleDashboard() {
 
   return (
     <div style={{ padding: "2rem" }}>
-      <h1 style={{ fontSize: "2rem", fontWeight: "bold", marginBottom: "1rem" }}>
+      {/* 튜토리얼 컴포넌트 추가 */}
+      <DashboardTutorial />
+      
+      <h1 id="dashboard-title" style={{ fontSize: "2rem", fontWeight: "bold", marginBottom: "1rem" }}>
         통합 대시보드
       </h1>
       <p style={{ color: "#6b7280", marginBottom: "2rem" }}>
@@ -134,7 +140,7 @@ export function SimpleDashboard() {
       </p>
       
       {/* 기본 메트릭 카드들 */}
-      <div style={{ 
+      <div id="metrics-container" style={{ 
         display: "grid", 
         gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", 
         gap: "1rem",
@@ -251,7 +257,7 @@ export function SimpleDashboard() {
       */}
 
       {/* 최근 활동 */}
-      <div style={{
+      <div id="recent-activities" style={{
         padding: "1.5rem",
         backgroundColor: "#fff",
         borderRadius: "8px",
@@ -263,7 +269,7 @@ export function SimpleDashboard() {
         </h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {recentActivities.map((activity, index) => (
-            <div key={index} style={{ display: "flex", alignItems: "start", gap: "0.75rem" }}>
+            <div key={`activity-${index}`} style={{ display: "flex", alignItems: "start", gap: "0.75rem" }}>
               <div style={{
                 width: "8px",
                 height: "8px",

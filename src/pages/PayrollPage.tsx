@@ -17,7 +17,9 @@ import {
   Calculator,
   FileText,
   CheckCircle,
-  Clock
+  Clock,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useEmployees } from "../context/EmployeeContext";
 import type { PayrollRecord } from "../types/employee";
@@ -104,6 +106,10 @@ export function PayrollPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [showCalculationModal, setShowCalculationModal] = useState(false);
+  
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [calculationData, setCalculationData] = useState({
     employeeId: "",
     period: "",
@@ -229,6 +235,32 @@ export function PayrollPage() {
     const matchesDepartment = departmentFilter === "all" || record.department === departmentFilter;
     return matchesSearch && matchesStatus && matchesDepartment;
   });
+  
+  // 페이지네이션 계산
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredRecords.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+  
+  // 페이지 그룹 계산 (5개씩 그룹화)
+  const pageGroupSize = 5;
+  const currentPageGroup = Math.ceil(currentPage / pageGroupSize);
+  const startPage = (currentPageGroup - 1) * pageGroupSize + 1;
+  const endPage = Math.min(startPage + pageGroupSize - 1, totalPages);
+  
+  // 페이지 변경 핸들러
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  // 페이지 그룹 이동 핸들러
+  const handlePageGroupChange = (direction: 'prev' | 'next') => {
+    if (direction === 'prev' && startPage > 1) {
+      setCurrentPage(startPage - 1);
+    } else if (direction === 'next' && endPage < totalPages) {
+      setCurrentPage(endPage + 1);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("ko-KR", {
@@ -532,7 +564,7 @@ export function PayrollPage() {
 
       <div className={styles.content}>
         <div className={styles.recordsGrid}>
-          {filteredRecords.map((record) => (
+          {currentItems.map((record) => (
             <Card key={record.id} className={styles.recordCard}>
               <div className={styles.cardHeader}>
                 <div className={styles.employeeInfo}>
@@ -604,6 +636,60 @@ export function PayrollPage() {
               </div>
             </Card>
           ))}
+        </div>
+        
+        {/* 페이지네이션 컴포넌트 */}
+        <div className={styles.paginationContainer}>
+          {/* 이전 페이지 그룹으로 이동 */}
+          <button 
+            className={styles.paginationButton} 
+            onClick={() => handlePageGroupChange('prev')}
+            disabled={startPage <= 1}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          
+          {/* 이전 페이지로 이동 */}
+          <button 
+            className={styles.paginationButton} 
+            onClick={() => handlePageChange(currentPage > 1 ? currentPage - 1 : 1)}
+            disabled={currentPage === 1}
+          >
+            이전
+          </button>
+          
+          {/* 페이지 번호 (5개씩 표시) */}
+          {Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map((page) => (
+            <button
+              key={page}
+              className={`${styles.paginationButton} ${currentPage === page ? styles.paginationButtonActive : ''}`}
+              onClick={() => handlePageChange(page)}
+            >
+              {page}
+            </button>
+          ))}
+          
+          {/* 다음 페이지로 이동 */}
+          <button 
+            className={styles.paginationButton} 
+            onClick={() => handlePageChange(currentPage < totalPages ? currentPage + 1 : totalPages)}
+            disabled={currentPage === totalPages}
+          >
+            다음
+          </button>
+          
+          {/* 다음 페이지 그룹으로 이동 */}
+          <button 
+            className={styles.paginationButton} 
+            onClick={() => handlePageGroupChange('next')}
+            disabled={endPage >= totalPages}
+          >
+            <ChevronRight size={16} />
+          </button>
+          
+          <span className={styles.paginationInfo}>
+            {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredRecords.length)} / {filteredRecords.length} 항목
+          </span>
         </div>
       </div>
 
