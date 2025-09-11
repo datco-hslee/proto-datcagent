@@ -162,11 +162,13 @@ export function TutorialOverlay() {
                 return;
               }
 
-              // 배경 자체를 클릭한 경우에만 튜토리얼 종료
-              if (e.target === e.currentTarget) {
+              // 배경 자체를 클릭한 경우에만 튜토리얼 종료 (메시지 처리 중에는 종료하지 않음)
+              if (e.target === e.currentTarget && !isTyping) {
                 console.log("Background clicked, closing tutorial");
                 clearHighlights();
                 deactivateTutorial();
+              } else if (isTyping) {
+                console.log("Background clicked during typing - ignoring to prevent interruption");
               }
             }}
           />

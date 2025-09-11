@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { useTutorialStore } from "@/store/tutorialStore";
+import { driver } from 'driver.js';
+import 'driver.js/dist/driver.css';
 
 export function MenuHighlighter() {
-  const { highlightedElements, isActive } = useTutorialStore();
+  const { highlightedElements, isActive, currentScenario } = useTutorialStore();
 
   useEffect(() => {
     // 기존 스타일 태그 제거
@@ -92,6 +94,12 @@ export function MenuHighlighter() {
   }, []);
 
   useEffect(() => {
+    // 기존 Driver.js 인스턴스 정리
+    if ((window as any).tutorialDriver) {
+      (window as any).tutorialDriver.destroy();
+      delete (window as any).tutorialDriver;
+    }
+
     // 하이라이트 적용/제거
     const allHighlighted = document.querySelectorAll(".tutorial-highlight");
     allHighlighted.forEach((el) => {
@@ -106,6 +114,134 @@ export function MenuHighlighter() {
 
     if (isActive && highlightedElements.length > 0) {
       console.log("MenuHighlighter: Starting to highlight elements:", highlightedElements);
+      
+      // Driver.js 인스턴스 생성 및 설정
+      const driverInstance = driver({
+        showProgress: true,
+        smoothScroll: true,
+        animate: true,
+        stagePadding: 15,
+        overlayColor: 'rgba(0, 0, 0, 0.7)',
+        allowClose: true,
+        showButtons: ['next', 'previous', 'close'],
+        disableActiveInteraction: false,
+        popoverClass: 'datco-driver-popover',
+        // 하이라이트 유지를 위한 설정
+        doneBtnText: '완료',
+        nextBtnText: '다음',
+        prevBtnText: '이전',
+        progressText: '{{current}} / {{total}}'
+      });
+
+      // 전역 변수로 저장
+      (window as any).tutorialDriver = driverInstance;
+
+      // 영업 고객 추가 시나리오인 경우 Driver.js 단계별 가이드 실행
+      if (currentScenario && currentScenario.response.includes('영업 고객 추가')) {
+        console.log("Driver.js: Starting customer addition tutorial");
+        
+        // 모든 단계를 하나의 인스턴스로 통합
+        const steps = [
+          {
+            element: '[data-section-id="sales-customer"]',
+            popover: {
+              title: 'Step 1: 영업 & 고객 섹션',
+              description: '왼쪽 사이드바에서 "영업 & 고객" 섹션을 확인하세요. 이 섹션에는 고객 관리와 관련된 모든 기능이 있습니다.',
+              side: 'right' as const,
+              align: 'start' as const
+            }
+          },
+          {
+            element: '[data-menu="customer-management"]',
+            popover: {
+              title: 'Step 2: 고객 관리 메뉴',
+              description: '"고객 관리" 메뉴를 클릭하여 고객 관리 페이지로 이동하세요. 여기서 모든 고객 정보를 관리할 수 있습니다.',
+              side: 'right' as const,
+              align: 'start' as const
+            }
+          }
+        ];
+
+        // 고객 추가 버튼 찾기 함수
+        const findAddButton = () => {
+          const buttons = document.querySelectorAll('button');
+          for (const button of buttons) {
+            if (button.textContent?.includes('새 고객 추가') || 
+                button.textContent?.includes('고객 추가') ||
+                button.textContent?.includes('추가')) {
+              return button;
+            }
+          }
+          return null;
+        };
+
+        // 고객 추가 버튼이 현재 페이지에 있는지 확인
+        const addButton = findAddButton();
+        if (addButton) {
+          steps.push({
+            element: addButton as any,
+            popover: {
+              title: 'Step 3: 새 고객 추가',
+              description: '이 버튼을 클릭하여 새로운 고객을 추가할 수 있습니다. 고객 정보를 입력하고 저장하세요.',
+              side: 'right' as const,
+              align: 'start' as const
+            }
+          });
+        }
+
+        // 단계별 네비게이션 처리
+        driverInstance.setConfig({
+          // 하이라이트 시작 시 스타일 제거
+          onHighlightStarted: (element: any) => {
+            if (element) {
+              console.log('하이라이트 시작:', element);
+              // 하이라이트 효과 제거 - 스타일 적용하지 않음
+            }
+          },
+          
+          onNextClick: (_element: any, _step: any, options: any) => {
+            const currentStepIndex = options.state.currentStep;
+            
+            // Step 2에서 고객 관리 페이지로 이동
+            if (currentStepIndex === 1) {
+              const customerMenu = document.querySelector('[data-menu="customer-management"]') as HTMLElement;
+              if (customerMenu) {
+                // 하이라이트 효과 제거
+                // 스타일 적용하지 않음
+                
+                // 클릭 이벤트 실행
+                customerMenu.click();
+                
+                // 페이지 이동 후 Step 3 버튼 찾기 (딜레이 증가)
+                setTimeout(() => {
+                  const newAddButton = findAddButton();
+                  if (newAddButton && steps.length === 2) {
+                    // Step 3 추가
+                    steps.push({
+                      element: newAddButton as any,
+                      popover: {
+                        title: 'Step 3: 새 고객 추가',
+                        description: '이 버튼을 클릭하여 새로운 고객을 추가할 수 있습니다. 고객 정보를 입력하고 저장하세요.',
+                        side: 'right' as const,
+                        align: 'start' as const
+                      }
+                    });
+                    driverInstance.setSteps(steps);
+                  }
+                }, 300); // 딜레이 300ms로 증가
+              }
+            }
+            
+            driverInstance.moveNext();
+          }
+        });
+
+        driverInstance.setSteps(steps);
+        driverInstance.drive();
+      } else {
+        // 다른 시나리오의 경우 기존 하이라이트 방식 사용
+        console.log("MenuHighlighter: Using standard highlight for scenario:", currentScenario?.response.substring(0, 50));
+      }
 
       highlightedElements.forEach((selector) => {
         const attemptHighlight = (retryCount = 0) => {
@@ -242,7 +378,7 @@ export function MenuHighlighter() {
         attemptHighlight();
       });
     }
-  }, [highlightedElements, isActive]);
+  }, [highlightedElements, isActive, currentScenario]);
 
   return null;
 }
