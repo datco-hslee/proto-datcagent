@@ -165,6 +165,97 @@ async def process_query(query_data: ChatbotQuery):
     
     return ChatbotResponse(**result)
 
+# 질문 전처리 함수
+def preprocess_query(query: str) -> str:
+    """
+    사용자 질문을 전처리하는 함수
+    
+    Args:
+        query: 원본 질문 문자열
+        
+    Returns:
+        str: 전처리된 질문 문자열
+    """
+    # 공백 제거 및 트리밍
+    query = query.strip()
+    
+    # 불필요한 문장 부호 제거
+    query = query.replace('?', ' ?').replace('.', ' .').replace('!', ' !')
+    
+    # 연속 공백 제거
+    import re
+    query = re.sub(r'\s+', ' ', query)
+    
+    # 특수 패턴 처리
+    patterns = {
+        r'\b어떻게\b': '방법',
+        r'\b어떠한\b': '방법',
+        r'\b어떠하게\b': '방법',
+        r'\b영업 고객\b': '고객',
+        r'\b고객 추가\b': '고객 추가 방법',
+        r'\b추가 방법\b': '추가 방법',
+        r'\b등록 방법\b': '추가 방법',
+    }
+    
+    for pattern, replacement in patterns.items():
+        query = re.sub(pattern, replacement, query)
+    
+    return query
+
+# 질문 의도 분석 함수
+def analyze_intent(query: str) -> Dict[str, float]:
+    """
+    질문의 의도를 분석하는 함수
+    
+    Args:
+        query: 전처리된 질문 문자열
+        
+    Returns:
+        Dict[str, float]: 의도별 확률을 나타내는 디셔너리
+    """
+    intent_scores = {}
+    
+    # 고객 추가 관련 의도 분석
+    customer_add_keywords = [
+        '고객', '추가', '등록', '신규', '입력', '영업', '방법'
+    ]
+    customer_add_score = sum(1 for keyword in customer_add_keywords if keyword in query) / len(customer_add_keywords)
+    
+    # 특정 패턴에 대한 가중치 부여
+    if '고객 추가' in query or '고객 등록' in query:
+        customer_add_score += 0.3
+    
+    if '방법' in query and ('고객' in query or '영업' in query):
+        customer_add_score += 0.2
+    
+    intent_scores['add_customer'] = min(customer_add_score, 1.0)
+    
+    return intent_scores
+
+# 고객 추가 질문 처리 함수
+def handle_add_customer_query() -> tuple[List[str], Dict[str, Any]]:
+    """
+    고객 추가 관련 질문에 대한 응답을 생성하는 함수
+    
+    Returns:
+        tuple: (메뉴경로 리스트, 응답 데이터 디셔너리)
+    """
+    return ["sales-customer", "customers"], {
+        "title": "고객 추가 방법",
+        "steps": [
+            "영업/고객 메뉴에서 고객 관리를 선택합니다.",
+            "고객 관리 페이지에서 '새 고객 추가' 버튼을 클릭합니다.",
+            "고객 정보 양식을 작성합니다.",
+            "'저장' 버튼을 클릭하여 새 고객을 등록합니다."
+        ],
+        "tips": [
+            "필수 입력 항목: 고객명, 연락처, 주소",
+            "고객 분류를 설정하면 나중에 필터링이 용이합니다.",
+            "담당자를 지정하면 알림이 자동으로 전송됩니다.",
+            "신규 고객은 등록 후 CRM 파이프라인에서 관리할 수 있습니다."
+        ]
+    }
+
 # 질문 분석 함수
 async def analyze_query(query: str) -> tuple[List[str], Dict[str, Any]]:
     """
@@ -177,23 +268,29 @@ async def analyze_query(query: str) -> tuple[List[str], Dict[str, Any]]:
     Returns:
         tuple: (메뉴경로 리스트, 응답 데이터 디셔너리)
     """
-    # ERP 데이터 관련 키워드 확인
-    erp_keywords = [
-        "근태", "출퇴근", "휴가", "급여", "생산", "재고", "판매", 
-        "구매", "회계", "주문", "고객", "분석", "통계", "예산", "인사"
-    ]
+    # 질문 전처리 (로그 및 경미한 정규화만 수행)
+    original_query = query  # 원본 질문 보존
+    preprocessed = preprocess_query(query)
+    print(f"\n원본 질문: {original_query}")
+    print(f"전처리된 질문: {preprocessed}\n")
     
-    # ERP 데이터 관련 질문인지 확인
-    query_lower = query.lower()
-    is_erp_query = any(keyword in query_lower for keyword in erp_keywords)
+    # 1) 모든 질문을 우선 Gemini로 전달 (질문 분석 포함)
+    try:
+        print("Gemini API로 질문 전달 (질문 분석은 Gemini가 수행)\n")
+        # 원본 질문과 전처리된 질문 모두 전달해 이해를 돕는다
+        enriched_query = f"{original_query} (preprocessed: {preprocessed})"
+        return await process_query_with_gemini(enriched_query)
+    except Exception as e:
+        print(f"Gemini API 오류: {e}")
+        print("기본 분석 로직으로 폴백합니다.\n")
+        # Gemini 오류 시에만 로컬 규칙 기반으로 처리
     
-    if is_erp_query:
-        # Gemini API를 활용하여 ERP 데이터 기반 응답 생성
-        try:
-            return await process_query_with_gemini(query)
-        except Exception as e:
-            print(f"Gemini API 오류: {e}")
-            # 오류 발생 시 기본 분석 로직으로 돌아감
+    # 2) 폴백: 로컬 의도 분석 및 규칙 기반 응답
+    query_lower = preprocessed.lower()
+    intent = analyze_intent(query_lower)
+    print(f"[FALLBACK] 의도 분석 결과: {intent}\n")
+    if intent.get("add_customer", 0) > 0.7:
+        return handle_add_customer_query()
     
     # 기본 분석 로직 (기존 코드)
     
