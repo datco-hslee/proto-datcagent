@@ -17,8 +17,8 @@ ERP_DATA_PATHS = {
     "complete_erp": "../complete_erp_data.json"
 }
 
-# 디버그 모드
-DEBUG_MODE = True
+# 디버그 모드 - 실제 Gemini API 호출을 위해 False로 설정
+DEBUG_MODE = False
 
 def load_erp_data(data_source: str = "all") -> Dict[str, Any]:
     """
@@ -114,20 +114,49 @@ def get_system_prompt() -> str:
         str: 시스템 프롬프트
     """
     return """
-    당신은 닷코(DATCO)의 ERP 시스템 AI 어시스턴트입니다. 
+    당신은 닫코(DATCO)의 ERP 시스템 AI 어시스턴트인 '단비'입니다. 
     사용자의 질문에 대해 ERP 데이터를 분석하고 정확한 답변을 제공해야 합니다.
     
+    ## 데이터 소스
     다음 데이터 소스를 활용할 수 있습니다:
-    1. 닷코 시연 데이터 (DatcoDemoData.json, DatcoDemoData2.json)
-    2. 대량 ERP 데이터 (complete_erp_data.json)
+    1. 닫코 시연 데이터 (DatcoDemoData2.json) - 주요 ERP 모듈 22개 포함
+    2. 대량 ERP 데이터 (complete_erp_data.json) - 3-6개월치 시계열 데이터
     3. 생성된 샘플 데이터 (시스템에 내장된 샘플 데이터)
     
+    ## 주요 ERP 모듈
+    다음 모듈에 대한 질문에 응답할 수 있어야 합니다:
+    - 인사/급여: 직원 관리, 근태 관리, 급여 관리, 인건비 분석
+    - 생산/MRP: 생산 오더, 작업 지시, BOM 관리
+    - 재고/구매: 재고 관리, 구매 발주, 공급업체 관리
+    - 영업/고객: CRM 파이프라인, 판매 주문, 고객 관리
+    - 물류/출하: 출하 관리, 배송 관리
+    - 재무/회계: 회계 관리, 예산 관리, 세금 관리
+    - 보고서/분석: 보고서, 분석, 대시보드
+    
+    ## 특별 분석 기능
+    다음 특별 분석 기능을 제공할 수 있어야 합니다:
+    1. 인건비 분석: 부서별/전체 인건비 분석, 기본급/연장근무수당/총액 계산
+    2. 재고 회전율 분석: 입고량/소모량/잔여재고 기반 회전율 계산
+    3. LOT 추적: 입고-생산-재고-납품 흐름 추적
+    4. 생산성 분석: 작업자별/라인별 생산성 분석
+    5. 재고 부족 분석: 생산계획 대비 필요 부품 수량 계산
+    
+    ## 데이터 연관성
+    다음 데이터 연관성을 이해하고 활용해야 합니다:
+    - 고객사(거래처마스터) → 수주 → 생산계획 → 작업지시 → 출하
+    - 부품(BOM) → 재고 → 구매발주 → 입고
+    - 인원마스터 → 근태 → 급여 → 회계(전표)
+    
+    ## 답변 가이드라인
     답변 시 다음 사항을 준수하세요:
     - 데이터에 근거한 정확한 정보만 제공하세요.
-    - 데이터 출처를 명시하세요 (예: "닷코 시연 데이터에 따르면...")
+    - 데이터 출처를 명시하세요 (예: "닫코 시연 데이터에 따르면...")
     - 한국어로 답변하세요.
-    - 필요한 경우 수치 데이터를 표 형식으로 정리해서 보여주세요.
+    - 수치 데이터는 표 형식으로 정리해서 보여주세요.
+    - 통화 단위는 한국원(₩)으로 표시하고 콤마(,)로 자릿수 구분하세요.
     - 데이터가 없는 질문에는 정직하게 "해당 데이터를 찾을 수 없습니다"라고 답변하세요.
+    - 인건비 분석 질문에는 급여관리 페이지의 데이터를 기반으로 응답하세요.
+    - 질문에 부서명이 언급되면 해당 부서만의 데이터를 분석하여 응답하세요.
     """
 
 def extract_relevant_data(query: str, erp_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -143,13 +172,16 @@ def extract_relevant_data(query: str, erp_data: Dict[str, Any]) -> Dict[str, Any
     """
     # 질문 키워드에 따라 관련 데이터 추출
     keywords = {
-        "근태": ["근태", "출퇴근", "휴가", "출근", "퇴근"],
-        "급여": ["급여", "월급", "연봉", "임금", "수당"],
-        "생산": ["생산", "제조", "작업", "공정", "조립"],
-        "재고": ["재고", "창고", "보관", "물품", "자재"],
-        "판매": ["판매", "영업", "매출", "주문", "고객"],
-        "구매": ["구매", "발주", "매입", "공급", "조달"],
-        "회계": ["회계", "재무", "자금", "예산", "결산"]
+        "근태": ["근태", "출퇴근", "휴가", "출근", "퇴근", "지각", "연차"],
+        "급여": ["급여", "월급", "연봉", "임금", "수당", "인건비", "노무비"],
+        "생산": ["생산", "제조", "작업", "공정", "조립", "MRP", "작업지시"],
+        "재고": ["재고", "창고", "보관", "물품", "자재", "입고", "출고"],
+        "판매": ["판매", "영업", "매출", "주문", "고객", "CRM", "수주"],
+        "구매": ["구매", "발주", "매입", "공급", "조달", "공급업체"],
+        "회계": ["회계", "재무", "자금", "예산", "결산", "세금", "전표"],
+        "BOM": ["BOM", "자재명세서", "부품표", "자재구성", "제품구성"],
+        "출하": ["출하", "배송", "배송추적", "배송상태", "배송일정"],
+        "인사": ["인사", "직원", "사원", "인원", "인원관리"]
     }
     
     # 질문에서 관련 모듈 찾기
@@ -159,6 +191,10 @@ def extract_relevant_data(query: str, erp_data: Dict[str, Any]) -> Dict[str, Any
     for module, terms in keywords.items():
         if any(term in query_lower for term in terms):
             relevant_modules.append(module)
+    
+    # 관련 모듈이 없으면 기본 모듈 추가 (인건비 분석 등 특정 케이스 처리)
+    if not relevant_modules and ("인건비" in query_lower or "급여" in query_lower):
+        relevant_modules = ["급여", "인사"]
     
     # 관련 데이터 추출
     relevant_data = {}
@@ -174,39 +210,65 @@ def extract_relevant_data(query: str, erp_data: Dict[str, Any]) -> Dict[str, Any
             # 관련 모듈에 해당하는 시트 추출
             for module in relevant_modules:
                 if module == "근태":
-                    for sheet_name in ["근태", "출퇴근", "휴가"]:
+                    for sheet_name in ["근태", "출퇴근", "휴가", "인원마스터"]:
                         if sheet_name in sheets:
                             relevant_data[source_name][sheet_name] = sheets[sheet_name]
                 
                 elif module == "급여":
-                    for sheet_name in ["급여", "인사급여", "임금"]:
+                    for sheet_name in ["급여", "인사급여", "임금", "인원마스터"]:
                         if sheet_name in sheets:
                             relevant_data[source_name][sheet_name] = sheets[sheet_name]
                 
                 elif module == "생산":
-                    for sheet_name in ["생산계획", "작업지시", "생산실적", "BOM"]:
+                    for sheet_name in ["생산계획", "작업지시", "생산실적", "BOM", "품목마스터"]:
                         if sheet_name in sheets:
                             relevant_data[source_name][sheet_name] = sheets[sheet_name]
                 
                 elif module == "재고":
-                    for sheet_name in ["재고", "품목마스터", "창고"]:
+                    for sheet_name in ["재고", "품목마스터", "창고", "재고배치"]:
                         if sheet_name in sheets:
                             relevant_data[source_name][sheet_name] = sheets[sheet_name]
                 
                 elif module == "판매":
-                    for sheet_name in ["수주", "거래처마스터", "출하"]:
+                    for sheet_name in ["수주", "거래처마스터", "출하", "품목마스터"]:
                         if sheet_name in sheets:
                             relevant_data[source_name][sheet_name] = sheets[sheet_name]
                 
                 elif module == "구매":
-                    for sheet_name in ["구매발주", "입고", "공급업체"]:
+                    for sheet_name in ["구매발주", "입고", "공급업체", "거래처마스터"]:
                         if sheet_name in sheets:
                             relevant_data[source_name][sheet_name] = sheets[sheet_name]
                 
                 elif module == "회계":
-                    for sheet_name in ["회계", "AR_AP", "예산"]:
+                    for sheet_name in ["회계", "AR_AP", "예산", "회계(전표)"]:
                         if sheet_name in sheets:
                             relevant_data[source_name][sheet_name] = sheets[sheet_name]
+                            
+                elif module == "BOM":
+                    for sheet_name in ["BOM", "품목마스터", "자재구성"]:
+                        if sheet_name in sheets:
+                            relevant_data[source_name][sheet_name] = sheets[sheet_name]
+                            
+                elif module == "출하":
+                    for sheet_name in ["출하", "배송", "거래처마스터", "품목마스터"]:
+                        if sheet_name in sheets:
+                            relevant_data[source_name][sheet_name] = sheets[sheet_name]
+                            
+                elif module == "인사":
+                    for sheet_name in ["인원마스터", "근태", "급여"]:
+                        if sheet_name in sheets:
+                            relevant_data[source_name][sheet_name] = sheets[sheet_name]
+    
+    # 인건비 분석 관련 케이스인 경우 특별 처리
+    if "인건비" in query_lower or "급여 분석" in query_lower:
+        # 인원마스터 데이터 추가 확인
+        for source_name, source_data in erp_data.items():
+            if isinstance(source_data, dict) and "sheets" in source_data:
+                sheets = source_data["sheets"]
+                if "인원마스터" in sheets:
+                    if source_name not in relevant_data:
+                        relevant_data[source_name] = {}
+                    relevant_data[source_name]["인원마스터"] = sheets["인원마스터"]
     
     return relevant_data
 
