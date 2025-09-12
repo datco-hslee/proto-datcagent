@@ -120,12 +120,11 @@ def get_system_prompt() -> str:
     당신은 닷코(DATCO)의 ERP 시스템 AI 어시스턴트인 '단비'입니다.
     사용자의 질문에 대해 ERP 데이터를 분석하고 정확한 답변을 제공해야 합니다.
     
-    ## 중요 지침 - 절대 위반하지 마세요
-    1. 절대로 일반적인 ERP 시스템 현황이나 통계 요약을 출력하지 마세요.
-    2. 절대로 "기준 정보", "거래 데이터", "시스템 특징" 등의 섹션을 만들지 마세요.
-    3. 절대로 글머리 기호(•, ✓, ✔, ✅ 등)를 사용하지 마세요.
-    4. 오직 사용자 질문에 대한 직접적인 답변만 제공하세요.
-    5. 질문한 특정 제품이나 자재가 데이터에 없으면 "해당 제품/자재는 현재 ERP 데이터에서 찾을 수 없습니다"라고 명확히 답변하세요.
+    
+    중요 지침
+    1. 사용자의 질문에 대해 데이터를 기반으로 정확하고 상세한 답변을 제공하세요.
+    2. 질문한 특정 제품이나 자재가 데이터에 없으면 "해당 제품/자재는 현재 ERP 데이터에서 찾을 수 없습니다"라고 명확히 답변하세요.
+    3. 사용자가 ERP 시스템 현황이나 통계에 대해 물어볼 경우 데이터를 기반으로 정확한 정보를 제공하세요.
     
     ## 데이터 소스
     다음 데이터 소스를 기반으로 질문에 답변하세요:
@@ -292,7 +291,7 @@ def extract_relevant_data(query: str, erp_data: Dict[str, Any]) -> Dict[str, Any
                 if "인원마스터" in sheets:
                     if source_name not in relevant_data:
                         relevant_data[source_name] = {}
-                    relevant_data[source_name]["인원마스터"] = sheets["인원마스터"] ````````````````````````````````
+                    relevant_data[source_name]["인원마스터"] = sheets["인원마스터"]
     
     return relevant_data
 
@@ -1311,7 +1310,7 @@ def process_query_with_gemini(query: str) -> Tuple[str, Dict[str, Any]]:
                 response = model.generate_content(
                     [system_prompt, user_prompt],
                     generation_config={
-                        "temperature": 0.2,
+                        "temperature": 0.7,  # 더 다양한 응답을 위해 temperature 값 증가
                         "max_output_tokens": 2048,
                         "top_p": 0.95,
                         "top_k": 40
@@ -1343,49 +1342,27 @@ def process_query_with_gemini(query: str) -> Tuple[str, Dict[str, Any]]:
             ev_matches = re.findall(ev_pattern, original_query)
             specific_products = [match.strip() for match in product_matches + ev_matches if match.strip()]
             
-            # EV9 특별 처리
-            if "EV9" in original_query:
-                specific_products.append("EV9 전기차용 시트 레일")
+            # 제품명 추출 개선 - 특별 처리 제거
+            # 원본 질문에서 직접 추출한 제품명만 사용
             
             print(f"\n질문에서 추출한 제품명: {specific_products}")
             
-            # 응답에서 ERP 시스템 현황 패턴 감지 - 더 강화된 패턴
+            # 응답에서 ERP 시스템 현황 패턴 감지 - 축소된 패턴 목록
             erp_system_indicators = [
-                # 섹션 헤더
-                r'ERP\s*시스템\s*현황',
-                r'기준\s*정보',
-                r'거래\s*데이터',
-                r'시스템\s*특징',
+                # 핵심 섹션 헤더만 감지
+                r'ERP\s*\uc2dc\uc2a4\ud15c\s*\ud604\ud669',
+                r'\uae30\uc900\s*\uc815\ubcf4.{0,10}\uace0\uac1d\uc0ac',
+                r'\uac70\ub798\s*\ub370\uc774\ud130.{0,10}\ucd1d\s*\uac70\ub798',
+                r'\uc2dc\uc2a4\ud15c\s*\ud2b9\uc9d5.{0,10}\u2705',
                 
-                # 표 형식 패턴
-                r'[•✓✔✅]\s+\w+\s*:\s*\d+',
-                r'[•✓✔✅]\s+\w+',
+                # 핵심 통계 패턴만 감지
+                r'\uace0\uac1d\uc0ac\s*:\s*\d+\s*\uac1c',
+                r'\uacf5\uae09\uc5c5\uccb4\s*:\s*\d+\s*\uac1c',
+                r'\ucd1d\s*\uc9c1\uc6d0\s*:\s*\d+\s*\uba85',
+                r'\ucd1d\s*\uac70\ub798\s*\uac74\uc218\s*:[\d,]+\s*\uac74',
                 
-                # 통계 데이터 패턴
-                r'고객사\s*:\s*\d+',
-                r'공급업체\s*:\s*\d+',
-                r'관리\s*자재\s*:\s*\d+',
-                r'생산\s*제품\s*:\s*\d+',
-                r'총\s*직원\s*:\s*\d+',
-                r'총\s*거래\s*건수\s*:\s*[\d,]+',
-                r'데이터\s*무결성',
-                r'추적성',
-                
-                # 일반적인 표 형식
-                r'\*\*\w+\*\*\s*:\s*\d+',
-                r'\*\*\w+\*\*',
-                r'\d{4}\s*\.\s*\d{1,2}\s*\.\s*\d{1,2}\s*~',  # 날짜 범위 패턴
-                r'\(\d+\s*개월\)',  # (개월) 패턴
-                
-                # 추가 패턴
-                r'표시기\s*:\s*[✅✔✓•]',
-                r'완료',
-                r'보장',
-                r'연계',
-                r'확보',
-                r'계산',
-                r'분석',
-                r'가능',
+                # 날짜 범위 패턴
+                r'\d{4}\s*\.\s*\d{1,2}\s*\.\s*\d{1,2}\s*~.{0,20}\(\d+\s*\uac1c\uc6d4\)'
             ]
             
             # 응답에 ERP 시스템 현황 패턴이 있는지 확인
@@ -1420,26 +1397,23 @@ def process_query_with_gemini(query: str) -> Tuple[str, Dict[str, Any]]:
                 has_general_erp_info = True
                 print("\n일반적인 ERP 시스템 현황 발견")
             
-            # 응답 문제 시나리오 감지 - 강화된 감지 로직
-            if "EV9" in original_query or "전기차" in original_query or "시트 레일" in original_query or "재고" in original_query:
-                # EV9 전기차용 시트 레일 관련 질문은 무조건 강제 변환
-                print("\n특별 처리: EV9 전기차용 시트 레일 관련 질문 감지")
-                
-                # 재고 정보 강제 생성
-                return "닷코 시연 데이터에 따르면, EV9 전기차용 시트 레일은 현재 15개가 재고로 남아있습니다. 안전재고는 10개이며, 다음 주에 20개가 추가 입고 예정입니다."
+            # 응답 문제 시나리오 감지 - 완화된 감지 로직
+            # 특정 제품 관련 질문에 대한 강제 응답 변환 제거
+            # 사용자 질문에 더 자유롭게 답변할 수 있도록 함
+            if False:  # 이 조건은 항상 False로 평가되어 아래 코드가 실행되지 않음
+                print("\n특별 처리: 제품 관련 질문 감지")
+                # 강제 응답 생성 코드 비활성화
             
-            # 일반적인 응답 문제 감지
-            elif has_erp_system_pattern or has_general_erp_info or (specific_products and not has_product_in_response) or ("EV9" in original_query and not has_inventory_info):
-                print("\n응답 문제 감지: ERP 시스템 현황 패턴 발견 또는 제품명 누락")
+            # 일반적인 응답 문제 감지 - 완화된 버전
+            # 시스템 현황 패턴이 있는 경우에만 가볍게 처리
+            elif has_general_erp_info and "ERP 시스템 현황" in response and not any(keyword in original_query.lower() for keyword in ["erp", "현황", "통계", "요약"]):
+                print("\n응답 문제 감지: 질문과 무관한 ERP 시스템 현황 발견")
                 
-                # 제품명이 있는 경우 직접 응답 생성
-                if specific_products:
+                # 제품명이 있는 경우에만 가볍게 처리
+                if specific_products and not has_product_in_response:
                     product_name = specific_products[0]
-                    return f"해당 제품({product_name})은 현재 ERP 데이터에서 찾을 수 없습니다."
-                elif "EV9" in original_query:
-                    return "닷코 시연 데이터에 따르면, EV9 전기차용 시트 레일은 현재 15개가 재고로 남아있습니다. 안전재고는 10개이며, 다음 주에 20개가 추가 입고 예정입니다."
-                else:
-                    return "질문하신 제품은 현재 ERP 데이터에서 찾을 수 없습니다."
+                    print(f"\n제품명 {product_name} 누락 발견, 응답 그대로 유지")
+                    # 응답을 그대로 유지하고 후처리만 적용
             
             # 표 형식 및 글머리 기호 제거
             response = re.sub(r'\n\s*[\*\-\u2022\u2713\u2714\u2705]\s+', '\n', response)
@@ -1451,17 +1425,22 @@ def process_query_with_gemini(query: str) -> Tuple[str, Dict[str, Any]]:
             # 일반적인 표 형식 제거
             response = re.sub(r'\n[\s\u2022\u2713\u2714\u2705\*\-]*\w+\s*:\s*[\d,]+\w*', '', response)
             
-            # ERP 시스템 현황 섹션 제거
-            if "ERP 시스템 현황" in response:
-                response = "해당 제품은 현재 ERP 데이터에서 찾을 수 없습니다."
+            # ERP 시스템 현황 섹션 처리 - 사용자 질문에 따른 처리
+            # 사용자가 ERP 시스템 현황을 물어보는 경우 응답을 그대로 유지
+            # 사용자가 특정 제품에 대해 물어보는데 ERP 시스템 현황이 응답되는 경우만 처리
+            if has_erp_system_pattern and specific_products and not any(keyword in original_query.lower() for keyword in ["erp", "현황", "통계", "요약", "시스템"]):
+                print("\
+제품 관련 질문에 ERP 시스템 현황 응답이 생성됨 - 제품 정보로 응답 생성")
+                
+                # 제품 정보로 응답 생성
+                product_name = specific_products[0]
+                return f"닷코 시연 데이터에 따르면, {product_name}에 대한 정보를 찾을 수 없습니다. 해당 제품은 현재 ERP 데이터에 등록되어 있지 않습니다."
             
             # 응답이 너무 짧은 경우 처리
             if len(response.strip()) < 10:
                 if specific_products:
                     product_name = specific_products[0]
                     return f"해당 제품({product_name})은 현재 ERP 데이터에서 찾을 수 없습니다."
-                elif "EV9" in original_query:
-                    return "EV9 전기차용 시트 레일은 현재 ERP 데이터에서 찾을 수 없습니다."
                 else:
                     return "질문하신 정보는 현재 ERP 데이터에서 찾을 수 없습니다."
             

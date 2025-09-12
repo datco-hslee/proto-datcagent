@@ -7,8 +7,8 @@ import {
   getDriverSteps 
 } from '../utils/menuTreeUtils';
 
-// Backend API configuration
-const BACKEND_API_URL = 'http://localhost:5000/api';
+// Backend API configuration - 프록시 사용
+const BACKEND_API_URL = '/api';
 
 // Enhanced chatbot response interface
 export interface EnhancedChatbotResponse {

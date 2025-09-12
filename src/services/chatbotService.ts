@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+// 프록시 설정을 사용하여 API 요청
+const API_URL = '/api';
 
 // 챗봇 응답 타입 정의
 export interface ChatbotResponse {
