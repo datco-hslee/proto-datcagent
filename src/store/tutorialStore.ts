@@ -107,6 +107,14 @@ const TUTORIAL_SCENARIOS: TutorialScenario[] = [
       { type: "expandSection", target: "inventory-purchase", delay: 200 }
     ],
   },
+  // 영업 고객 추가 시나리오 (우선순위 높음)
+  {
+    trigger: /영업.*고객.*추가|고객.*추가.*방법|새.*고객.*등록|고객.*등록.*방법|영업.*고객.*등록/i,
+    response:
+      "영업 고객 추가는 고객 관리 메뉴에서 할 수 있습니다! 👥\n\n✨ 화면에서 파란색으로 하이라이트된 '고객 관리' 메뉴를 확인해보세요!\n\n📌 하이라이트된 메뉴를 클릭하면 고객 관리 페이지로 이동하여:\n• 새 고객 추가 버튼 클릭\n• 고객 기본 정보 입력\n• 영업 담당자 지정\n• 고객 등급 설정\n\n💡 지금 바로 클릭해보세요!",
+    highlightPath: ['[data-menu="customers"]'],
+    additionalActions: [{ type: "expandSection", target: "sales-customer", delay: 100 }],
+  },
   // 기존 튜토리얼 시나리오들
   {
     trigger: /고객.*정보.*관리|CRM|영업.*관리|고객.*어떻게/i,

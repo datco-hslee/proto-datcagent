@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { CrmPipelineTutorial } from './CrmPipelineTutorial';
 import {
   DndContext,
   PointerSensor,
@@ -26,6 +27,7 @@ import {
   Building2,
   X,
   TrendingUp,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -158,19 +160,20 @@ const MOCK_LEADS: Lead[] = [
 ];
 
 // 단계별 섹션 컴포넌트
-function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead }: {
+function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead, onDeleteLead }: {
   stage: typeof PIPELINE_STAGES[0];
   leads: Lead[];
   selectedLead: Lead | null;
   onSelectLead: (lead: Lead) => void;
   onEditLead: (lead: Lead) => void;
+  onDeleteLead: (lead: Lead) => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: stage.id,
   });
 
   return (
-    <div className={styles.stageSection}>
+    <div className={`${styles.stageSection} stage-section`}>
       <div className={styles.stageHeader} style={{ borderTopColor: stage.color }}>
         <div className={styles.stageHeaderContent}>
           <h3 className={styles.stageTitle}>{stage.name}</h3>
@@ -205,6 +208,7 @@ function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead }: 
                 onSelect={onSelectLead}
                 isSelected={selectedLead?.id === lead.id}
                 onEdit={onEditLead}
+                onDelete={onDeleteLead}
               />
             ))}
           </div>
@@ -219,12 +223,13 @@ function StageSection({ stage, leads, selectedLead, onSelectLead, onEditLead }: 
   );
 }
 
-function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit }: {
+function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit, onDelete }: {
   lead: Lead;
   stage: typeof PIPELINE_STAGES[0];
   onSelect: (lead: Lead) => void;
   isSelected: boolean;
   onEdit: (lead: Lead) => void;
+  onDelete: (lead: Lead) => void;
 }) {
   const {
     attributes,
@@ -252,8 +257,13 @@ function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit }: {
     >
       <div className={styles.leadCardHeader}>
         <h4 className={styles.leadCardCompany}>{lead.companyName}</h4>
-        <div className={styles.leadCardValue}>
-          ₩{(lead.estimatedValue / 10000).toFixed(0)}만원
+        <div className={styles.leadCardValueContainer}>
+          <div className={styles.leadCardValue}>
+            ₩{(lead.estimatedValue / 10000).toFixed(0)}만원
+          </div>
+          <span className={styles.leadCardDate}>
+            {new Date(lead.updatedAt).toLocaleDateString('ko-KR')}
+          </span>
         </div>
       </div>
 
@@ -298,19 +308,29 @@ function SortableLeadCard({ lead, stage, onSelect, isSelected, onEdit }: {
           )}
         </div>
         <div className={styles.leadCardActions}>
-          <span className={styles.leadCardDate}>
-            {new Date(lead.updatedAt).toLocaleDateString('ko-KR')}
-          </span>
-          <button 
-            className={styles.leadCardEditButton}
-            onClick={(e) => { 
-              e.stopPropagation(); 
-              onEdit(lead); 
-            }}
-            title="리드 편집"
-          >
-            <Edit className={styles.leadCardEditIcon} />
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              className={styles.leadCardEditButton}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onEdit(lead); 
+              }}
+              title="리드 편집"
+            >
+              <Edit className={styles.leadCardEditIcon} />
+            </button>
+            <button 
+              className={styles.leadCardEditButton}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onDelete(lead); 
+              }}
+              title="리드 삭제"
+              style={{ color: '#ef4444' }}
+            >
+              <Trash2 className={styles.leadCardEditIcon} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -565,6 +585,18 @@ export function CrmPipelinePage() {
     alert('리드 정보가 수정되었습니다.');
   };
 
+  // 리드 삭제
+  const handleDeleteLead = (lead: Lead) => {
+    if (window.confirm(`"${lead.companyName}" 리드를 삭제하시겠습니까?`)) {
+      const updatedLeads = leads.filter(l => l.id !== lead.id);
+      setLeads(updatedLeads);
+      if (selectedLead?.id === lead.id) {
+        setSelectedLead(null);
+      }
+      alert('리드가 삭제되었습니다.');
+    }
+  };
+
   // 활동 추가
   const handleAddActivity = (lead: Lead) => {
     setEditingLead(lead);
@@ -612,6 +644,9 @@ export function CrmPipelinePage() {
 
   return (
     <div className={styles.container}>
+      {/* 튜토리얼 컴포넌트 추가 */}
+      <CrmPipelineTutorial />
+      
       {/* 헤더 */}
       <div className={styles.header}>
         <div className={styles.headerContent}>
@@ -621,7 +656,7 @@ export function CrmPipelinePage() {
                 <TrendingUp />
               </div>
               <div>
-                <h1 className={styles.headerTitle}>CRM 파이프라인</h1>
+                <h1 id="crm-title" className={styles.headerTitle}>CRM 파이프라인</h1>
                 <p className={styles.headerSubtitle}>영업 기회를 관리하고 추적하세요</p>
               </div>
             </div>
@@ -645,11 +680,11 @@ export function CrmPipelinePage() {
             </div>
           </div>
           <div className={styles.controlsRow}>
-            <Button variant="outline" onClick={handleFilterClick}>
+            <Button id="filter-button" variant="outline" onClick={handleFilterClick}>
               <Filter className="h-4 w-4 mr-2" />
               필터
             </Button>
-            <Button onClick={handleAddNewLead}>
+            <Button id="add-lead-button" onClick={handleAddNewLead}>
               <Plus className="h-4 w-4 mr-2" />
               새 영업 기회
             </Button>
@@ -661,6 +696,7 @@ export function CrmPipelinePage() {
       <div className={styles.toolbar}>
         <div className={styles.controlsRow}>
           <select 
+            id="data-source-selector"
             value={selectedDataSource} 
             onChange={(e) => setSelectedDataSource(e.target.value as 'erp' | 'sample')}
             className={styles.filterSelect}
@@ -669,7 +705,7 @@ export function CrmPipelinePage() {
             <option value="sample">생성된 샘플 데이터</option>
           </select>
           
-          <div className={styles.searchContainer}>
+          <div id="search-container" className={styles.searchContainer}>
             <Search className={styles.searchIcon} />
             <Input
               type="text"
@@ -684,7 +720,7 @@ export function CrmPipelinePage() {
 
       {/* 파이프라인 보드 */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className={styles.pipeline}>
+        <div id="pipeline-board" className={styles.pipeline}>
           {PIPELINE_STAGES.map((stage) => (
             <StageSection
               key={stage.id}
@@ -693,6 +729,7 @@ export function CrmPipelinePage() {
               selectedLead={selectedLead}
               onSelectLead={setSelectedLead}
               onEditLead={handleEditLead}
+              onDeleteLead={handleDeleteLead}
             />
           ))}
         </div>
@@ -703,6 +740,7 @@ export function CrmPipelinePage() {
               stage={PIPELINE_STAGES[0]}
               onSelect={() => {}}
               onEdit={() => {}}
+              onDelete={() => {}}
               isSelected={false}
             />
           ) : null}

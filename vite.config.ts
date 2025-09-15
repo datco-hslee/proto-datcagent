@@ -15,7 +15,14 @@ export default defineConfig({
     allowedHosts: [
       'datcagent.datco.kr',
       'localhost'
-    ]
+    ],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   css: {
     modules: {

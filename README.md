@@ -1,73 +1,238 @@
-# 이희수 수정 파일 
+# DATCO ERP 시스템 (Proto-DatcAgent)
 
+DATCO ERP 시스템은 제조업체를 위한 종합 ERP(Enterprise Resource Planning) 솔루션으로, 고객 관리, 생산 관리, 재고 관리, 구매 관리, 인사 관리, 회계/재무 관리 등 다양한 비즈니스 프로세스를 통합적으로 관리할 수 있는 웹 애플리케이션입니다.
 
+## 목차
 
-# React + TypeScript + Vite
+- [기능 개요](#기능-개요)
+- [시스템 요구사항](#시스템-요구사항)
+- [설치 및 실행 방법](#설치-및-실행-방법)
+- [프로젝트 구조](#프로젝트-구조)
+- [주요 페이지 설명](#주요-페이지-설명)
+- [데이터 소스](#데이터-소스)
+- [AI 챗봇 기능](#ai-챗봇-기능)
+- [기술 스택](#기술-스택)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 기능 개요
 
-Currently, two official plugins are available:
+DATCO ERP 시스템은 다음과 같은 주요 기능을 제공합니다:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **통합 대시보드**: 실시간 경영 현황 및 주요 지표 확인
+- **고객 관리**: 고객사 정보 관리 및 영업 활동 추적
+- **생산 관리**: 생산 주문, BOM 관리, 작업 지시 관리
+- **재고 관리**: 재고 현황, 입출고 관리, 재고 부족 분석
+- **구매 관리**: 구매 발주, 공급업체 관리
+- **인사 관리**: 직원 정보, 근태, 급여 관리
+- **회계/재무**: 예산 관리, 매출/매입 관리
+- **물류/배송**: 출하 관리, 배송 추적
+- **AI 챗봇**: 업무 지원 및 데이터 조회 기능
 
-## Expanding the ESLint configuration
+## 시스템 요구사항
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Node.js 18.0 이상
+- Python 3.8 이상
+- npm 또는 yarn
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 설치 및 실행 방법
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### 1. 저장소 클론
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone https://github.com/datco-hslee/proto-datcagent.git
+cd proto-datcagent
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. 프론트엔드 의존성 설치
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
+
+### 3. 백엔드 의존성 설치
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+### 4. 환경 변수 설정 (AI 챗봇 기능 사용 시)
+
+백엔드 디렉토리에 `.env` 파일을 생성하고 다음 내용을 추가합니다:
+
+```
+GOOGLE_API_KEY=your_gemini_api_key_here
+```
+
+### 5. 애플리케이션 실행
+
+프로젝트 루트 디렉토리에서 다음 명령어를 실행합니다:
+
+```bash
+npm run dev
+```
+
+이 명령어는 다음 작업을 수행합니다:
+- 백엔드 서버 실행 (FastAPI, 기본 포트: 8000)
+- 프론트엔드 개발 서버 실행 (Vite, 기본 포트: 5173)
+
+### 6. 애플리케이션 접속
+
+웹 브라우저에서 다음 주소로 접속합니다:
+- 프론트엔드: http://localhost:5173
+- 백엔드 API 문서: http://localhost:8000/docs
+
+## 프로젝트 구조
+
+```
+proto-datcagent/
+├── backend/                # 백엔드 (FastAPI)
+│   ├── app.py              # 메인 애플리케이션 서버
+│   ├── gemini_client.py    # Google Gemini API 클라이언트
+│   ├── requirements.txt    # 파이썬 의존성
+│   └── cache/              # 챗봇 응답 캐시
+├── public/                 # 정적 파일
+├── src/                    # 프론트엔드 소스 코드
+│   ├── assets/             # 이미지, 아이콘 등 자산
+│   ├── components/         # 재사용 가능한 컴포넌트
+│   │   ├── chatbot/        # AI 챗봇 관련 컴포넌트
+│   │   ├── common/         # 공통 UI 컴포넌트
+│   │   └── dashboard/      # 대시보드 관련 컴포넌트
+│   ├── context/            # React Context API
+│   │   ├── CustomerContext.tsx    # 고객 데이터 관리
+│   │   ├── EmployeeContext.tsx    # 직원 데이터 관리
+│   │   └── GlobalDataContext.tsx  # 전역 데이터 관리
+│   ├── data/               # 데이터 통합 및 처리 로직
+│   │   ├── aiChatbotDataIntegration.ts  # AI 챗봇 데이터 통합
+│   │   ├── chatbotDataIntegration.ts    # 챗봇 데이터 통합
+│   │   └── chatbotIntegration.ts        # 챗봇 통합 로직
+│   └── pages/              # 애플리케이션 페이지
+├── DatcoDemoData.json      # 데모 데이터 (기본)
+├── DatcoDemoData2.json     # 확장 데모 데이터
+├── 닷코 시연 데이터 구성.json  # 한글 ERP 데이터
+├── package.json            # npm 패키지 설정
+└── vite.config.ts          # Vite 설정
+```
+
+## 주요 페이지 설명
+
+### 1. 대시보드 (Dashboard)
+
+- **경로**: `/`
+- **설명**: 주요 경영 지표, 최근 활동, 알림을 한눈에 볼 수 있는 메인 페이지
+- **주요 기능**: 매출 현황, 신규 고객 수, 진행 중인 주문, 재고 회전율 등 주요 지표 표시
+
+### 2. 고객 관리 (Customer Management)
+
+- **경로**: `/customers`
+- **설명**: 고객사 정보 관리 및 영업 활동 추적
+- **주요 기능**: 
+  - 고객 정보 조회/추가/수정/삭제
+  - 고객 상태 관리 (활성/잠재/비활성)
+  - 데이터 소스 전환 (닷코 시연 데이터/생성된 샘플 데이터)
+
+### 3. 생산 관리 (Production Management)
+
+- **경로**: `/production`
+- **설명**: 생산 주문, BOM, 작업 지시를 통합 관리하는 탭 기반 인터페이스
+- **주요 기능**:
+  - **생산 주문 탭**: 생산 주문 조회/추가/수정/삭제
+  - **BOM 관리 탭**: 제품 구조 및 자재 소요량 관리
+  - **작업 지시 탭**: 작업 지시 생성 및 진행 상황 추적
+
+### 4. 재고 관리 (Inventory Management)
+
+- **경로**: `/inventory`
+- **설명**: 재고 현황 및 입출고 관리
+- **주요 기능**:
+  - 품목별 재고 현황 조회
+  - 재고 상태 관리 (정상/부족/과다)
+  - 데이터 소스 전환 기능
+
+### 5. 구매 관리 (Purchase Management)
+
+- **경로**: `/purchase`
+- **설명**: 구매 발주 및 공급업체 관리
+- **주요 기능**:
+  - 구매 발주 조회/추가/수정/삭제
+  - 공급업체 정보 관리
+  - ERP 데이터 통합 (발주번호, 거래처코드, 품목코드 등)
+
+### 6. 인사 관리 (HR Management)
+
+- **경로**: `/employees`
+- **설명**: 직원 정보 및 근태 관리
+- **주요 기능**:
+  - 직원 정보 조회/추가/수정/삭제
+  - 부서별/직급별 직원 필터링
+  - 데이터 소스 전환 (전체/닷코 시연 데이터/생성된 샘플데이터)
+
+### 7. 회계/재무 (Finance)
+
+- **경로**: `/finance`
+- **설명**: 예산 관리 및 재무 현황
+- **주요 기능**:
+  - 예산 항목 조회/추가/수정/삭제
+  - 예산 계획 대비 실적 분석
+  - 회계 데이터 통합 (계정과목, 거래처명, 금액, 부서)
+
+### 8. 물류/배송 (Shipping)
+
+- **경로**: `/shipping`
+- **설명**: 출하 관리 및 배송 추적
+- **주요 기능**:
+  - 출하 정보 조회/추가/수정/삭제
+  - 배송 상태 추적
+  - 고객사 및 품목 정보 연동
+
+## 데이터 소스
+
+DATCO ERP 시스템은 두 가지 주요 데이터 소스를 지원합니다:
+
+### 1. 닷코 시연 데이터 (DatcoDemoData2.json)
+
+- 실제 제조업 환경을 반영한 22개 ERP 모듈 데이터
+- 자동차 부품 제조업 시나리오 기반
+- 거래처마스터, 품목마스터, BOM, 라우팅, 수주, 생산계획 등 포함
+- 완전한 데이터 연계성 제공 (거래처→수주→생산→BOM→재고→구매→품질→출하→회계)
+
+### 2. 생성된 샘플 데이터
+
+- 각 페이지별로 하드코딩된 샘플 데이터
+- 기본적인 테스트 및 데모용
+- 페이지별 독립적인 데이터 구조
+
+모든 페이지는 데이터 소스 전환 기능을 통해 두 데이터 소스 간 실시간 전환이 가능합니다.
+
+## AI 챗봇 기능
+
+DATCO ERP 시스템은 Google Gemini API를 활용한 AI 챗봇 기능을 제공합니다:
+
+- **접근 방법**: 화면 우측 하단의 "AI 어시스턴트" 버튼
+- **주요 기능**:
+  - 자연어 질의를 통한 ERP 데이터 조회
+  - 업무 프로세스 안내 및 튜토리얼 제공
+  - 메뉴 및 기능 탐색 지원
+  - 데이터 분석 및 인사이트 제공
+
+## 기술 스택
+
+### 프론트엔드
+- React 19
+- TypeScript
+- Vite
+- React Router
+- Zustand (상태 관리)
+- Recharts (차트 라이브러리)
+- Lucide React (아이콘)
+- DND Kit (드래그 앤 드롭)
+
+### 백엔드
+- FastAPI
+- Python 3.8+
+- Google Generative AI (Gemini)
+- Pydantic
+
+### 데이터 관리
+- JSON 기반 데이터 저장
+- React Context API
+- 로컬 스토리지 지속성
