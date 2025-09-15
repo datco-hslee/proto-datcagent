@@ -129,4 +129,7 @@ export const getCustomerAddButtonSelector = () => {
 };
 
 // 고객 추가 버튼 선택자 문자열 (하이라이트용)
-export const CUSTOMER_ADD_BUTTON_SELECTOR = 'button';
+export const CUSTOMER_ADD_BUTTON_SELECTOR = 'button';  
+
+// 주문 생성 버튼 선택자 문자열 (하이라이트용)
+export const ORDER_CREATE_BUTTON_SELECTOR = 'button:contains("새 주문 생성"), button:contains("주문 추가"), button:has(svg):contains("새"), button[style*="background"]:contains("새")';

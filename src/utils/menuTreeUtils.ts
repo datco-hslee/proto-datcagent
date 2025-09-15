@@ -201,16 +201,31 @@ export const getDriverSteps = (navigationPath: NavigationPath, includeActionButt
   ];
 
   // Add action button step for specific pages
-  if (includeActionButton && navigationPath.menuId === 'customers') {
-    steps.push({
-      element: 'button:contains("새 고객 추가"), button[style*="background"]:contains("새"), button:has(svg):contains("새"), button[onclick*="AddCustomer"]',
-      popover: {
-        title: '3단계: 새 고객 추가',
-        description: '이 버튼을 클릭하여 새로운 고객을 추가하세요.',
-        side: 'right' as const,
-        align: 'start' as const
-      }
-    });
+  if (includeActionButton) {
+    // 고객 추가 버튼
+    if (navigationPath.menuId === 'customers') {
+      steps.push({
+        element: 'button:contains("\uc0c8 \uace0\uac1d \ucd94\uac00"), button[style*="background"]:contains("\uc0c8"), button:has(svg):contains("\uc0c8"), button[onclick*="AddCustomer"]',
+        popover: {
+          title: '3\ub2e8\uacc4: \uc0c8 \uace0\uac1d \ucd94\uac00',
+          description: '\uc774 \ubc84\ud2bc\uc744 \ud074\ub9ad\ud558\uc5ec \uc0c8\ub85c\uc6b4 \uace0\uac1d\uc744 \ucd94\uac00\ud558\uc138\uc694.',
+          side: 'right' as const,
+          align: 'start' as const
+        }
+      });
+    }
+    // 주문 생성 버튼
+    else if (navigationPath.menuId === 'orders') {
+      steps.push({
+        element: 'button:contains("\uc0c8 \uc8fc\ubb38 \uc0dd\uc131"), button:contains("\uc8fc\ubb38 \ucd94\uac00"), button:has(svg):contains("\uc0c8"), button[style*="background"]:contains("\uc0c8")',
+        popover: {
+          title: '3\ub2e8\uacc4: \uc0c8 \uc8fc\ubb38 \uc0dd\uc131',
+          description: '\uc774 \ubc84\ud2bc\uc744 \ud074\ub9ad\ud558\uc5ec \uc0c8\ub85c\uc6b4 \uc8fc\ubb38\uc744 \uc0dd\uc131\ud558\uc138\uc694.',
+          side: 'right' as const,
+          align: 'start' as const
+        }
+      });
+    }
   }
 
   return steps;
@@ -221,22 +236,47 @@ export const generateChatbotResponse = (query: string, navigationPath: Navigatio
   const lowerQuery = query.toLowerCase();
   const includeActionButton = lowerQuery.includes('추가') || lowerQuery.includes('등록') || lowerQuery.includes('생성');
   
-  // Enhanced steps for customer addition
+  // Enhanced steps for customer addition or order creation
   let enhancedSteps = [...navigationPath.steps];
-  if (includeActionButton && navigationPath.menuId === 'customers') {
-    enhancedSteps.push('우측 상단의 "새 고객 추가" 버튼을 클릭하세요.');
-    enhancedSteps.push('고객 정보를 입력하고 저장하세요.');
+  
+  if (includeActionButton) {
+    // 고객 추가 케이스
+    if (navigationPath.menuId === 'customers') {
+      enhancedSteps.push('우측 상단의 "새 고객 추가" 버튼을 클릭하세요.');
+      enhancedSteps.push('고객 정보를 입력하고 저장하세요.');
+    }
+    // 주문 생성 케이스
+    else if (navigationPath.menuId === 'orders') {
+      enhancedSteps.push('우측 상단의 "새 주문 생성" 버튼을 클릭하세요.');
+      enhancedSteps.push('고객을 선택하고 주문 정보를 입력하세요.');
+      enhancedSteps.push('주문할 제품을 추가하고 수량과 가격을 입력하세요.');
+      enhancedSteps.push('"저장" 버튼을 클릭하여 주문을 완료하세요.');
+    }
+  }
+  
+  // 팁 설정
+  let tips = [
+    '메뉴를 클릭하면 자동으로 해당 페이지로 이동합니다.',
+    '각 단계별로 안내에 따라 진행하세요.'
+  ];
+  
+  // 특정 페이지에 따른 추가 팁
+  if (includeActionButton) {
+    tips.push('필수 항목은 빨간 별표(*)로 표시됩니다.');
+    
+    if (navigationPath.menuId === 'orders') {
+      tips.push('주문 상태를 "임시 저장"으로 설정하면 나중에 수정할 수 있습니다.');
+      tips.push('주문이 완료되면 자동으로 생산 계획에 반영됩니다.');
+    }
+  } else {
+    tips.push('추가 도움이 필요하면 언제든 문의하세요.');
   }
   
   return {
     response: {
       title: `${navigationPath.menuName} 사용 방법`,
       steps: enhancedSteps,
-      tips: [
-        '메뉴를 클릭하면 자동으로 해당 페이지로 이동합니다.',
-        '각 단계별로 안내에 따라 진행하세요.',
-        includeActionButton ? '필수 항목은 빨간 별표(*)로 표시됩니다.' : '추가 도움이 필요하면 언제든 문의하세요.'
-      ]
+      tips: tips
     },
     menuPath: [navigationPath.dataSectionId, navigationPath.dataMenu],
     navigationPath: navigationPath,

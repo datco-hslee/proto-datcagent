@@ -3,7 +3,7 @@ import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import { Bot, Send, X } from 'lucide-react';
 import enhancedChatbotService, { type EnhancedChatbotResponse } from '../../data/enhancedChatbotIntegration';
-import { createDriverInstance, expandMenuSection, addHighlightEffect, removeHighlightEffect, CUSTOMER_ADD_BUTTON_SELECTOR } from '../../utils/driverHelper';
+import { createDriverInstance, expandMenuSection, addHighlightEffect, removeHighlightEffect, CUSTOMER_ADD_BUTTON_SELECTOR, ORDER_CREATE_BUTTON_SELECTOR } from '../../utils/driverHelper';
 import styles from './ChatbotTutorial.module.css';
 
 interface ChatMessage {
@@ -243,7 +243,7 @@ const ChatbotTutorial: React.FC<ChatbotTutorialProps> = ({ isOpen, onClose }) =>
               menuElement.click();
               await new Promise(resolve => setTimeout(resolve, 1500));
               
-              // 3단계가 있는 경우 (고객 추가 버튼)
+              // 3단계가 있는 경우 (고객 추가 버튼 또는 주문 생성 버튼)
               if (response.driverSteps && response.driverSteps.length > 2) {
                 console.log('3단계 버튼 검색 시작');
                 let retries = 0;
@@ -258,9 +258,18 @@ const ChatbotTutorial: React.FC<ChatbotTutorialProps> = ({ isOpen, onClose }) =>
                     console.log(`버튼 ${idx + 1}: ${btn.textContent?.trim() || '[텍스트 없음]'}`);
                   });
                   
-                  const addButton = document.querySelector(CUSTOMER_ADD_BUTTON_SELECTOR);
-                  if (addButton) {
-                    console.log('새 고객 추가 버튼 발견!');
+                  // 페이지에 따라 적절한 버튼 선택자 사용
+                  let buttonSelector = CUSTOMER_ADD_BUTTON_SELECTOR;
+                  let buttonName = '새 고객 추가';
+                  
+                  if (response.navigationPath.menuId === 'orders') {
+                    buttonSelector = ORDER_CREATE_BUTTON_SELECTOR;
+                    buttonName = '새 주문 생성';
+                  }
+                  
+                  const actionButton = document.querySelector(buttonSelector);
+                  if (actionButton) {
+                    console.log(`${buttonName} 버튼 발견!`);
                     break;
                   }
                   
@@ -338,6 +347,18 @@ const ChatbotTutorial: React.FC<ChatbotTutorialProps> = ({ isOpen, onClose }) =>
         popover: {
           title: '3단계: 새 고객 추가',
           description: '이 버튼을 클릭하여 새로운 고객을 추가하세요.',
+          side: 'right' as const,
+          align: 'start' as const
+        }
+      });
+    }
+    // 3단계: 새 주문 생성 버튼 (주문 관리 페이지인 경우)
+    else if (menuPath.includes('orders')) {
+      steps.push({
+        element: ORDER_CREATE_BUTTON_SELECTOR,
+        popover: {
+          title: '3단계: 새 주문 생성',
+          description: '이 버튼을 클릭하여 새로운 주문을 생성하세요.',
           side: 'right' as const,
           align: 'start' as const
         }
